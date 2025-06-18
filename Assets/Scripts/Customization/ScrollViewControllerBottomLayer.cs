@@ -14,7 +14,6 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
     private bool firstTouch = true;
     public GarageUIManager garageUI;
 
-    //TEST
     [Header("Scrollables")]
     public GameObject scrollbar;
     public DisableableScrollRect scrollRect;
