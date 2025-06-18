@@ -85,8 +85,8 @@ public class CarDisplay : MonoBehaviour
         }
         Debug.Log(Time.time + " NUM OF " + currentCar.name + "s OWNED: " + numOfThisCarTypeOwned);
 
-        //_car.InitializeCar(currentCarType, currentCarIndex, isOwned);
-        _car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
+        _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
+        //_car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
 
         GameObject carModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
         return carModel;

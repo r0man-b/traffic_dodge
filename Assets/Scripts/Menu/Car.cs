@@ -429,7 +429,7 @@ public class Car : ScriptableObject
                     secondColor.SetColor("_FresnelColor2", fresnelColor2);
 
                 // 1/100 chance for metallic value of 1, otherwise 0.1.
-                float metallicValue = (UnityEngine.Random.Range(0, 2) == 0) ? 1f : 0.1f;
+                float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : 0.1f;
                 targetMaterial.SetFloat("_Metallic", metallicValue);
                 secondColor.SetFloat("_Metallic", metallicValue);
             }
