@@ -13,14 +13,3 @@
 # Except the Scripts folder and its contents
 !/Assets/Scripts/
 !/Assets/Scripts/**
-
-# Unity build system and user-specific files
-/Library/
-/Temp/
-/Obj/
-/Build/
-/Logs/
-*.csproj
-*.sln
-*.user
-*.meta
