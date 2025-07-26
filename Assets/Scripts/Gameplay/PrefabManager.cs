@@ -7,20 +7,21 @@ public class PrefabManager : MonoBehaviour
     // Road gameObject.
     public GameObject[] roads = new GameObject[4];
 
-    // Array of lists for spawning traffic.
+    // Traffic spawning classes.
     [System.Serializable]
-    public class TrafficList // This hack allows the array of lists to show up in the inspector window.
+    public class BaseTrafficList
     {
         public List<GameObject> trafficVariations;
     }
-    public TrafficList[] trafficPrefabs = new TrafficList[7];
+
+    [System.Serializable]
+    public class TrafficList : BaseTrafficList { }  // This hack allows the array of lists to show up in the inspector window.
 
     // Array of lists for spawning lowpoly traffic.
     [System.Serializable]
-    public class TrafficListLowPoly // This hack allows the array of lists to show up in the inspector window.
-    {
-        public List<GameObject> trafficVariations;
-    }
+    public class TrafficListLowPoly : BaseTrafficList { } // This hack allows the array of lists to show up in the inspector window.
+
+    public TrafficList[] trafficPrefabs = new TrafficList[7];
     public TrafficListLowPoly[] trafficPrefabsLowPoly = new TrafficListLowPoly[7];
 
     // Array of lists for spawning scifi buildings. (City 77)
@@ -242,33 +243,16 @@ public class PrefabManager : MonoBehaviour
 
 
         // Spawn initial traffic cars.
-        if (SaveManager.Instance.SaveData.UseLowPolyTraffic)
+        for (int i = 0; i < maxCarsPerLane; i++)
         {
-            for (int i = 0; i < maxCarsPerLane; i++)
-            {
-                SpawnTrafficLowPoly(0);
-                SpawnTrafficLowPoly(1);
-                SpawnTrafficLowPoly(2);
-                SpawnTrafficLowPoly(3);
-                SpawnTrafficLowPoly(4);
-                SpawnTrafficLowPoly(5);
-                SpawnTrafficLowPoly(6);
-                SpawnTrafficLowPoly(7);
-            }
-        }
-        else
-        {
-            for (int i = 0; i < maxCarsPerLane; i++)
-            {
-                SpawnTraffic(0);
-                SpawnTraffic(1);
-                SpawnTraffic(2);
-                SpawnTraffic(3);
-                SpawnTraffic(4);
-                SpawnTraffic(5);
-                SpawnTraffic(6);
-                SpawnTraffic(7);
-            }
+            SpawnTraffic(0);
+            SpawnTraffic(1);
+            SpawnTraffic(2);
+            SpawnTraffic(3);
+            SpawnTraffic(4);
+            SpawnTraffic(5);
+            SpawnTraffic(6);
+            SpawnTraffic(7);
         }
 
         trafficDensity = SaveManager.Instance.SaveData.TrafficDensity;
@@ -339,8 +323,7 @@ public class PrefabManager : MonoBehaviour
                             car.SetActive(false);
                             car.transform.SetParent(originalParent);
                             tornadoTraffic.Remove(car);
-                            if (SaveManager.Instance.SaveData.UseLowPolyTraffic) ReturnTrafficLowPoly(laneIndex);
-                            else ReturnTraffic(laneIndex);
+                            ReturnTraffic(laneIndex);
                         }
                         else if (playerController.tornado)
                         {
@@ -393,8 +376,7 @@ public class PrefabManager : MonoBehaviour
                                 {
                                     car.SetActive(false);
                                     tornadoTraffic.Remove(car);
-                                    if (SaveManager.Instance.SaveData.UseLowPolyTraffic) ReturnTrafficLowPoly(laneIndex);
-                                    else ReturnTraffic(laneIndex);
+                                    ReturnTraffic(laneIndex);
                                 }
                             }
                         }
@@ -476,29 +458,14 @@ public class PrefabManager : MonoBehaviour
                 break;
         }
 
-        // Keep spawning traffic cars.
-        if (SaveManager.Instance.SaveData.UseLowPolyTraffic)
-        {
-            if (lane0traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(0);
-            if (lane1traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(1);
-            if (lane2traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(2);
-            if (lane3traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(3);
-            if (lane4traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(4);
-            if (lane5traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(5);
-            if (lane6traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(6);
-            if (lane7traffic.Count < maxCarsPerLane) SpawnTrafficLowPoly(7);
-        }
-        else
-        {
-            if (lane0traffic.Count < maxCarsPerLane) SpawnTraffic(0);
-            if (lane1traffic.Count < maxCarsPerLane) SpawnTraffic(1);
-            if (lane2traffic.Count < maxCarsPerLane) SpawnTraffic(2);
-            if (lane3traffic.Count < maxCarsPerLane) SpawnTraffic(3);
-            if (lane4traffic.Count < maxCarsPerLane) SpawnTraffic(4);
-            if (lane5traffic.Count < maxCarsPerLane) SpawnTraffic(5);
-            if (lane6traffic.Count < maxCarsPerLane) SpawnTraffic(6);
-            if (lane7traffic.Count < maxCarsPerLane) SpawnTraffic(7);
-        }
+        if (lane0traffic.Count < maxCarsPerLane) SpawnTraffic(0);
+        if (lane1traffic.Count < maxCarsPerLane) SpawnTraffic(1);
+        if (lane2traffic.Count < maxCarsPerLane) SpawnTraffic(2);
+        if (lane3traffic.Count < maxCarsPerLane) SpawnTraffic(3);
+        if (lane4traffic.Count < maxCarsPerLane) SpawnTraffic(4);
+        if (lane5traffic.Count < maxCarsPerLane) SpawnTraffic(5);
+        if (lane6traffic.Count < maxCarsPerLane) SpawnTraffic(6);
+        if (lane7traffic.Count < maxCarsPerLane) SpawnTraffic(7);
 
         // Spawn a powerup.
         if (powerUpAllowedToSpawn && (Time.time - startTime) - powerUpSpawnTime >= Mathf.Max(-6.5f * playerController.accel + 30, 10)) SpawnPowerup();
@@ -507,27 +474,23 @@ public class PrefabManager : MonoBehaviour
         if (activeRoads[0].transform.position.z < playerPosZ - 99) RecycleRoad();
 
         // If any car is behind the player, move it to the object pool.
-        if (SaveManager.Instance.SaveData.UseLowPolyTraffic)
+        if (lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(0);
+        if (lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(1);
+        if (lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(2);
+        if (lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(3);
+        if (!playerController.gameEnd) // Return same lane traffic if the traffic is behind the player.
         {
-            if (lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(0);
-            if (lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(1);
-            if (lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(2);
-            if (lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(3);
-            if (lane4traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(4);
-            if (lane5traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(5);
-            if (lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(6);
-            if (lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTrafficLowPoly(7);
-        }
-        else
-        {
-            if (lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(0);
-            if (lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(1);
-            if (lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(2);
-            if (lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(3);
             if (lane4traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(4);
             if (lane5traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(5);
             if (lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(6);
             if (lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(7);
+        }
+        else // Once the player has crashed and exploded, start returning same lane traffic that is 100 units in front of him.
+        {
+            if (lane5traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(5);
+            if (lane4traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(4);
+            if (lane6traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(6);
+            if (lane7traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(7);
         }
     }
 
@@ -925,441 +888,122 @@ public class PrefabManager : MonoBehaviour
     {
         GameObject vehicle;
         float distance = Random.Range(10, 50);
-        float elapsedTime = Time.time - startTime;
-        float trafficScaler;
-        
-        if (!playerController.bullet)
-            trafficScaler = Mathf.Min(playerController.accel, 3.38f);
-        else trafficScaler = playerController.oldAccel;
-        
+        float trafficScaler = !playerController.bullet
+            ? Mathf.Min(playerController.accel, 3.38f)
+            : playerController.oldAccel;
         trafficScaler = Mathf.Max(trafficScaler, 1);
         distance *= trafficDensity * trafficScaler;
-        int vehicle_id = vehicle_ids[Random.Range(0, vehicle_ids.Length)];
-        
-        while (trafficPrefabs[vehicle_id].trafficVariations.Count < 1)
-        {
-            vehicle_id += 1;
-            if (vehicle_id >= trafficPrefabs.Length) vehicle_id = 0;
-        }
-        int vehicle_variation = Random.Range(0, trafficPrefabs[vehicle_id].trafficVariations.Count);
 
-        if (lane == 0)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane0traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-11.5f, vehicle.transform.position.y, lane0traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-11.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane0traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-
-        else if (lane == 1)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane1traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-8.5f, vehicle.transform.position.y, lane1traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-8.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane1traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 2)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane2traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-5.5f, vehicle.transform.position.y, lane2traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-5.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane2traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 3)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane3traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-2.5f, vehicle.transform.position.y, lane3traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-2.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane3traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 4)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane4traffic.Count > 0)
-                vehicle.transform.position = new(1f, vehicle.transform.position.y, lane4traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new (1f, vehicle.transform.position.y, playerPosZ + distance);
-            lane4traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 5)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane5traffic.Count > 0)
-                vehicle.transform.position = new(4f, vehicle.transform.position.y, lane5traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(4f, vehicle.transform.position.y, playerPosZ + distance);
-            lane5traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-
-        else if (lane == 6)
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane6traffic.Count > 0)
-                vehicle.transform.position = new(7f, vehicle.transform.position.y, lane6traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(7f, vehicle.transform.position.y, playerPosZ + distance);
-            lane6traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-
-        else
-        {
-            vehicle = trafficPrefabs[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane7traffic.Count > 0)
-                vehicle.transform.position = new(10f, vehicle.transform.position.y, lane7traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(10f, vehicle.transform.position.y, playerPosZ + distance);
-            lane7traffic.Add(vehicle);
-            trafficPrefabs[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        //activeTraffic[vehicle] = Random.Range(0, 22);
-        //trafficTimers[vehicle] = 2f;
-        vehicle.SetActive(true);
-    }
-
-    // Get a low poly traffic car from the low poly traffic pool.
-    public void SpawnTrafficLowPoly(int lane /*0-7*/)
-    {
-        GameObject vehicle;
-        float distance = Random.Range(10, 50);
-        float elapsedTime = Time.time - startTime;
-        float trafficScaler;
-
-        if (!playerController.bullet)
-            trafficScaler = Mathf.Min(playerController.accel, 3.38f);
-        else trafficScaler = playerController.oldAccel;
-
-        trafficScaler = Mathf.Max(trafficScaler, 1);
-        distance *= trafficDensity * trafficScaler;
         int vehicle_id = vehicle_ids[Random.Range(0, vehicle_ids.Length)];
 
-        while (trafficPrefabsLowPoly[vehicle_id].trafficVariations.Count < 1)
-        {
-            vehicle_id += 1;
-            if (vehicle_id >= trafficPrefabsLowPoly.Length) vehicle_id = 0;
-        }
-        int vehicle_variation = Random.Range(0, trafficPrefabsLowPoly[vehicle_id].trafficVariations.Count);
+        BaseTrafficList[] currentTrafficPrefabList = SaveManager.Instance.SaveData.UseLowPolyTraffic
+            ? trafficPrefabsLowPoly
+            : trafficPrefabs;
 
-        if (lane == 0)
+        // Ensure the selected vehicle has at least one variation
+        while (currentTrafficPrefabList[vehicle_id].trafficVariations.Count < 1)
         {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane0traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-11.5f, vehicle.transform.position.y, lane0traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-11.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane0traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
+            vehicle_id = (vehicle_id + 1) % currentTrafficPrefabList.Length;
         }
 
-        else if (lane == 1)
+        int vehicle_variation = Random.Range(0, currentTrafficPrefabList[vehicle_id].trafficVariations.Count);
+        vehicle = currentTrafficPrefabList[vehicle_id].trafficVariations[vehicle_variation];
+
+        float x = lane switch
         {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane1traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-8.5f, vehicle.transform.position.y, lane1traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-8.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane1traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 2)
+            0 => -11.5f,
+            1 => -8.5f,
+            2 => -5.5f,
+            3 => -2.5f,
+            4 => 1f,
+            5 => 4f,
+            6 => 7f,
+            7 => 10f,
+            _ => throw new System.ArgumentOutOfRangeException(nameof(lane))
+        };
+
+        List<GameObject> laneList = lane switch
         {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane2traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-5.5f, vehicle.transform.position.y, lane2traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-5.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane2traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 3)
+            0 => lane0traffic,
+            1 => lane1traffic,
+            2 => lane2traffic,
+            3 => lane3traffic,
+            4 => lane4traffic,
+            5 => lane5traffic,
+            6 => lane6traffic,
+            7 => lane7traffic,
+            _ => throw new System.ArgumentOutOfRangeException(nameof(lane))
+        };
+
+        float z = (laneList.Count > 0)
+            ? laneList[^1].transform.position.z + distance
+            : playerPosZ + distance;
+
+        if (playerController.gameEnd && lane > 3)
         {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane3traffic.Count > 0)
-                vehicle.transform.SetPositionAndRotation(new Vector3(-2.5f, vehicle.transform.position.y, lane3traffic[^1].transform.position.z + distance), Quaternion.Euler(0, 180, 0));
-            else
-                vehicle.transform.SetPositionAndRotation(new Vector3(-2.5f, vehicle.transform.position.y, playerPosZ + distance), Quaternion.Euler(0, 180, 0));
-            lane3traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 4)
-        {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane4traffic.Count > 0)
-                vehicle.transform.position = new(1f, vehicle.transform.position.y, lane4traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(1f, vehicle.transform.position.y, playerPosZ + distance);
-            lane4traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        else if (lane == 5)
-        {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane5traffic.Count > 0)
-                vehicle.transform.position = new(4f, vehicle.transform.position.y, lane5traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(4f, vehicle.transform.position.y, playerPosZ + distance);
-            lane5traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
+            z = laneList[0].transform.position.z - distance;
+            if (z > playerPosZ - 5) z = playerPosZ - 5;
         }
 
-        else if (lane == 6)
-        {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane6traffic.Count > 0)
-                vehicle.transform.position = new(7f, vehicle.transform.position.y, lane6traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(7f, vehicle.transform.position.y, playerPosZ + distance);
-            lane6traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
+        Vector3 spawnPos = new Vector3(x, vehicle.transform.position.y, z);
+        Quaternion rot = lane <= 3 ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
 
-        else
-        {
-            vehicle = trafficPrefabsLowPoly[vehicle_id].trafficVariations[vehicle_variation];
-            if (lane7traffic.Count > 0)
-                vehicle.transform.position = new(10f, vehicle.transform.position.y, lane7traffic[^1].transform.position.z + distance);
-            else
-                vehicle.transform.position = new(10f, vehicle.transform.position.y, playerPosZ + distance);
-            lane7traffic.Add(vehicle);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
-        }
-        //activeTraffic[vehicle] = Random.Range(0, 22);
-        //trafficTimers[vehicle] = 2f;
+        vehicle.transform.SetPositionAndRotation(spawnPos, rot);
+        if (playerController.gameEnd && lane > 3) laneList.Insert(0, vehicle);
+        else laneList.Add(vehicle);
+        currentTrafficPrefabList[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
         vehicle.SetActive(true);
     }
 
     // Return the 0th traffic car of the lane to the traffic pool.
     private void ReturnTraffic(int lane)
     {
-        if (lane == 0)
+        // Select correct lane list
+        List<GameObject> laneList = lane switch
         {
-            int vehicle_id = lane0traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane0traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane0traffic[0]);
-            lane0traffic[0].SetActive(false);
-            lane0traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.Euler(0, 0, 0));
-            lane0traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane0traffic[0]);
-            lane0traffic.RemoveAt(0);
-        }
-        else if (lane == 1)
+            0 => lane0traffic,
+            1 => lane1traffic,
+            2 => lane2traffic,
+            3 => lane3traffic,
+            4 => lane4traffic,
+            5 => lane5traffic,
+            6 => lane6traffic,
+            7 => lane7traffic,
+            _ => throw new System.ArgumentOutOfRangeException(nameof(lane))
+        };
+
+        if (laneList.Count == 0)
+            return;
+
+        int index = playerController.gameEnd && lane > 3 ? laneList.Count - 1 : 0;
+        GameObject vehicle = laneList[index];
+
+        // Extract vehicle ID and variation index from name
+        int vehicle_id = vehicle.name[0] - '0'; // prefix
+        int vehicle_variation = vehicle.name[^1] - '0'; // suffix
+        if (vehicle_variation > 9) vehicle_variation = 0;
+
+        float yReturnValue = original_traffic_y_positions[vehicle_id];
+        Vector3 resetPosition = new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id);
+
+        // Deactivate and reset vehicle
+        tornadoTraffic.Remove(vehicle);
+        vehicle.SetActive(false);
+        vehicle.transform.SetPositionAndRotation(resetPosition, Quaternion.identity);
+        vehicle.transform.SetParent(originalParent);
+
+        // Return to appropriate prefab pool
+        if (SaveManager.Instance.SaveData.UseLowPolyTraffic)
         {
-            int vehicle_id = lane1traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane1traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane1traffic[0]);
-            lane1traffic[0].SetActive(false);
-            lane1traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane1traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane1traffic[0]);
-            lane1traffic.RemoveAt(0);
-        }
-        else if (lane == 2)
-        {
-            int vehicle_id = lane2traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane2traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane2traffic[0]);
-            lane2traffic[0].SetActive(false);
-            lane2traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane2traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane2traffic[0]);
-            lane2traffic.RemoveAt(0);
-        }
-        else if (lane == 3)
-        {
-            int vehicle_id = lane3traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane3traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane3traffic[0]);
-            lane3traffic[0].SetActive(false);
-            lane3traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane3traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane3traffic[0]);
-            lane3traffic.RemoveAt(0);
-        }
-        else if (lane == 4)
-        {
-            int vehicle_id = lane4traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane4traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane4traffic[0]);
-            lane4traffic[0].SetActive(false);
-            lane4traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane4traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane4traffic[0]);
-            lane4traffic.RemoveAt(0);
-        }
-        else if (lane == 5)
-        {
-            int vehicle_id = lane5traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane5traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane5traffic[0]);
-            lane5traffic[0].SetActive(false);
-            lane5traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane5traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane5traffic[0]);
-            lane5traffic.RemoveAt(0);
-        }
-        else if (lane == 6)
-        {
-            int vehicle_id = lane6traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane6traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane6traffic[0]);
-            lane6traffic[0].SetActive(false);
-            lane6traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane6traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane6traffic[0]);
-            lane6traffic.RemoveAt(0);
+            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(vehicle);
         }
         else
         {
-            int vehicle_id = lane7traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane7traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane7traffic[0]);
-            lane7traffic[0].SetActive(false);
-            lane7traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane7traffic[0].transform.SetParent(originalParent);
-            trafficPrefabs[vehicle_id].trafficVariations.Add(lane7traffic[0]);
-            lane7traffic.RemoveAt(0);
+            trafficPrefabs[vehicle_id].trafficVariations.Add(vehicle);
         }
-    }
 
-    // Return the 0th low poly traffic car of the lane to the low poly traffic pool.
-    private void ReturnTrafficLowPoly(int lane)
-    {
-        if (lane == 0)
-        {
-            int vehicle_id = lane0traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane0traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane0traffic[0]);
-            lane0traffic[0].SetActive(false);
-            lane0traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.Euler(0, 0, 0));
-            lane0traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane0traffic[0]);
-            lane0traffic.RemoveAt(0);
-        }
-        else if (lane == 1)
-        {
-            int vehicle_id = lane1traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane1traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane1traffic[0]);
-            lane1traffic[0].SetActive(false);
-            lane1traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane1traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane1traffic[0]);
-            lane1traffic.RemoveAt(0);
-        }
-        else if (lane == 2)
-        {
-            int vehicle_id = lane2traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane2traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane2traffic[0]);
-            lane2traffic[0].SetActive(false);
-            lane2traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane2traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane2traffic[0]);
-            lane2traffic.RemoveAt(0);
-        }
-        else if (lane == 3)
-        {
-            int vehicle_id = lane3traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane3traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane3traffic[0]);
-            lane3traffic[0].SetActive(false);
-            lane3traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane3traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane3traffic[0]);
-            lane3traffic.RemoveAt(0);
-        }
-        else if (lane == 4)
-        {
-            int vehicle_id = lane4traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane4traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane4traffic[0]);
-            lane4traffic[0].SetActive(false);
-            lane4traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane4traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane4traffic[0]);
-            lane4traffic.RemoveAt(0);
-        }
-        else if (lane == 5)
-        {
-            int vehicle_id = lane5traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane5traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane5traffic[0]);
-            lane5traffic[0].SetActive(false);
-            lane5traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane5traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane5traffic[0]);
-            lane5traffic.RemoveAt(0);
-        }
-        else if (lane == 6)
-        {
-            int vehicle_id = lane6traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane6traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane6traffic[0]);
-            lane6traffic[0].SetActive(false);
-            lane6traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane6traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane6traffic[0]);
-            lane6traffic.RemoveAt(0);
-        }
-        else
-        {
-            int vehicle_id = lane7traffic[0].name[0] - '0'; // Convert the id prefixed in the name of the vehicle to a numerical index.
-            int vehicle_variation = lane7traffic[0].name[^1] - '0'; // Convert the variation id appended to the name of the vehicle to an int.
-            if (vehicle_variation > 9) vehicle_variation = 0;
-            float yReturnValue = original_traffic_y_positions[vehicle_id];
-            tornadoTraffic.Remove(lane7traffic[0]);
-            lane7traffic[0].SetActive(false);
-            lane7traffic[0].transform.SetPositionAndRotation(new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id), Quaternion.identity);
-            lane7traffic[0].transform.SetParent(originalParent);
-            trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(lane7traffic[0]);
-            lane7traffic.RemoveAt(0);
-        }
+        laneList.RemoveAt(index);
     }
-
 
     /*------------------------------------ OTHER TRAFFIC FUNCTIONS ------------------------------------*/
     // If the player collides with a traffic while he is in aggro mode, this coroutine will launch the traffic into the air.
