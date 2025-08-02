@@ -173,12 +173,15 @@ public class PrefabManager : MonoBehaviour
     // FOR TRAILER ONLY
     //public bool dontDespawn;
 
-    private int currentEnvironment = 0;
+    private int currentEnvironment;
     private int currentWastelandBuildingType = 0;
     private int wasteLandBuildingCount = 0;
     private int wasteLandSkyscraperCount = 0;
     void Start()
     {
+        // Get current environment.
+        currentEnvironment = SaveManager.Instance.SaveData.CurrentEnvironment;
+
         // Start the clock.
         startTime = Time.time;
 
@@ -229,13 +232,13 @@ public class PrefabManager : MonoBehaviour
                 }
                 break;
             case 2:
+                for (int i = 0; i < maxSpaceTunnels; i++) SpawnSpaceTunnel();
+                break;
+            case 3:
                 for (int i = 0; i < maxRocksPerSide; i++) SpawnRock(0);
                 for (int i = 0; i < maxRocksPerSide; i++) SpawnRock(1);
                 for (int i = 0; i < maxGrassPerSide; i++) SpawnGrass(0);
                 for (int i = 0; i < maxGrassPerSide; i++) SpawnGrass(1);
-                break;
-            case 3:
-                for (int i = 0; i < maxSpaceTunnels; i++) SpawnSpaceTunnel();
                 break;
             default:
                 break;
@@ -444,15 +447,15 @@ public class PrefabManager : MonoBehaviour
                 if (activeLeftWastelandBuildings[0].transform.position.z < playerPosZ - 125) ReturnWastelandBuilding(0);
                 if (activeRightWastelandBuildings[0].transform.position.z < playerPosZ - 125) ReturnWastelandBuilding(1);
                 break;
-            case 2:
+            case 2: // Recycle space tunnels (Trans-galactic highway)
+                if (activeSpaceTunnels[0].transform.position.z < playerPosZ - spaceTunnelLength + 70) RecycleSpaceTunnel();
+                break;
+            case 3:
                 if (activeLeftRocks[0].transform.position.z < playerPosZ + 2) RecycleRock(0);
                 if (activeRightRocks[0].transform.position.z < playerPosZ + 2) RecycleRock(1);
                 if (activeLeftGrass[0].transform.position.z < playerPosZ) RecycleGrass(0);
                 if (activeRightGrass[0].transform.position.z < playerPosZ) RecycleGrass(1);
                 if (atlantis.transform.position.z < playerPosZ - 200) RecycleAtlantis();
-                break;
-            case 3: // Recycle space tunnels (Trans-galactic highway)
-                if (activeSpaceTunnels[0].transform.position.z < playerPosZ - spaceTunnelLength + 70) RecycleSpaceTunnel();
                 break;
             default:
                 break;

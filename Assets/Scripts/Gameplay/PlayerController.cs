@@ -117,13 +117,15 @@ public class PlayerController : MonoBehaviour
     private const float TORNADO_CAMERA_SHAKE = 0.5f;
     private const float BULLET_CAMERA_SHAKE = 10000f;
 
-    private int currentEnvironment = 0;
+    private int currentEnvironment;
 
     void Awake()
     {
         // Access the SaveData instance.
         SaveData saveData = SaveManager.Instance.SaveData;
-        //Application.targetFrameRate = 60;
+        
+        // Get current environment.
+        currentEnvironment = saveData.CurrentEnvironment;
 
         // Retrieve the current car type and index from SaveData.
         currentCarType = saveData.CurrentCarType;

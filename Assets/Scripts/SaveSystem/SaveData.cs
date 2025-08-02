@@ -15,7 +15,7 @@ public class SaveData
 
     // Game/PrefabManager.cs && Menu/OptionsMenu.cs
     public int TrafficDensity = -1;
-    public int CurrentEnvironment = 1;
+    public int CurrentEnvironment = 0;
 
     // Menu/Car.cs && Menu/CarDisplay.cs && Menu/GarageUIManager.cs && Game/PlayerController.cs
     public Dictionary<(int CarType, int CarIndex), CarData> Cars = new Dictionary<(int, int), CarData>();

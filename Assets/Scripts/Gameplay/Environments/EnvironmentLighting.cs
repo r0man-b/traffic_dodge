@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class EnvironmentLighting : MonoBehaviour
 {
-    private int currentEnvironment = 0;
+    private int currentEnvironment;
 
     [Header("Environment Skyboxes")]
     public Material scifiSkybox;
@@ -45,6 +45,9 @@ public class EnvironmentLighting : MonoBehaviour
 
     void Start()
     {
+        // Get current environment.
+        currentEnvironment = SaveManager.Instance.SaveData.CurrentEnvironment;
+
         RenderSettings.fog = true;
 
         switch (currentEnvironment)
@@ -65,21 +68,21 @@ public class EnvironmentLighting : MonoBehaviour
                 directionalLight.color = wastelandSunColor;
                 directionalLight.transform.rotation = Quaternion.Euler(wastelandSunRotation);
                 break;
-            case 2: // Underwater
-                RenderSettings.skybox = underwaterSkybox;
-                RenderSettings.fogColor = underwaterFog;
-                RenderSettings.fogStartDistance = underwaterFogStart;
-                RenderSettings.fogEndDistance = underwaterFogEnd;
-                directionalLight.color = underwaterSunColor;
-                directionalLight.transform.rotation = Quaternion.Euler(underwaterSunRotation);
-                break;
-            case 3: // Space
+            case 2: // Space
                 RenderSettings.skybox = spaceSkybox;
                 RenderSettings.fogColor = spaceFog;
                 RenderSettings.fogStartDistance = spaceFogStart;
                 RenderSettings.fogEndDistance = spaceFogEnd;
                 directionalLight.color = spaceSunColor;
                 directionalLight.transform.rotation = Quaternion.Euler(spaceSunRotation);
+                break;
+            case 3: // Underwater
+                RenderSettings.skybox = underwaterSkybox;
+                RenderSettings.fogColor = underwaterFog;
+                RenderSettings.fogStartDistance = underwaterFogStart;
+                RenderSettings.fogEndDistance = underwaterFogEnd;
+                directionalLight.color = underwaterSunColor;
+                directionalLight.transform.rotation = Quaternion.Euler(underwaterSunRotation);
                 break;
             default: // Fallback to Sci-Fi
                 RenderSettings.skybox = scifiSkybox;

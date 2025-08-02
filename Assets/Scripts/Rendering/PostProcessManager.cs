@@ -41,10 +41,13 @@ public class PostProcessManager : MonoBehaviour
     private bool colorsSet = false;
     private bool inScreenFlash = false;
 
-    private int currentEnvironment = 0;
+    private int currentEnvironment;
 
     private void Start()
     {
+        // Get current environment.
+        currentEnvironment = SaveManager.Instance.SaveData.CurrentEnvironment;
+
         // Start the clock.
         startTime = Time.time;
 
