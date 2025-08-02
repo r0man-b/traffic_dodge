@@ -24,7 +24,7 @@ public class SaveData
     public int LastOwnedCarType;
     public int LastOwnedCarIndex;
     public int NitroCount;
-    public float TotalDistanceTraveled;
+    public float DistanceUntilNextNitro = 100.0f;
     [System.Serializable]
     public class CarData
     {

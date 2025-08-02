@@ -240,19 +240,28 @@ public class UIManager : MonoBehaviour
     {
         gameEndSet = true;
         SaveData saveData = SaveManager.Instance.SaveData;
-        saveData.TotalDistanceTraveled += totalDistance;
         bool isImperial = saveData.ImperialUnits;
         float metricMultiplier = isImperial ? 1f : 1.60934f;
 
         // Award nitro if player drives another 100 miles.
-        float totalDistanceTraveled = saveData.TotalDistanceTraveled;
-        int nitroEarnedThisRace = 0;
-        while (saveData.TotalDistanceTraveled + totalDistance - Mathf.FloorToInt(saveData.TotalDistanceTraveled / 100f) * 100 > 100)
+        int nitrosEarned = 0;
+        if (totalDistance >= saveData.DistanceUntilNextNitro)
         {
-            nitroEarnedThisRace += 1;
-            totalDistanceTraveled -= 100;
+            float excessDistance = totalDistance - saveData.DistanceUntilNextNitro;
+
+            // Award one Nitro for every 100 units of excess distance
+            nitrosEarned = 1 + Mathf.FloorToInt(excessDistance / 100f);
+            saveData.NitroCount += nitrosEarned;
+
+            // Set DistanceUntilNextNitro to the remainder to reach next 100-mile threshold
+            float remainder = excessDistance % 100f;
+            saveData.DistanceUntilNextNitro = 100f - remainder;
         }
-        saveData.NitroCount += nitroEarnedThisRace;
+        else
+        {
+            // Decrease the countdown by the distance driven this race
+            saveData.DistanceUntilNextNitro -= totalDistance;
+        }
 
         // Load & save player stats.
         nitrocount.text = saveData.NitroCount.ToString();
@@ -269,7 +278,7 @@ public class UIManager : MonoBehaviour
         }
 
         // Add a new text if nitro earned this race was over than zero.
-        if (nitroEarnedThisRace > 0)
+        if (nitrosEarned > 0)
         {
             TextMeshProUGUI nitroEarnedText = Instantiate(nitrocount, nitrocount.transform.parent);
             RectTransform nitroEarnedTextRectTransform = nitroEarnedText.GetComponent<RectTransform>();
@@ -277,7 +286,7 @@ public class UIManager : MonoBehaviour
             nitroEarnedTextRectTransform.anchoredPosition += new Vector2(150f, 0f);
             nitroEarnedText.lineSpacing = -35f;
             nitroEarnedText.fontSize = 45f;
-            nitroEarnedText.text = "<b><i>+" + nitroEarnedThisRace + " nitro earned !</i></b>";
+            nitroEarnedText.text = "<b><i>+" + nitrosEarned + " nitro earned !</i></b>";
         }
 
         // Display game end widgets and disable in-race widgets.
