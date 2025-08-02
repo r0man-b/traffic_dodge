@@ -4,6 +4,6 @@ public class WheelRotator : MonoBehaviour
 {
     void Update()
     {
-        transform.Rotate(1050 * Time.deltaTime, 0, 0);
+        transform.Rotate(1300 * Time.deltaTime, 0, 0);
     }
 }
