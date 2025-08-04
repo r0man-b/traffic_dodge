@@ -64,6 +64,8 @@ public class PlayerController : MonoBehaviour
     private float cameraZMultiplier;
     private float senseOfSpeedModifier;
     Vector3 newPosition;
+    Vector3 startingLocalCamPosition;
+    Quaternion startingLocalCamRotation;
 
     // Powerup variables.
     public bool aggro = false;
@@ -257,6 +259,8 @@ public class PlayerController : MonoBehaviour
         defaultCamPosY = camPosY;
         minYPosition = camPosY - 0.066f * cameraHeightMultiplier;
         maxYPosition = camPosY + 0.066f * cameraHeightMultiplier;
+        startingLocalCamPosition = cam.transform.localPosition;
+        startingLocalCamRotation = cam.transform.localRotation;
 
         // Set playercar variables.
         defaultRot = transform.rotation;
@@ -349,6 +353,43 @@ public class PlayerController : MonoBehaviour
         {
             if (!(soundManager.zoomoutsource.isPlaying))
                 soundManager.PlayAggro(true);
+        }
+
+        // Cinematic camera intro sequence before race starts (0–3s)
+        float timeSinceStart = Time.time - startTime;
+
+        if (timeSinceStart < soundManager.drop)
+        {
+            Vector3 frontLeftLocalPos = new Vector3(-1.16f, -0.39f, 7f);
+            Quaternion frontLeftLocalRot = new Quaternion(0.0297561251f, 0.964581788f, -0.12442141f, 0.230685517f);
+
+            Vector3 rearLeftLocalPos = new Vector3(-1.15999997f, -0.899999976f, 1.89999998f);
+            Quaternion rearLeftLocalRot = new Quaternion(-0.0368956365f, 0.341510594f, 0.013417975f, 0.939057589f);
+
+            const float snapDuration = 0.25f;
+            float t = timeSinceStart;
+
+            if (t < 1f)
+            {
+                cam.transform.localPosition = frontLeftLocalPos;
+                cam.transform.localRotation = frontLeftLocalRot;
+            }
+            else if (t < 2f)
+            {
+                float phaseTime = t - 1f;
+                float lerpT = Mathf.Clamp01(phaseTime / snapDuration);
+                cam.transform.localPosition = Vector3.Lerp(frontLeftLocalPos, rearLeftLocalPos, lerpT);
+                cam.transform.localRotation = Quaternion.Slerp(frontLeftLocalRot, rearLeftLocalRot, lerpT);
+            }
+            else if (t < 3f)
+            {
+                float phaseTime = t - 2f;
+                float lerpT = Mathf.Clamp01(phaseTime / snapDuration);
+                cam.transform.localPosition = Vector3.Lerp(rearLeftLocalPos, startingLocalCamPosition, lerpT);
+                cam.transform.localRotation = Quaternion.Slerp(rearLeftLocalRot, startingLocalCamRotation, lerpT);
+            }
+
+            return; // Prevent camera logic below from overriding during cinematic
         }
 
         // Increase acceleration, apply fov increase and camera shake.
