@@ -4,7 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class OptionsMenu : MonoBehaviour
+public class TrafficDensityUtil : MonoBehaviour
 {
     public Toggle[] toggleButtons;
     public ToggleGroup toggleGroup;  // Reference to the ToggleGroup component.
