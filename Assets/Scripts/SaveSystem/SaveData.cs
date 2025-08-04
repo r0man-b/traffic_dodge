@@ -16,6 +16,10 @@ public class SaveData
     // Game/PrefabManager.cs && Menu/OptionsMenu.cs
     public int TrafficDensity = -1;
     public int CurrentEnvironment = 0;
+    public bool City77EnvironmentPurchased = true;
+    public bool ApocalypticWastelandEnvironmentPurchased = false;
+    public bool GalacticHighwayEnvironmentPurchased = false;
+    public bool TransatlanticTunnelEnvironmentPurchased = false;
 
     // Menu/Car.cs && Menu/CarDisplay.cs && Menu/GarageUIManager.cs && Game/PlayerController.cs
     public Dictionary<(int CarType, int CarIndex), CarData> Cars = new Dictionary<(int, int), CarData>();
