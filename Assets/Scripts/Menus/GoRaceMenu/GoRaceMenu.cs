@@ -5,6 +5,8 @@ using UnityEngine.UI;
 
 public class GoRaceMenu : MonoBehaviour
 {
+    [SerializeField] private Transform environmentPanel;
+
     private List<Transform> environmentButtons = new List<Transform>();
     private int currentSelectedIndex = -1;
     private int environmentToBuyIndex = -1;
@@ -17,11 +19,17 @@ public class GoRaceMenu : MonoBehaviour
     public TextMeshProUGUI notEnoughCreditsPopUpText;
     public AudioSource audioSource;
 
+    private bool enteredFromMainMenu;
+
+    public GameObject buttons;
+    public GameObject garageUI;
+    public GameObject mainMenuUI;
+
     void Start()
     {
-        for (int i = 0; i < transform.childCount; i++)
+        for (int i = 0; i < environmentPanel.childCount; i++)
         {
-            Transform child = transform.GetChild(i);
+            Transform child = environmentPanel.GetChild(i);
             environmentButtons.Add(child);
 
             int index = i;
@@ -174,5 +182,24 @@ public class GoRaceMenu : MonoBehaviour
 
         SaveManager.Instance.SaveGame();
         OnEnvironmentSelected(environmentToBuyIndex); // Auto-select after purchase
+    }
+
+    public void SetEnteredFromMainMenu(bool value)
+    {
+        enteredFromMainMenu = value;
+    }
+
+    public void ExitGoRaceMenu()
+    {
+        if (enteredFromMainMenu)
+        {
+            buttons.SetActive(true);
+        }
+        else
+        {
+            buttons.SetActive(true);
+            garageUI.SetActive(true);
+            mainMenuUI.SetActive(false);
+        }
     }
 }
