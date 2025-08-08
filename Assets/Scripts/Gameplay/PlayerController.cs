@@ -212,8 +212,9 @@ public class PlayerController : MonoBehaviour
         CarsPaint carPaintScript = carObject.GetComponent<CarsPaint>();
         if (carPaintScript != null)
         {
-            //carPaintScript.TextureSize = TextureSizeType.x128;
-            carPaintScript.IsEnabled = false;
+            carPaintScript.TextureSize = TextureSizeType.x256;
+            carPaintScript.RunForEveryXthFrame = 2;
+            //currentCar.primColor.SetFloat("_Brightness", currentCar.primColor.GetFloat("_Brightness") * 2f);
         }
 
         // Set up camera type and sense of speed values from the gameplay options.
@@ -357,13 +358,12 @@ public class PlayerController : MonoBehaviour
 
         // Cinematic camera intro sequence before race starts (0–3s)
         float timeSinceStart = Time.time - startTime;
-
         if (timeSinceStart < soundManager.drop)
         {
             Vector3 frontLeftLocalPos = new Vector3(-1.16f, -0.39f, 7f);
             Quaternion frontLeftLocalRot = new Quaternion(0.0297561251f, 0.964581788f, -0.12442141f, 0.230685517f);
 
-            Vector3 rearLeftLocalPos = new Vector3(-1.15999997f, -0.899999976f, 1.89999998f);
+            Vector3 rearLeftLocalPos = new Vector3(-1.15999997f, -0.7f, 1.89999998f);
             Quaternion rearLeftLocalRot = new Quaternion(-0.0368956365f, 0.341510594f, 0.013417975f, 0.939057589f);
 
             const float snapDuration = 0.15f;

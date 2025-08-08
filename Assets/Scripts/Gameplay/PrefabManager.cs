@@ -526,6 +526,8 @@ public class PrefabManager : MonoBehaviour
 
 
     /*---------------------------------- ENVIRONMENT OBJECT SPAWNING FUNCTIONS ----------------------------------*/
+    // Spawn beginning objects behind the player
+    
     // Get a scifi building from the building pool.
     public void SpawnSciFiBuilding(int right)
     {

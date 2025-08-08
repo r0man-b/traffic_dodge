@@ -269,10 +269,10 @@ public class Car : ScriptableObject
         // Load the base color.
         Color? baseColor = LoadColorFromSaveData(carData, colorIndex) ?? defaultColor;
 
-        // Apply emission if needed.
         if (isEmissiveMaterial)
         {
-            targetMaterial.SetColor("_EmissionColor", baseColor.Value);
+            Color emissionColor = baseColor.Value * 3f; // 3x intensity
+            targetMaterial.SetColor("_EmissionColor", emissionColor);
             targetMaterial.EnableKeyword("_EMISSION");
         }
         else
@@ -846,6 +846,8 @@ public class Car : ScriptableObject
             ApplySavedColors(tailLight, ColorType.TAIL_LIGHT, true, defaultTailLightColor);
         }
 
+        primColor.SetFloat("_Brightness", 1.21f);
+
         // Save the updated data to disk.
         SaveManager.Instance.SaveGame();
     }
@@ -1070,6 +1072,8 @@ public class Car : ScriptableObject
         RandomizeColors(primLight, ColorType.PRIMARY_LIGHT, true);
         RandomizeColors(secondLight, ColorType.SECONDARY_LIGHT, true);
         RandomizeColors(tailLight, ColorType.TAIL_LIGHT, true);
+
+        primColor.SetFloat("_Brightness", 1.21f);
 
         // Save the updated data to disk.
         SaveManager.Instance.SaveGame();
