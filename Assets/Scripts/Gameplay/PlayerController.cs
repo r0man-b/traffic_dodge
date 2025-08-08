@@ -366,7 +366,7 @@ public class PlayerController : MonoBehaviour
             Vector3 rearLeftLocalPos = new Vector3(-1.15999997f, -0.899999976f, 1.89999998f);
             Quaternion rearLeftLocalRot = new Quaternion(-0.0368956365f, 0.341510594f, 0.013417975f, 0.939057589f);
 
-            const float snapDuration = 0.25f;
+            const float snapDuration = 0.15f;
             float t = timeSinceStart;
 
             if (t < 1f)
