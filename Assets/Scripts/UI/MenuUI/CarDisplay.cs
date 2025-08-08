@@ -104,6 +104,7 @@ public class CarDisplay : MonoBehaviour
 
         if (creditManager.GetCredits() < currentCar.price)
         {
+            notEnoughCreditsPopUpText.text = "You  do  not  have  enough  credits  to   purchase  this  car";
             notEnoughCreditsPopUp.SetActive(true);
             buyConfirmationPopUp.SetActive(false);
             cannotSellPopUp.SetActive(false);

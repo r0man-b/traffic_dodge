@@ -30,6 +30,15 @@ public class GarageUIManager : MonoBehaviour
     public CreditManager creditManager;
     public TextMeshProUGUI nitrocount;
 
+    [Space(10)]
+    [Header("UI Popups for buying items")]
+    public GameObject popUps;
+    public GameObject buyConfirmationPopUp;
+    public TextMeshProUGUI buyConfirmationPopUpText;
+    public Button buyButton;
+    public GameObject notEnoughCreditsPopUp;
+    public TextMeshProUGUI notEnoughCreditsPopUpText;
+
     // Car variables.
     [Space(10)]
     [Header("Car Related Stuff")]
@@ -665,7 +674,7 @@ public class GarageUIManager : MonoBehaviour
 
             // Make the button clickable.
             int tempIndex = i;
-            newButton.onClick.AddListener(() => BuyPart(tempIndex, partIndex));
+            newButton.onClick.AddListener(() => ConfirmBuyPart(tempIndex, partIndex));
 
             // Adjust the alpha channels of the button's text & image.
             TextMeshProUGUI[] texts = newButton.GetComponentsInChildren<TextMeshProUGUI>();
@@ -753,6 +762,24 @@ public class GarageUIManager : MonoBehaviour
         }
     }
 
+    private void ConfirmBuyPart(int partType, int partIndex)
+    {
+        popUps.SetActive(true);
+        if (creditManager.GetCredits() < carParts[partIndex][partType].price)
+        {
+            notEnoughCreditsPopUpText.text = "You  do  not  have  enough  credits  to   purchase  this  part";
+            notEnoughCreditsPopUp.SetActive(true);
+            buyConfirmationPopUp.SetActive(false);
+        }
+        else
+        {
+            buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price + "?";
+            notEnoughCreditsPopUp.SetActive(false);
+            buyButton.onClick.AddListener(() => BuyPart(partType, partIndex));
+            buyConfirmationPopUp.SetActive(true);
+        }
+    }
+
     private void BuyPart(int partType, int partIndex)
     {
         // Access the SaveData instance and retrieve the car's data.
@@ -803,6 +830,9 @@ public class GarageUIManager : MonoBehaviour
         // Update the button texts.
         scrollController.buttonPrices[oldIndex].text = "OWNED";
         scrollController.buttonPrices[partType].text = "INSTALLED";
+
+        // Deactivate the UI popups
+        popUps.SetActive(false);
     }
 
     public void EnterPreviousBucket()
