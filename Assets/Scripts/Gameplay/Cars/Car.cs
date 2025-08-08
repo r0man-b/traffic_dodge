@@ -310,7 +310,7 @@ public class Car : ScriptableObject
                 && !(colorData.EmissionColor[0] == -1f && colorData.EmissionColor[1] == -1f && colorData.EmissionColor[2] == -1f && colorData.EmissionColor[3] == -1f))
             {
                 targetMaterial.color = Color.black;
-                Color emissionColor = new Color(colorData.EmissionColor[0], colorData.EmissionColor[1], colorData.EmissionColor[2], colorData.EmissionColor[3]);
+                Color emissionColor = new Color(colorData.EmissionColor[0], colorData.EmissionColor[1], colorData.EmissionColor[2], colorData.EmissionColor[3]) * 2f;
                 targetMaterial.SetColor("_EmissionColor", emissionColor);
                 targetMaterial.EnableKeyword("_EMISSION");
             }

@@ -101,7 +101,8 @@ public class PlayerController : MonoBehaviour
     private bool inTrafficExplosion = false;
     private bool inTornadoExplosion = false;
     private bool inBulletExplosion = false;
-    
+    private bool hasReturnedPosteriorObjects = false;
+
     // System variables.
     public bool invincible;
     private float startTime = 0;
@@ -360,8 +361,8 @@ public class PlayerController : MonoBehaviour
         float timeSinceStart = Time.time - startTime;
         if (timeSinceStart < soundManager.drop)
         {
-            Vector3 frontLeftLocalPos = new Vector3(-1.16f, -0.39f, 7f);
-            Quaternion frontLeftLocalRot = new Quaternion(0.0297561251f, 0.964581788f, -0.12442141f, 0.230685517f);
+            Vector3 frontLeftLocalPos = new Vector3(-1.20000002f, -0.750000021f, 6.6500001f);
+            Quaternion frontLeftLocalRot = new Quaternion(-0.00363085279f, 0.925662994f, 0.0088860495f, 0.378227264f);
 
             Vector3 rearLeftLocalPos = new Vector3(-1.15999997f, -0.7f, 1.89999998f);
             Quaternion rearLeftLocalRot = new Quaternion(-0.0368956365f, 0.341510594f, 0.013417975f, 0.939057589f);
@@ -380,6 +381,11 @@ public class PlayerController : MonoBehaviour
                 float lerpT = Mathf.Clamp01(phaseTime / snapDuration);
                 cam.transform.localPosition = Vector3.Lerp(frontLeftLocalPos, rearLeftLocalPos, lerpT);
                 cam.transform.localRotation = Quaternion.Slerp(frontLeftLocalRot, rearLeftLocalRot, lerpT);
+                if (!hasReturnedPosteriorObjects)
+                {
+                    prefabManager.ReturnPosteriorObjects();
+                    hasReturnedPosteriorObjects = true;
+                }
             }
             else if (t < 3f)
             {

@@ -104,6 +104,10 @@ public class PrefabManager : MonoBehaviour
     public int maxUnderwaterTunnels = 12;
     public int maxRocksPerSide = 5;
     public int maxGrassPerSide = 100;
+    private float scifiPosteriorObjectMoveAmount = 3000f;
+    private float wastelandPosteriorObjectMoveAmount = 1000f;
+    private float spacePosteriorObjectMoveAmount = 540f * 3;
+    private float underwaterPosteriorObjectMoveAmount = 400f;
     private int leftBuildingIndex;
     private int rightBuildingIndex;
 
@@ -244,6 +248,9 @@ public class PrefabManager : MonoBehaviour
                 break;
         }
 
+        // Spawn temporary environment objects behind the player (Used for the reversed camera view at the beginning of the pre-race cinematic).
+        SpawnPosteriorRoads();
+        CreatePosteriorObjects();
 
         // Spawn initial traffic cars.
         for (int i = 0; i < maxCarsPerLane; i++)
@@ -257,6 +264,7 @@ public class PrefabManager : MonoBehaviour
             SpawnTraffic(6);
             SpawnTraffic(7);
         }
+        PutTrafficBehindPlayer();
 
         trafficDensity = SaveManager.Instance.SaveData.TrafficDensity;
         if (trafficDensity < 0)
@@ -453,8 +461,11 @@ public class PrefabManager : MonoBehaviour
             case 3:
                 if (activeLeftRocks[0].transform.position.z < playerPosZ + 2) RecycleRock(0);
                 if (activeRightRocks[0].transform.position.z < playerPosZ + 2) RecycleRock(1);
-                if (activeLeftGrass[0].transform.position.z < playerPosZ) RecycleGrass(0);
-                if (activeRightGrass[0].transform.position.z < playerPosZ) RecycleGrass(1);
+                if (Time.time - startTime > 1)
+                {
+                    if (activeLeftGrass[0].transform.position.z < playerPosZ) RecycleGrass(0);
+                    if (activeRightGrass[0].transform.position.z < playerPosZ) RecycleGrass(1);
+                }
                 if (atlantis.transform.position.z < playerPosZ - 200) RecycleAtlantis();
                 break;
             default:
@@ -477,23 +488,26 @@ public class PrefabManager : MonoBehaviour
         if (activeRoads[0].transform.position.z < playerPosZ - 99) RecycleRoad();
 
         // If any car is behind the player, move it to the object pool.
-        if (lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(0);
-        if (lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(1);
-        if (lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(2);
-        if (lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(3);
-        if (!playerController.gameEnd) // Return same lane traffic if the traffic is behind the player.
+        if (Time.time - startTime > 1)
         {
-            if (lane4traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(4);
-            if (lane5traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(5);
-            if (lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(6);
-            if (lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(7);
-        }
-        else // Once the player has crashed and exploded, start returning same lane traffic that is 100 units in front of him.
-        {
-            if (lane5traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(5);
-            if (lane4traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(4);
-            if (lane6traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(6);
-            if (lane7traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(7);
+            if (lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(0);
+            if (lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(1);
+            if (lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(2);
+            if (lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(3);
+            if (!playerController.gameEnd) // Return same lane traffic if the traffic is behind the player.
+            {
+                if (lane4traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(4);
+                if (lane5traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(5);
+                if (lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(6);
+                if (lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(7);
+            }
+            else // Once the player has crashed and exploded, start returning same lane traffic that is 100 units in front of him.
+            {
+                if (lane5traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(5);
+                if (lane4traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(4);
+                if (lane6traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(6);
+                if (lane7traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(7);
+            }
         }
     }
 
@@ -524,10 +538,72 @@ public class PrefabManager : MonoBehaviour
         activeRoads.Add(recycledRoad);
     }
 
+    // Spawn beginning roads behind the player.
+    public void SpawnPosteriorRoads()
+    {
+        for (int i = 1; i < 11; i++)
+        {
+            Instantiate(roads[currentEnvironment], activeRoads[0].transform.position - new Vector3(0, 0, i * roadLength), transform.rotation);
+        }
+    }
 
     /*---------------------------------- ENVIRONMENT OBJECT SPAWNING FUNCTIONS ----------------------------------*/
-    // Spawn beginning objects behind the player
-    
+    // Spawn beginning objects behind the player.
+    public void CreatePosteriorObjects()
+    {
+        switch (currentEnvironment)
+        {
+            case 0: // Spawn sci fi buildings (City 77)
+                OffsetAndFlip(activeLeftBuildings, -scifiPosteriorObjectMoveAmount, true);
+                OffsetAndFlip(activeRightBuildings, -scifiPosteriorObjectMoveAmount, false);
+                break;
+
+            case 1: // Spawn wasteland buildings (Nuclear Wasteland)
+                OffsetAndFlip(activeLeftWastelandBuildings, -wastelandPosteriorObjectMoveAmount, true);
+                OffsetAndFlip(activeRightWastelandBuildings, -wastelandPosteriorObjectMoveAmount, false);
+                break;
+
+            case 2:
+                OffsetAndFlip(activeSpaceTunnels, -spacePosteriorObjectMoveAmount, false);
+                break;
+
+            case 3:
+                OffsetAndFlip(activeLeftRocks, -underwaterPosteriorObjectMoveAmount, true);
+                OffsetAndFlip(activeRightRocks, -underwaterPosteriorObjectMoveAmount, false);
+                OffsetAndFlip(activeLeftGrass, -underwaterPosteriorObjectMoveAmount, true, true);
+                OffsetAndFlip(activeRightGrass, -underwaterPosteriorObjectMoveAmount, false, true);
+                break;
+        }
+    }
+
+    // Do the opposite: add and flip back
+    public void ReturnPosteriorObjects()
+    {
+        switch (currentEnvironment)
+        {
+            case 0:
+                OffsetAndFlip(activeLeftBuildings, scifiPosteriorObjectMoveAmount, true);
+                OffsetAndFlip(activeRightBuildings, scifiPosteriorObjectMoveAmount, false);
+                break;
+
+            case 1:
+                OffsetAndFlip(activeLeftWastelandBuildings, wastelandPosteriorObjectMoveAmount, true);
+                OffsetAndFlip(activeRightWastelandBuildings, wastelandPosteriorObjectMoveAmount, false);
+                break;
+
+            case 2:
+                OffsetAndFlip(activeSpaceTunnels, spacePosteriorObjectMoveAmount, false);
+                break;
+
+            case 3:
+                OffsetAndFlip(activeLeftRocks, underwaterPosteriorObjectMoveAmount, true);
+                OffsetAndFlip(activeRightRocks, underwaterPosteriorObjectMoveAmount, false);
+                OffsetAndFlip(activeLeftGrass, underwaterPosteriorObjectMoveAmount, true, true);
+                OffsetAndFlip(activeRightGrass, underwaterPosteriorObjectMoveAmount, false, true);
+                break;
+        }
+    }
+
     // Get a scifi building from the building pool.
     public void SpawnSciFiBuilding(int right)
     {
@@ -550,13 +626,13 @@ public class PrefabManager : MonoBehaviour
                         newPos = new Vector3(xPos, Random.Range(-82.1f, 1), activeLeftBuildings[^1].transform.position.z + 200);
                 }
 
-                else // If this is the first time we are spawning a left building, initialize the Z position to 200.
+                else // If this is the first time we are spawning a left building, initialize the Z position to 100.
                 {
                     if (leftBuildingIndex == 5 && rotationNumber == 2)  // If the building has the drive-through tunnel do not randomize the X & Y spawning direction.
-                        newPos = new Vector3(-133.3f, 0, 200);
+                        newPos = new Vector3(-133.3f, 0, 100);
 
                     else // Otherwise spawn building normally.
-                        newPos = new Vector3(xPos, Random.Range(-82.1f, 1), 200);
+                        newPos = new Vector3(xPos, Random.Range(-82.1f, 1), 100);
                 }
                 
                 leftBuilding.transform.position = newPos;
@@ -578,8 +654,8 @@ public class PrefabManager : MonoBehaviour
                 if (activeRightBuildings.Count > 0)
                     newPos = new Vector3(xPos, Random.Range(-82.1f, 1), activeRightBuildings[^1].transform.position.z + 200);
 
-                else // If this is the first time we are spawning a right building, initialize the Z position to 200.
-                    newPos = new Vector3(xPos, Random.Range(-82.1f, 1), 200);
+                else // If this is the first time we are spawning a right building, initialize the Z position to 100.
+                    newPos = new Vector3(xPos, Random.Range(-82.1f, 1), 100);
  
                 rightBuilding.transform.position = newPos;
                 activeRightBuildings.Add(rightBuilding);
@@ -771,6 +847,7 @@ public class PrefabManager : MonoBehaviour
             activeLeftRocks.Add(spawnedRock);
         }
         spawnedRock.transform.rotation = Quaternion.Euler(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
+        spawnedRock.SetActive(true);
     }
 
 
@@ -826,6 +903,7 @@ public class PrefabManager : MonoBehaviour
             }
             activeLeftGrass.Add(spawnedGrass);
         }
+        spawnedGrass.SetActive(true);
         //spawnedGrass.transform.rotation = Quaternion.Euler(Random.Range(0f, 360f), Random.Range(0f, 360f), Random.Range(0f, 360f));
     }
 
@@ -850,6 +928,7 @@ public class PrefabManager : MonoBehaviour
     private void RecycleAtlantis()
     {
         atlantis.transform.position = new Vector3(atlantis.transform.position.x, atlantis.transform.position.y, playerPosZ + 5000);
+        atlantis.SetActive(true);
     }
 
     private void SpawnSpaceTunnel()
@@ -867,6 +946,7 @@ public class PrefabManager : MonoBehaviour
             spawnedSpaceTunnel.transform.position = new Vector3(spawnedSpaceTunnel.transform.position.x, spawnedSpaceTunnel.transform.position.y, 100);
         }
         activeSpaceTunnels.Add(spawnedSpaceTunnel);
+        spawnedSpaceTunnel.SetActive(true);
     }
 
     private void RecycleSpaceTunnel()
@@ -888,6 +968,72 @@ public class PrefabManager : MonoBehaviour
 
 
     /*----------------------------------- TRAFFIC SPAWNING FUNCTIONS ----------------------------------*/
+    public void PutTrafficBehindPlayer()
+    {
+        // 1. Find max z position from last 4 elements of lane4traffic–lane7traffic
+        float maxZ = float.MinValue;
+
+        List<List<GameObject>> sameWayLanes = new List<List<GameObject>>()
+        {
+            lane4traffic,
+            lane5traffic,
+            lane6traffic,
+            lane7traffic
+        };
+
+        foreach (var lane in sameWayLanes)
+        {
+            if (lane == null || lane.Count == 0) continue;
+
+            int startIndex = Mathf.Max(0, lane.Count - 4); // Last 4 elements
+            for (int i = startIndex; i < lane.Count; i++)
+            {
+                if (lane[i] == null) continue;
+                float z = lane[i].transform.position.z;
+                if (z > maxZ) maxZ = z;
+            }
+        }
+
+        if (maxZ == float.MinValue)
+            return; // No objects found
+        maxZ += 10;
+        // 2. Subtract full value from lane4traffic–lane7traffic
+        foreach (var lane in sameWayLanes)
+        {
+            if (lane == null) continue;
+
+            foreach (var go in lane)
+            {
+                if (go == null) continue;
+                Vector3 pos = go.transform.position;
+                pos.z -= maxZ;
+                go.transform.position = pos;
+            }
+        }
+
+        // 3. Subtract half value from lane0traffic–lane3traffic
+        List<List<GameObject>> oppositeWayLanes = new List<List<GameObject>>()
+    {
+        lane0traffic,
+        lane1traffic,
+        lane2traffic,
+        lane3traffic
+    };
+
+        foreach (var lane in oppositeWayLanes)
+        {
+            if (lane == null) continue;
+
+            foreach (var go in lane)
+            {
+                if (go == null) continue;
+                Vector3 pos = go.transform.position;
+                pos.z -= maxZ * 0.5f;
+                go.transform.position = pos;
+            }
+        }
+    }
+
     // Get a traffic car from the traffic pool.
     public void SpawnTraffic(int lane /*0-7*/)
     {
@@ -898,6 +1044,7 @@ public class PrefabManager : MonoBehaviour
             : playerController.oldAccel;
         trafficScaler = Mathf.Max(trafficScaler, 1);
         distance *= trafficDensity * trafficScaler;
+        if (trafficDensity == 1 && lane < 4) distance *= 1.25f;
 
         int vehicle_id = vehicle_ids[Random.Range(0, vehicle_ids.Length)];
 
@@ -1204,6 +1351,66 @@ public class PrefabManager : MonoBehaviour
 
 
     /*---------------------------------------- OTHER FUNCTIONS ----------------------------------------*/
+    private static void OffsetAndFlip(IList<GameObject> list, float zDelta, bool isLeft, bool isGrass = false)
+    {
+        if (list == null) return;
+
+        for (int i = 1; i < list.Count; i++)
+        {
+            var go = list[i];
+            if (go == null) continue;
+
+            Transform t = go.transform;
+
+            // World position Z adjustment
+            Vector3 p = t.position;
+            p.z += zDelta;
+            t.position = p;
+
+            if (isGrass)
+            {
+                // Rotate 180 degrees around Z axis (local rotation)
+                t.Rotate(0f, 0f, 180f, Space.Self);
+            }
+            else
+            {
+                // Flip scale depending on left/right
+                Vector3 s = t.localScale;
+                if (isLeft)
+                    s.z = -s.z;
+                else
+                    s.x = -s.x;
+                t.localScale = s;
+            }
+        }
+    }
+
+    private static void OffsetAndFlip(IList<WastelandBuilding> list, float zDelta, bool isLeft)
+    {
+        if (list == null) return;
+
+        for (int i = 1; i < list.Count; i++)
+        {
+            var wb = list[i];
+            if (wb == null) continue;
+
+            Transform t = wb.transform;
+
+            // World position Z adjustment
+            Vector3 p = t.position;
+            p.z += zDelta;
+            t.position = p;
+
+            // Flip scale depending on left/right
+            Vector3 s = t.localScale;
+            if (isLeft)
+                s.z = -s.z;
+            else
+                s.x = -s.x;
+            t.localScale = s;
+        }
+    }
+
     private float EaseOutCubic(float x)
     {
         return 1 - Mathf.Pow(1 - x, 3);
