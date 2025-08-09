@@ -43,13 +43,15 @@ public class CarDisplay : MonoBehaviour
     public MenuSounds menuSounds;
 
     private Car currentCar;
-    private int currentCarType;
+    private string currentCarType;   // switched to string
     private int currentCarIndex;
     private int numOfThisCarTypeOwned;
     private int sellPrice;
     private const string carsOwned = "CARS_OWNED";
 
-    public GameObject DisplayCar(Car _car, int carType, int carIndex)
+    // NOTE: Update caller sites to pass car type as string.
+    // If your Car.InitializeCar previously accepted an int type, update it to accept string.
+    public GameObject DisplayCar(Car _car, string carType, int carIndex)
     {
         currentCar = _car;
         currentCarType = carType;
@@ -58,7 +60,7 @@ public class CarDisplay : MonoBehaviour
         // Access the SaveData instance.
         SaveData saveData = SaveManager.Instance.SaveData;
 
-        // Get the count of cars owned for the current car type.
+        // Get the count of cars owned for the current car type (string).
         numOfThisCarTypeOwned = saveData.Cars.Count(car => car.Key.CarType == currentCarType);
 
         carName.text = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
@@ -68,12 +70,12 @@ public class CarDisplay : MonoBehaviour
         if (carHolder.childCount > 0)
             Destroy(carHolder.GetChild(0).gameObject);
 
-        bool isOwned = SaveManager.Instance.SaveData.Cars.ContainsKey((currentCarType, currentCarIndex));
+        bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
         if (isOwned)
         {
             lockUiElement.SetActive(false);
             lockImage.SetActive(false);
-            buttonSet1.SetActive(false); 
+            buttonSet1.SetActive(false);
             buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
         }
         else
@@ -83,10 +85,12 @@ public class CarDisplay : MonoBehaviour
             buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
             buttonSet2.SetActive(false);
         }
+
         Debug.Log(Time.time + " NUM OF " + currentCar.name + "s OWNED: " + numOfThisCarTypeOwned);
 
+        // Ensure Car.InitializeCar signature supports string carType
         _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
-        //_car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
+        // _car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
 
         GameObject carModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
         return carModel;
@@ -139,7 +143,6 @@ public class CarDisplay : MonoBehaviour
         }
     }
 
-
     // Buy the car. Set car to owned, adjust player currency.
     public void BuyCar()
     {
@@ -183,7 +186,6 @@ public class CarDisplay : MonoBehaviour
         cannotSellPopUp.SetActive(false);
     }
 
-
     // Display car sell confirmation dialogue, check if player has at least one car.
     public void ConfirmSell()
     {
@@ -226,7 +228,6 @@ public class CarDisplay : MonoBehaviour
         }
     }
 
-
     // Sell the car. Set car to unowned, add car's value to player currency.
     public void SellCar()
     {
@@ -234,12 +235,6 @@ public class CarDisplay : MonoBehaviour
         SaveData saveData = SaveManager.Instance.SaveData;
 
         numOfThisCarTypeOwned -= 1;
-
-        // Remove the car from the Cars dictionary.
-        //saveData.Cars.Remove((currentCarType, currentCarIndex));
-
-        // Adjust total cars owned.
-        //int totalCarsOwned = saveData.Cars.Count;
 
         if (currentCarIndex == numOfThisCarTypeOwned && numOfThisCarTypeOwned > 0) // Selling the last type of this car.
         {
@@ -277,8 +272,9 @@ public class CarDisplay : MonoBehaviour
             buttonSet1.SetActive(true);
             buttonSet2.SetActive(false);
             menuSounds.PlayChaChing();
-            //DisplayCar(currentCar, currentCarType, currentCarIndex);
+            // DisplayCar(currentCar, currentCarType, currentCarIndex);
         }
+
         garageUIManager.UpdatePerformanceStats();
         SaveManager.Instance.SaveGame(); // Save changes to the data.
         buyConfirmationPopUp.SetActive(false);
@@ -287,12 +283,14 @@ public class CarDisplay : MonoBehaviour
         cannotSellPopUp.SetActive(false);
     }
 
-
     public void UpdateStats(float accelMaxValue, float accelIncreaseRate, int numlives)
     {
         bool isImperial = SaveManager.Instance.SaveData.ImperialUnits;
-        double topSpeed = isImperial ? System.Math.Round(85.36585365f * accelMaxValue + 12.3170731707f) : System.Math.Round((85.36585365f * accelMaxValue + 12.3170731707f) * 1.60934f);
-        carTopSpeed.text = isImperial ? topSpeed.ToString() + " mph" : topSpeed.ToString() + " kph";
+        double topSpeed = isImperial
+            ? System.Math.Round(85.36585365f * accelMaxValue + 12.3170731707f)
+            : System.Math.Round((85.36585365f * accelMaxValue + 12.3170731707f) * 1.60934f);
+
+        carTopSpeed.text = isImperial ? topSpeed + " mph" : topSpeed + " kph";
         carHorsepower.text = System.Math.Round(513.57616f * accelMaxValue - 608.44812f).ToString() + " hp";
         carZerotosixty.text = System.Math.Round(Mathf.Max(-12.28856f * accelIncreaseRate + 23.2393f, -5.484f * accelIncreaseRate + 12.068f), 1).ToString() + "s";
         carLives.text = numlives.ToString();

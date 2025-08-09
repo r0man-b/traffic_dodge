@@ -46,9 +46,21 @@ public class GarageUIManager : MonoBehaviour
     [SerializeField] private CarDisplay carDisplay;
     private GameObject currentCar;
     private Car car;
-    private int currentCarType;
+
+    // IMPORTANT: Car type is now a string (car name), not an int index.
+    private string currentCarType;
     private int currentCarIndex;
     private int numOfThisCarTypeOwned;
+
+    // Name <-> index mapping for CarCollection access and ordered traversal.
+    private Dictionary<string, int> typeIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    private List<string> typeOrder = new List<string>();
+
+    // Optional: name-based capability gate (temporary, prefer per-car flags in data)
+    private readonly HashSet<string> noEmissiveSecondaryTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "ferret", "viking hd"
+    };
 
     // Customization bucket variables.
     [Space(10)]
@@ -134,32 +146,47 @@ public class GarageUIManager : MonoBehaviour
     public Button tailLightColorButton;
     private bool invokedFromUpdate;
 
-
     private const string defaultCar = "OWNED_0_0";
     private const string carsOwned = "CARS_OWNED";
 
     private int counter = 0;
+
     private void Awake()
     {
+        // Build type name <-> index map and ordered traversal list.
+        BuildCarTypeNameIndex();
+
         // Access the SaveData instance.
         SaveData saveData = SaveManager.Instance.SaveData;
 
         // Ensure at least one car is always owned.
         if (saveData.Cars.Count == 0)
         {
-            // Set the 0th ferret (Type = 0) as being owned.
             SaveData.CarData defaultCarData = new SaveData.CarData();
 
-            // Add the default ferret to the Cars dictionary.
-            saveData.Cars[(0, 0)] = defaultCarData;
+            // Choose a default type name; if not set previously, use the first type in collection.
+            string defaultTypeName = typeOrder.Count > 0 ? typeOrder[0] : "ferret";
 
-            saveData.CurrentCarType = 0;
+            // Add the default car to the Cars dictionary.
+            saveData.Cars[(defaultTypeName, 0)] = defaultCarData;
+
+            saveData.CurrentCarType = defaultTypeName;
             saveData.CurrentCarIndex = 0;
-            saveData.LastOwnedCarType = 0;
+            saveData.LastOwnedCarType = defaultTypeName;
             saveData.LastOwnedCarIndex = 0;
 
-            // Save changes.
             SaveManager.Instance.SaveGame();
+        }
+        else
+        {
+            // If CurrentCarType is empty or unknown, normalize to a known one.
+            if (string.IsNullOrWhiteSpace(saveData.CurrentCarType) || !typeIndexByName.ContainsKey(saveData.CurrentCarType))
+            {
+                string fallback = typeOrder.Count > 0 ? typeOrder[0] : "ferret";
+                saveData.CurrentCarType = fallback;
+                saveData.CurrentCarIndex = 0;
+                SaveManager.Instance.SaveGame();
+            }
         }
 
         carParts = new CarPart[13][];
@@ -171,105 +198,164 @@ public class GarageUIManager : MonoBehaviour
     private void Update()
     {
         // ************************************************* PC KEYBOARD INPUT COMMANDS FOR DEBUGGING ************************************************* //
-        if (Input.GetKeyDown(KeyCode.C))                                                                                                                //
-        {                                                                                                                                               //
-            creditManager.ChangeCredits(1900000);                                                                                                       //
-        }                                                                                                                                               //
-        if (Input.GetKeyDown(KeyCode.H))                                                                                                                //
-        {                                                                                                                                               //
-            Cursor.visible = !Cursor.visible; // Toggle the cursor's visibility                                                                         //
-        }                                                                                                                                               //
-                                                                                                                                                        //
-        if (isPlayerInPaintMenu) /* 0 = Primary Color, 1 = Secondary Color, 2 = Rim Color, 3 = Primary Light, 4 = Secondary Light, 5 = Tail Lights */   //
-        {                                                                                                                                               //
-            if (Input.GetKeyUp(KeyCode.B))                                                                                                              //
-            {                                                                                                                                           //
-                if (whichPartToPaint < 2)                                                                                                               //
-                    backButtons[3].onClick.Invoke();                                                                                                    //
-                else if (whichPartToPaint == 2)                                                                                                         //
-                    backButtons[2].onClick.Invoke();                                                                                                    //
-                else                                                                                                                                    //
-                    backButtons[4].onClick.Invoke();                                                                                                    //
-            }                                                                                                                                           //
-                                                                                                                                                        //
-            if (Input.GetKeyDown(KeyCode.LeftArrow) && whichPartToPaint < 2)                                                                            //
-            {                                                                                                                                           //
-                buttonSwitchPaintTypeLeft.onClick.Invoke();                                                                                             //
-            }                                                                                                                                           //
-                                                                                                                                                        //
-            if (Input.GetKeyDown(KeyCode.RightArrow) && whichPartToPaint < 2)                                                                           //
-            {                                                                                                                                           //
-                buttonSwitchPaintTypeRight.onClick.Invoke();                                                                                            //
-            }                                                                                                                                           //
-                                                                                                                                                        //
-            if (Input.GetKeyDown(KeyCode.Return))                                                                                                       //
-            {                                                                                                                                           //
-                invokedFromUpdate = true;                                                                                                               //
-                if (whichPartToPaint == 0)                                                                                                              //
-                {                                                                                                                                       //
-                    primaryColorButton.onClick.Invoke();                                                                                                //
-                    SetColor(primaryColorButton);                                                                                                       //
-                }                                                                                                                                       //
-                                                                                                                                                        //
-                else if (whichPartToPaint == 1)                                                                                                         //
-                {                                                                                                                                       //
-                    secondaryColorButton.onClick.Invoke();                                                                                              //
-                    SetColor(secondaryColorButton);                                                                                                     //
-                }                                                                                                                                       //
-                                                                                                                                                        //
-                else if (whichPartToPaint == 2)                                                                                                         //
-                {                                                                                                                                       //
-                    rimButton.onClick.Invoke();                                                                                                         //
-                    SetColor(rimButton);                                                                                                                //
-                }                                                                                                                                       //
-                                                                                                                                                        //
-                else if (whichPartToPaint == 3)                                                                                                         //
-                {                                                                                                                                       //
-                    primaryLightColorButton.onClick.Invoke();                                                                                           //
-                    SetColor(primaryLightColorButton);                                                                                                  //
-                }                                                                                                                                       //
-                                                                                                                                                        //
-                else if (whichPartToPaint == 4)                                                                                                         //
-                {                                                                                                                                       //
-                    secondaryLightColorButton.onClick.Invoke();                                                                                         //
-                    SetColor(secondaryLightColorButton);                                                                                                //
-                }                                                                                                                                       //
-                                                                                                                                                        //
-                else                                                                                                                                    //
-                {                                                                                                                                       //
-                    tailLightColorButton.onClick.Invoke();                                                                                              //
-                    SetColor(tailLightColorButton);                                                                                                     //
-                }                                                                                                                                       //
-                invokedFromUpdate = false;                                                                                                              //
-            }                                                                                                                                           //
-        }                                                                                                                                               //
-                                                                                                                                                        //
-        if (inCustomizationMenu) return;                                                                                                                //
-                                                                                                                                                        //
-        if (!isPlayerInPaintMenu)                                                                                                                       //
-        {                                                                                                                                               //
-            if (Input.GetKeyDown(KeyCode.Return))                                                                                                       //
-            {                                                                                                                                           //
-                carCustomize.onClick.Invoke();                                                                                                          //
-            }                                                                                                                                           //
-                                                                                                                                                        //
-            if (Input.GetKeyDown(KeyCode.LeftArrow))                                                                                                    //
-            {                                                                                                                                           //
-                leftCarChange.onClick.Invoke();                                                                                                         //
-            }                                                                                                                                           //
-                                                                                                                                                        //
-            else if (Input.GetKeyDown(KeyCode.RightArrow))                                                                                              //
-            {                                                                                                                                           //
-                rightCarChange.onClick.Invoke();                                                                                                        //
-            }                                                                                                                                           //
-        }                                                                                                                                               //
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            creditManager.ChangeCredits(1900000);
+        }
+        if (Input.GetKeyDown(KeyCode.H))
+        {
+            Cursor.visible = !Cursor.visible; // Toggle the cursor's visibility
+        }
+
+        if (isPlayerInPaintMenu) /* 0 = Primary Color, 1 = Secondary Color, 2 = Rim Color, 3 = Primary Light, 4 = Secondary Light, 5 = Tail Lights */
+        {
+            if (Input.GetKeyUp(KeyCode.B))
+            {
+                if (whichPartToPaint < 2)
+                    backButtons[3].onClick.Invoke();
+                else if (whichPartToPaint == 2)
+                    backButtons[2].onClick.Invoke();
+                else
+                    backButtons[4].onClick.Invoke();
+            }
+
+            if (Input.GetKeyDown(KeyCode.LeftArrow) && whichPartToPaint < 2)
+            {
+                buttonSwitchPaintTypeLeft.onClick.Invoke();
+            }
+
+            if (Input.GetKeyDown(KeyCode.RightArrow) && whichPartToPaint < 2)
+            {
+                buttonSwitchPaintTypeRight.onClick.Invoke();
+            }
+
+            if (Input.GetKeyDown(KeyCode.Return))
+            {
+                invokedFromUpdate = true;
+                if (whichPartToPaint == 0)
+                {
+                    primaryColorButton.onClick.Invoke();
+                    SetColor(primaryColorButton);
+                }
+
+                else if (whichPartToPaint == 1)
+                {
+                    secondaryColorButton.onClick.Invoke();
+                    SetColor(secondaryColorButton);
+                }
+
+                else if (whichPartToPaint == 2)
+                {
+                    rimButton.onClick.Invoke();
+                    SetColor(rimButton);
+                }
+
+                else if (whichPartToPaint == 3)
+                {
+                    primaryLightColorButton.onClick.Invoke();
+                    SetColor(primaryLightColorButton);
+                }
+
+                else if (whichPartToPaint == 4)
+                {
+                    secondaryLightColorButton.onClick.Invoke();
+                    SetColor(secondaryLightColorButton);
+                }
+
+                else
+                {
+                    tailLightColorButton.onClick.Invoke();
+                    SetColor(tailLightColorButton);
+                }
+                invokedFromUpdate = false;
+            }
+        }
+
+        if (inCustomizationMenu) return;
+
+        if (!isPlayerInPaintMenu)
+        {
+            if (Input.GetKeyDown(KeyCode.Return))
+            {
+                carCustomize.onClick.Invoke();
+            }
+
+            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                leftCarChange.onClick.Invoke();
+            }
+
+            else if (Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                rightCarChange.onClick.Invoke();
+            }
+        }
     }   // ******************************************************************************************************************************************** //
 
+    private void BuildCarTypeNameIndex()
+    {
+        typeIndexByName.Clear();
+        typeOrder.Clear();
+
+        for (int i = 0; i < carCollection.carTypes.Count; i++)
+        {
+            var bucket = carCollection.carTypes[i];
+            if (bucket.items == null || bucket.items.Count == 0)
+                continue;
+
+            var first = bucket.items[0] as Car;
+            if (first == null)
+                throw new InvalidOperationException($"CarCollection.carTypes[{i}] contains a non-Car ScriptableObject.");
+
+            // Preferred: Car exposes a public string TypeName. Fallback to asset name if missing.
+            string typeName = !string.IsNullOrWhiteSpace(first.car_name)
+                ? first.car_name
+                : first.name; // fallback
+
+            if (string.IsNullOrWhiteSpace(typeName))
+                throw new InvalidOperationException($"Car at index {i} has empty type name.");
+
+            if (typeIndexByName.ContainsKey(typeName))
+                throw new InvalidOperationException($"Duplicate car type name '{typeName}' detected in CarCollection.");
+
+            typeIndexByName[typeName] = i;
+            typeOrder.Add(typeName);
+        }
+    }
+
+    private int GetCarTypeIndex(string typeName)
+    {
+        if (!typeIndexByName.TryGetValue(typeName, out var idx))
+            throw new KeyNotFoundException($"Unknown car type '{typeName}'. Ensure it exists in CarCollection.");
+        return idx;
+    }
+
+    private CarCollection.CarType GetCarTypeBucket(string typeName)
+    {
+        return carCollection.carTypes[GetCarTypeIndex(typeName)];
+    }
+
+    private int GetTypeOrderIndex(string typeName)
+    {
+        int t = typeOrder.IndexOf(typeName);
+        if (t < 0) throw new KeyNotFoundException($"Type '{typeName}' not found in type order.");
+        return t;
+    }
+
+    private string GetNextType(string current)
+    {
+        int i = GetTypeOrderIndex(current);
+        return typeOrder[(i + 1) % typeOrder.Count];
+    }
+
+    private string GetPrevType(string current)
+    {
+        int i = GetTypeOrderIndex(current);
+        return typeOrder[(i - 1 + typeOrder.Count) % typeOrder.Count];
+    }
 
     private void CacheComponents()
     {
-        // Initialize customizationSubBuckets and the first dimension of the cached arrays
-        //customizationSubBuckets = new GameObject[customizationBuckets.Length][];
         rawImages = new RawImage[customizationBuckets.Length][];
         textMeshPros = new TextMeshProUGUI[customizationBuckets.Length][];
         bucketButtons = new Button[customizationBuckets.Length][];
@@ -277,20 +363,8 @@ public class GarageUIManager : MonoBehaviour
 
         for (int i = 0; i < customizationBuckets.Length; i++)
         {
-            Transform bucketTransform = customizationBuckets[i].transform;
-            int childCount = bucketTransform.childCount - 1;  // Subtracting one to exclude the last child (back button)
-
-            // Store child game objects of the current customizationBucket, excluding the back button
-            /*customizationSubBuckets[i] = new GameObject[childCount];
-            for (int c = 0; c < childCount; c++)
-            {
-                customizationSubBuckets[i][c] = bucketTransform.GetChild(c).gameObject;
-                Debug.Log("Customization bucket column " + i + ", row " + c + " name: " + customizationSubBuckets[i][c].name);
-            }*/
-
             int subArrayLength = customizationSubBuckets[i].items.Length;
 
-            // Initialize the second dimension of the cached arrays based on the subArrayLength
             rawImages[i] = new RawImage[subArrayLength];
             textMeshPros[i] = new TextMeshProUGUI[subArrayLength];
             bucketButtons[i] = new Button[subArrayLength];
@@ -306,45 +380,59 @@ public class GarageUIManager : MonoBehaviour
         }
     }
 
-
     /*------------------------------------- GARAGE UI FUNCTIONS -------------------------------------*/
     public void ChangeCar(int change)
     {
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        currentCarIndex += change;
-
-        // Get the current car type (e.g. ferret, viking HD) and get the total number of this type of car owned.
+        // Load current selection
         currentCarType = saveData.CurrentCarType;
-        numOfThisCarTypeOwned  = SaveManager.Instance.SaveData.Cars.Count(car => car.Key.CarType == currentCarType);
+        currentCarIndex = saveData.CurrentCarIndex;
 
-        // Boundary checking.
-        if (currentCarIndex < 0)
+        // Safety: if type unknown, reset to first available.
+        if (string.IsNullOrWhiteSpace(currentCarType) || !typeIndexByName.ContainsKey(currentCarType))
         {
-            // Switch to the previous car type.
-            currentCarType -= 1;
-            if (currentCarType < 0) currentCarType = carCollection.carTypes.Count - 1;
-            numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(car => car.Key.CarType == currentCarType);
-
-            // Set the index to the last owned car copy of this car type. E.g. if the player owns 5 ferrets, set the currentCarIndex to 4.
-            currentCarIndex = Mathf.Min(Mathf.Max(numOfThisCarTypeOwned - 1, 0), carCollection.carTypes[currentCarType].items.Count - 1);
-        }
-        // Boundary checking. So as to not display the full 100 potentially buyable copies of the same car,
-        // check to make sure we don't go over the total number of copies of this car that the player owns.
-        else if (currentCarIndex > numOfThisCarTypeOwned - 1 || currentCarIndex > carCollection.carTypes[currentCarType].items.Count - 1)
-        {
-            currentCarType += 1;
-            if (currentCarType > carCollection.carTypes.Count - 1) currentCarType = 0;
+            currentCarType = typeOrder.Count > 0 ? typeOrder[0] : currentCarType;
             currentCarIndex = 0;
         }
 
+        // Apply index change within the same type
+        currentCarIndex += change;
 
+        // Owned copies of current type
+        numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+
+        // Variations count available in collection
+        var typeBucket = GetCarTypeBucket(currentCarType);
+        int maxVariations = typeBucket.items.Count;
+
+        if (currentCarIndex < 0)
+        {
+            // Move to previous type
+            currentCarType = GetPrevType(currentCarType);
+            typeBucket = GetCarTypeBucket(currentCarType);
+            numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+            maxVariations = typeBucket.items.Count;
+
+            currentCarIndex = Mathf.Min(Mathf.Max(numOfThisCarTypeOwned - 1, 0), Mathf.Max(maxVariations - 1, 0));
+        }
+        else if (currentCarIndex > Mathf.Min(numOfThisCarTypeOwned - 1, maxVariations - 1))
+        {
+            // Move to next type
+            currentCarType = GetNextType(currentCarType);
+            typeBucket = GetCarTypeBucket(currentCarType);
+            numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+            maxVariations = typeBucket.items.Count;
+
+            currentCarIndex = 0;
+        }
+
+        // Persist current selection
         saveData.CurrentCarType = currentCarType;
         saveData.CurrentCarIndex = currentCarIndex;
 
-        // Grab the car object from the car collection field. DO I NEED THIS???
-        car = (Car)carCollection.carTypes[currentCarType].items[currentCarIndex];
+        // Grab the car object
+        car = (Car)typeBucket.items[currentCarIndex];
 
         // Save the last owned car index if this car is owned.
         bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
@@ -355,7 +443,11 @@ public class GarageUIManager : MonoBehaviour
         }
         SaveManager.Instance.SaveGame();
 
-        if (carDisplay != null) currentCar = carDisplay.DisplayCar((Car)carCollection.carTypes[currentCarType].items[currentCarIndex], currentCarType, currentCarIndex);
+        if (carDisplay != null)
+        {
+            // Ensure CarDisplay supports string carType. If not, map to index via GetCarTypeIndex(currentCarType).
+            currentCar = carDisplay.DisplayCar(car, currentCarType, currentCarIndex);
+        }
 
         Transform carTransform = currentCar.transform.Find("BODY").transform;
 
@@ -384,84 +476,72 @@ public class GarageUIManager : MonoBehaviour
         secondaryLight = currentCar.GetComponent<CarPart>().secondaryLight;
         tailLight = currentCar.GetComponent<CarPart>().tailLight;
 
-        // Loop through each row (array) in the 2D array
+        // Sort each row by price
         for (int i = 0; i < carParts.Length; i++)
         {
-            // Sort each row (1D array) by price.
             Array.Sort(carParts[i], (part1, part2) => part1.price.CompareTo(part2.price));
         }
 
         UpdatePerformanceStats();
-        
+
         // Add chrome display function over here.
     }
 
     // Revert the current car index back to the last car the player owns.
     public void RevertToLastOwnedCar()
     {
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Retrieve the last owned car type and index.
         currentCarType = saveData.LastOwnedCarType;
         currentCarIndex = saveData.LastOwnedCarIndex;
 
-        // Update the currently displayed car.
+        if (string.IsNullOrWhiteSpace(currentCarType) || !typeIndexByName.ContainsKey(currentCarType))
+        {
+            currentCarType = typeOrder.Count > 0 ? typeOrder[0] : currentCarType;
+            currentCarIndex = 0;
+        }
+
         saveData.CurrentCarType = currentCarType;
         saveData.CurrentCarIndex = currentCarIndex;
 
-        // Save changes to disk.
         SaveManager.Instance.SaveGame();
 
-        // Temporarily set currentCarIndex to 0, then change the car.
         int oldCurrentCarIndex = currentCarIndex;
         currentCarIndex = 0;
         ChangeCar(oldCurrentCarIndex);
-
-        // Restore the original currentCarIndex.
         currentCarIndex = oldCurrentCarIndex;
     }
 
     public void SetLastOwnedCar()
     {
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Update the last owned car type and index.
         saveData.CurrentCarType = currentCarType;
         saveData.CurrentCarIndex = currentCarIndex;
 
         saveData.LastOwnedCarType = currentCarType;
         saveData.LastOwnedCarIndex = currentCarIndex;
 
-        // Save the changes to disk.
         SaveManager.Instance.SaveGame();
     }
-
 
     // Calculate the sell price of the car. (Sell price = car price / 2 + value of installed parts / 4).
     public int GetSellPrice()
     {
-        // Access the SaveData instance and retrieve the car's data.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Attempt to get the car's save data.
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
-            // Throw an exception if the car data doesn't exist.
             throw new KeyNotFoundException($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
         }
 
         int sellPrice = car.price / 2;
 
-        // Iterate across all car part types from 0 (Exhausts) to 12 (Liveries).
         for (int i = 0; i < carParts.Length; i++)
         {
-            // Access the currently installed part index for the specified part 'i' (0-12).
             currentPartIndex = carData.CarParts[i].CurrentInstalledPart;
             if (currentPartIndex == -1) currentPartIndex = GetDefaultPartIndex(i);
 
-            // Don't add to the sell price if the currently installed part is a default part.
             bool isDefaultPart = i switch
             {
                 0 => carParts[i][currentPartIndex].name == car.DefaultExhaust,      // Exhaust
@@ -483,10 +563,8 @@ public class GarageUIManager : MonoBehaviour
     // Remove ownership of all parts. Used when selling the car.
     public void ClearOwnedParts(int carIndex)
     {
-        // Access the SaveData instance and retrieve the car's data.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Iterate across all car part types from 0 (Exhausts) to 12 (Liveries).
         for (int i = 0; i < carParts.Length; i++)
         {
             bool foundDefaultPart = false;
@@ -494,27 +572,22 @@ public class GarageUIManager : MonoBehaviour
             {
                 switch (i)
                 {
-                    // Set the car's default exhausts as active.
                     case 0:
                         if (carParts[i][j].name == car.DefaultExhaust) { carParts[i][j].gameObject.SetActive(true); foundDefaultPart = true; }
                         else carParts[i][j].gameObject.SetActive(false);
                         break;
-                    // Set the car's default front wheels as active.
                     case 2:
                         if (carParts[i][j].name == car.DefaultFrontWheels) { carParts[i][j].gameObject.SetActive(true); foundDefaultPart = true; }
                         else carParts[i][j].gameObject.SetActive(false);
                         break;
-                    // Set the car's default rear splitter as active.
                     case 3:
                         if (carParts[i][j].name == car.DefaultRearSplitter) { carParts[i][j].gameObject.SetActive(true); foundDefaultPart = true; }
                         else carParts[i][j].gameObject.SetActive(false);
                         break;
-                    // Set the car's default rear wheels as active.
                     case 4:
                         if (carParts[i][j].name == car.DefaultRearWheels) { carParts[i][j].gameObject.SetActive(true); foundDefaultPart = true; }
                         else carParts[i][j].gameObject.SetActive(false);
                         break;
-                    // Set the car's default spoiler as active.
                     case 6:
                         if (carParts[i][j].name == car.DefaultSpoiler) { carParts[i][j].gameObject.SetActive(true); foundDefaultPart = true; }
                         else carParts[i][j].gameObject.SetActive(false);
@@ -524,55 +597,39 @@ public class GarageUIManager : MonoBehaviour
                         break;
                 }
             }
-            if (!foundDefaultPart) // If no default part exists, set the 0th car part (Stock/None) as active.
+            if (!foundDefaultPart)
             {
                 carParts[i][0].gameObject.SetActive(true);
             }
         }
 
-        // Paint the car's default colors.
         car.SetDefaultColors();
-
-        // Remove any livery currently painted on the car.
         car.ApplyLivery(0);
 
-        // Remove the car entry from the dictionary.
         saveData.Cars.Remove((currentCarType, carIndex));
-
-        // Save the updated data.
         SaveManager.Instance.SaveGame();
     }
 
-    // This function is used instead of ClearOwnedParts() if the player sells a car copy somewhere
-    // in the middle of their total number of cars of this type. It works by shifting all the keys
-    // of the cars dictionary following this car's index by -1.
-    public void AdjustCarIndices(int carType, int removedCarIndex)
+    // Shift indices after removing a car copy of a given type (string).
+    public void AdjustCarIndices(string carTypeName, int removedCarIndex)
     {
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Create a list of keys that need to be shifted.
         var keysToShift = saveData.Cars.Keys
-            .Where(key => key.CarType == carType && key.CarIndex > removedCarIndex)
+            .Where(key => key.CarType == carTypeName && key.CarIndex > removedCarIndex)
             .OrderBy(key => key.CarIndex)
             .ToList();
 
-        // Shift each car's index down by 1.
         foreach (var key in keysToShift)
         {
-            // Extract the CarData and remove the old key.
             SaveData.CarData carData = saveData.Cars[key];
             saveData.Cars.Remove(key);
-
-            // Insert the car data with the new adjusted key.
             var newKey = (key.CarType, key.CarIndex - 1);
             saveData.Cars[newKey] = carData;
         }
 
-        // Save the updated data.
         SaveManager.Instance.SaveGame();
     }
-
 
     // Enter customization menu.
     public void EnterCustomizationMenu(bool entering)
@@ -615,52 +672,39 @@ public class GarageUIManager : MonoBehaviour
         inItemDisplayMenu = true;
         currentPartIndex = partIndex;
 
-        // Set all previous buttons to not be interactable.
         bucketButtons[currentBucketIndex][bucketSubIndex].interactable = false;
 
-        // Change the alpha values of the previous buttons to zero.
         for (int i = 0; i < bucketButtons[currentBucketIndex].Length; i++)
         {
             AdjustAlpha(rawImages[currentBucketIndex][i], textMeshPros[currentBucketIndex][i], bucketImages[currentBucketIndex][i], 0f);
         }
 
-        // Access the SaveData instance and retrieve the car's data.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Ensure the car exists in the dictionary.
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
             throw new KeyNotFoundException($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
         }
 
-        // Get the index of the current installed part so we can highlight the correct button.
         startingIndex = carData.CarParts[currentPartIndex].CurrentInstalledPart;
         if (startingIndex == -1) startingIndex = GetDefaultPartIndex(currentPartIndex);
         currentInstantiatedButtonIndex = startingIndex;
 
-        // Point the camera at the part.
         if (currentPartIndex < 8)
             garageCamera.SetCameraPosition(currentPartIndex + 1);
 
-        // Handle 'All Rims' menu logic.
         if (isPlayerInAllRimsMenu)
         {
-            // Retrieve the currently installed rear rims part index.
             rearRims = carData.CarParts[4].CurrentInstalledPart;
-
-            // Deactivate the previously installed rear rims part.
-            if (rearRims == -1) rearRims = GetDefaultPartIndex(4); // Handle entering the "All Rims" menu for the first time after buying a car.
+            if (rearRims == -1) rearRims = GetDefaultPartIndex(4);
             else carParts[4][rearRims].gameObject.SetActive(false);
 
-            // Match the rear rims with the front rims.
             carParts[4][startingIndex].gameObject.SetActive(true);
         }
 
-        // Create button array with same length as the number of parts in this bucket.
         int numOfParts = carParts[partIndex].Length;
         instantiatedButtons = new Button[numOfParts];
 
-        // Activate the scroll view for the buttons & set it to the parent transform.
         scrollController.scrollRect.gameObject.SetActive(true);
         Transform spawnTransform = scrollController.scrollRect.content.transform;
 
@@ -668,33 +712,26 @@ public class GarageUIManager : MonoBehaviour
         {
             float alphaValue = 10;
             bool interactable = false;
-            Button newButton = Instantiate(buttonTemplate, Vector3.zero, Quaternion.identity, spawnTransform /*buttonTemplate.transform.parent*/); //////////////// NEW ///////////////////////////
+            Button newButton = Instantiate(buttonTemplate, Vector3.zero, Quaternion.identity, spawnTransform);
 
-            // Find if the current part is owned.
             bool isPartOwned = carData.CarParts[currentPartIndex].Ownership.TryGetValue(i, out bool owned) && owned;
 
-            // Make the button clickable.
             int tempIndex = i;
             newButton.onClick.AddListener(() => ConfirmBuyPart(tempIndex, partIndex));
 
-            // Adjust the alpha channels of the button's text & image.
             TextMeshProUGUI[] texts = newButton.GetComponentsInChildren<TextMeshProUGUI>();
             Image image = newButton.GetComponent<Image>();
             texts[0].color = new Color(texts[0].color.r, texts[0].color.g, texts[0].color.b, alphaValue / 255f);
             texts[1].color = new Color(texts[0].color.r, texts[0].color.g, texts[0].color.b, alphaValue / 255f);
             image.color = new Color(image.color.r, image.color.g, image.color.b, alphaValue / 255f);
 
-            // Correctly set the part's button's name & price.
             texts[0].text = carParts[partIndex][i].name;
             if (partIndex == 8)
                 texts[1].text = "+" + System.Math.Round((513.57616f * car.defaultAccelMaxValue * carParts[partIndex][i].accelMaxValueUpgrade - 608.44812f) - (513.57616f * car.defaultAccelMaxValue - 608.44812f)).ToString() + " HP";
-
             else if (partIndex == 9)
                 texts[1].text = "0-60: -" + System.Math.Round((Mathf.Max(-12.28856f * car.defaultAccelIncreaseRate + 23.2393f, -5.484f * car.defaultAccelIncreaseRate + 12.068f) - Mathf.Max(-12.28856f * car.defaultAccelIncreaseRate * carParts[partIndex][i].accelIncreaseRateUpgrade + 23.2393f, -5.484f * car.defaultAccelIncreaseRate * carParts[partIndex][i].accelIncreaseRateUpgrade + 12.068f)), 1).ToString() + "s";
-
             else if (partIndex == 10)
                 texts[1].text = "+" + (carParts[partIndex][i].maxLives - car.defaultNumLives) + " lives";
-
             else
             {
                 if (i == startingIndex)
@@ -702,25 +739,21 @@ public class GarageUIManager : MonoBehaviour
                 else if (isPartOwned)
                     texts[1].text = "OWNED";
                 else
-                    texts[1].text = carParts[partIndex][i].price.ToString() + " cr";    // Display price.
+                    texts[1].text = carParts[partIndex][i].price.ToString() + " cr";
             }
 
-            // Activate the button.
             newButton.interactable = interactable;
             newButton.gameObject.SetActive(true);
             instantiatedButtons[i] = newButton;
 
-            // Add the button & components to the scroll view's cached component arrays.
             scrollController.buttons.Add(newButton);
             scrollController.buttonTransforms.Add(newButton.transform);
             scrollController.buttonImages.Add(image);
             scrollController.buttonNames.Add(texts[0]);
             scrollController.buttonPrices.Add(texts[1]);
             scrollController.backButton = backButtons[currentBucketIndex - 1];
-
         }
 
-        // Initialize the scroll view, and set its scroll position to the button with the currently installed part.
         scrollController.Initialize();
         scrollController.SetScrollPosition(startingIndex);
     }
@@ -730,7 +763,6 @@ public class GarageUIManager : MonoBehaviour
         int oldInstantiatedButtonIndex = currentInstantiatedButtonIndex;
         currentInstantiatedButtonIndex = change;
 
-        // Boundary checking.
         if (currentInstantiatedButtonIndex < 0 || currentInstantiatedButtonIndex > instantiatedButtons.Length - 1)
         {
             currentInstantiatedButtonIndex = Mathf.Clamp(currentInstantiatedButtonIndex, 0, instantiatedButtons.Length - 1);
@@ -746,10 +778,8 @@ public class GarageUIManager : MonoBehaviour
             carParts[4][currentInstantiatedButtonIndex].gameObject.SetActive(true);
         }
 
-        // Change the car suspension height.
         if (currentPartIndex == 7) suspensionHolder.SetSuspensionHeight(currentInstantiatedButtonIndex);
 
-        // Change the car livery.
         if (currentPartIndex == 12)
         {
             if (change == 0)
@@ -784,57 +814,45 @@ public class GarageUIManager : MonoBehaviour
 
     private void BuyPart(int partType, int partIndex)
     {
-        // Access the SaveData instance and retrieve the car's data.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
-        // Ensure the car exists in the dictionary.
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
             throw new KeyNotFoundException($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
         }
 
-        // Get the old part index.
         int oldIndex = carData.CarParts[partIndex].CurrentInstalledPart;
         if (oldIndex == -1) oldIndex = GetDefaultPartIndex(partIndex);
 
-        // Update the currently installed part.
         carData.CarParts[partIndex].CurrentInstalledPart = partType;
 
-        // Save both front & rear wheel indices if the player is in the 'All Rims' bucket.
         if (isPlayerInAllRimsMenu)
         {
             carData.CarParts[4].CurrentInstalledPart = partType; // Rear wheels
             rearRims = partType;
         }
 
-        // If the part is a performance part, update the current car's performance stats.
         if (partIndex > 7 && partIndex < 11)
         {
             UpdatePerformanceStats();
         }
 
-        // Update the startingIndex to the newly installed part.
         startingIndex = partType;
 
-        // Check if the part has already been purchased
         bool isPartOwned = carData.CarParts[partIndex].Ownership.TryGetValue(partType, out bool owned) && owned;
 
-        // Update the credit count and mark part as owned if the part hasn't been purchased before.
         if (!isPartOwned)
         {
             carData.CarParts[partIndex].Ownership[partType] = true;
             creditManager.ChangeCredits((int)(-1 * carParts[partIndex][partType].price));
         }
 
-        // Save the updated data.
         SaveManager.Instance.SaveGame();
 
-        // Update the button texts.
         Debug.Log(counter++ + " | Old part name: " + carParts[partIndex][oldIndex].name + " index: " + oldIndex);
         scrollController.buttonPrices[oldIndex].text = "OWNED";
         scrollController.buttonPrices[partType].text = "INSTALLED";
 
-        // Deactivate the UI popups
         notEnoughCreditsPopUp.SetActive(false);
         buyConfirmationPopUp.SetActive(false);
         popUps.SetActive(false);
@@ -844,8 +862,7 @@ public class GarageUIManager : MonoBehaviour
     {
         if (inItemDisplayMenu)
         {
-            //if (currentPartIndex < 8)
-                garageCamera.SetCameraPosition(0);
+            garageCamera.SetCameraPosition(0);
             for (int i = 0; i < instantiatedButtons.Length; i++)
             {
                 Destroy(instantiatedButtons[i].gameObject);
@@ -860,13 +877,13 @@ public class GarageUIManager : MonoBehaviour
                 else if (i == bucketSubIndex - 1 || i == bucketSubIndex + 1)
                     AdjustAlpha(rawImages[currentBucketIndex][i], textMeshPros[currentBucketIndex][i], bucketImages[currentBucketIndex][i], 100f);
 
-                else 
+                else
                     AdjustAlpha(rawImages[currentBucketIndex][i], textMeshPros[currentBucketIndex][i], bucketImages[currentBucketIndex][i], 10f);
             }
 
             carParts[currentPartIndex][currentInstantiatedButtonIndex].gameObject.SetActive(false);
             carParts[currentPartIndex][startingIndex].gameObject.SetActive(true);
-            
+
             if (isPlayerInAllRimsMenu)
             {
                 carParts[4][currentInstantiatedButtonIndex].gameObject.SetActive(false);
@@ -960,7 +977,7 @@ public class GarageUIManager : MonoBehaviour
             }
         }
     }
-    
+
     public void SetIsPlayerInAllRimsMenuToTrue()
     {
         isPlayerInAllRimsMenu = true;
@@ -971,8 +988,7 @@ public class GarageUIManager : MonoBehaviour
     {
         whichPartToPaint = part;
         isPlayerInPaintMenu = true;
-        
-        // Disable the buttons that we used to get into the paint menu, and enable the switch paint type buttons.
+
         if (whichPartToPaint == 0 || whichPartToPaint == 1)
         {
             buttonPrimaryColor.gameObject.SetActive(false);
@@ -999,21 +1015,17 @@ public class GarageUIManager : MonoBehaviour
             paintType.text = "";
         }
 
-        // Disable the buttons that allowed us to change customization buckets.
         leftButton.gameObject.SetActive(false);
         rightButton.gameObject.SetActive(false);
 
-        // Enable the colors menu.
         colors.SetActive(true);
 
-        // Set the default paint type to matte.
         currentPaintType = 0;
         activeShader = matteShader;
     }
 
     public void ChangePaintType(int change)
     {
-        // Rims can only either be matte or emissive.
         if (whichPartToPaint == 2)
         {
             if (change < 0) currentPaintType = 0;
@@ -1022,7 +1034,8 @@ public class GarageUIManager : MonoBehaviour
         else
             currentPaintType += change;
 
-        // Check boundaries.
+        bool supportsEmissiveSecondary = SupportsEmissiveSecondary(currentCarType, car);
+
         if (whichPartToPaint == 0) // Primary color doesn't include emissive colors.
         {
             if (currentPaintType < 0 || currentPaintType > 2)
@@ -1031,9 +1044,9 @@ public class GarageUIManager : MonoBehaviour
                 return;
             }
         }
-        else if (whichPartToPaint == 1) // Secondary color includes emissive colors.
+        else if (whichPartToPaint == 1) // Secondary color includes emissive colors conditionally.
         {
-            if (currentCarType == 0 || currentCarType == 1) // Ferret & Viking HD don't have emissive colors enabled. NEEDS TO BE CHANGED FOR METAL COLORS IN THE FUTURE.
+            if (!supportsEmissiveSecondary)
             {
                 if (currentPaintType < 0 || currentPaintType > 2)
                 {
@@ -1043,11 +1056,8 @@ public class GarageUIManager : MonoBehaviour
             }
             else if (currentPaintType < 0 || currentPaintType > 3)
             {
-                if (currentPaintType < 0 || currentPaintType > 3)
-                {
-                    currentPaintType = Mathf.Clamp(currentPaintType, 0, 3);
-                    return;
-                }
+                currentPaintType = Mathf.Clamp(currentPaintType, 0, 3);
+                return;
             }
         }
         else if (whichPartToPaint == 2) // Rim color includes emissive colors.
@@ -1099,6 +1109,13 @@ public class GarageUIManager : MonoBehaviour
         }
     }
 
+    private bool SupportsEmissiveSecondary(string typeName, Car carAsset)
+    {
+        // Preferred: return carAsset.SupportsEmissiveSecondary; // if your Car scriptable exposes this
+        // Temporary: name-based exclusion
+        return !noEmissiveSecondaryTypes.Contains(typeName);
+    }
+
     // Called when user clicks on a paint button. Sets the colour of the part to paint to the button's colour.
     public void SetColor()
     {
@@ -1110,25 +1127,21 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        // Get the material of the paint button we clicked.
         Material buttonMaterial = clickedButton.GetComponent<Image>().material;
         Color topColor, middleColor, bottomColor;
-        Color buttonColor = new Color(0,0,0);
+        Color buttonColor = new Color(0, 0, 0);
 
-        // Retrieve the three colors from the button if it is a pearlescent paint button.
         if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") && buttonMaterial.HasProperty("_MiddleColor") && buttonMaterial.HasProperty("_BottomColor"))
         {
-            
             topColor = buttonMaterial.GetColor("_TopColor");
             middleColor = buttonMaterial.GetColor("_MiddleColor");
             bottomColor = buttonMaterial.GetColor("_BottomColor");
         }
-        else // Retrieve the main color of the button if it is any other paint type.
+        else
         {
             buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
         }
 
-        // Access the SaveData instance and get the current car's data.
         SaveData saveData = SaveManager.Instance.SaveData;
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
@@ -1136,25 +1149,21 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        // Get ColorType enum.
         Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
-
-        // Update the color data based on the current part to paint.
         SaveData.ColorData colorData = carData.Colors[whichPartToPaint];
 
-        // Update the material of the car to reflect the new color.
         switch (colorType)
         {
             case Car.ColorType.PRIMARY_COLOR:
                 primaryColor.color = topColor;
-                primaryColor.SetColor("_FresnelColor", middleColor); // Using the middle color for FresnelColor.
-                primaryColor.SetColor("_FresnelColor2", bottomColor); // Using the bottom color for FresnelColor2.
+                primaryColor.SetColor("_FresnelColor", middleColor);
+                primaryColor.SetColor("_FresnelColor2", bottomColor);
                 colorData.BaseColor = new float[] { topColor.r, topColor.g, topColor.b, topColor.a };
                 colorData.FresnelColor = new float[] { middleColor.r, middleColor.g, middleColor.b, middleColor.a };
                 colorData.FresnelColor2 = new float[] { bottomColor.r, bottomColor.g, bottomColor.b, bottomColor.a };
                 break;
             case Car.ColorType.SECONDARY_COLOR:
-                if (currentPaintType == 1 || currentPaintType == 2) // Non-emissive color.
+                if (currentPaintType == 1 || currentPaintType == 2) // Non-emissive
                 {
                     secondaryColor.color = topColor;
                     secondaryColor.SetColor("_FresnelColor", middleColor);
@@ -1166,9 +1175,9 @@ public class GarageUIManager : MonoBehaviour
                     colorData.FresnelColor2 = new float[] { bottomColor.r, bottomColor.g, bottomColor.b, bottomColor.a };
                     colorData.EmissionColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
                 }
-                else // Emissive color.
+                else
                 {
-                    secondaryColor.color = Color.black; // Set base color to black.
+                    secondaryColor.color = Color.black;
                     secondaryColor.SetColor("_FresnelColor", Color.black);
                     secondaryColor.SetColor("_FresnelColor2", Color.black);
                     secondaryColor.SetColor("_EmissionColor", buttonColor);
@@ -1180,32 +1189,20 @@ public class GarageUIManager : MonoBehaviour
                 }
                 break;
             case Car.ColorType.RIM_COLOR:
-                if (currentPaintType == 3) // Emissive color.
+                if (currentPaintType == 3) // Emissive
                 {
-                    rimColor.color = Color.black; // Set base color to black.
-                    /*  UNCOMMENT WHEN RIMS GET CONVERTED TO METALLIC
-                    secondaryColor.SetColor("_FresnelColor", Color.black);
-                    secondaryColor.SetColor("_FresnelColor2", Color.black);*/
+                    rimColor.color = Color.black;
                     rimColor.SetColor("_EmissionColor", buttonColor);
                     rimColor.EnableKeyword("_EMISSION");
                     colorData.BaseColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
-                    /*   UNCOMMENT WHEN RIMS GET CONVERTED TO METALLIC
-                    colorData.FresnelColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
-                    colorData.FresnelColor2 = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };*/
                     colorData.EmissionColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
                 }
                 else
                 {
                     rimColor.color = buttonColor;
-                    /*  UNCOMMENT WHEN RIMS GET CONVERTED TO METALLIC
-                    secondaryColor.SetColor("_FresnelColor", buttonColor);
-                    secondaryColor.SetColor("_FresnelColor2", buttonColor);*/
                     rimColor.SetColor("_EmissionColor", Color.black);
                     rimColor.DisableKeyword("_EMISSION");
                     colorData.BaseColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
-                    /*   UNCOMMENT WHEN RIMS GET CONVERTED TO METALLIC
-                    colorData.FresnelColor = new float[] { middleColor.r, middleColor.g, middleColor.b, middleColor.a };
-                    colorData.FresnelColor2 = new float[] { bottomColor.r, bottomColor.g, bottomColor.b, bottomColor.a };*/
                     colorData.EmissionColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
                 }
                 break;
@@ -1226,7 +1223,6 @@ public class GarageUIManager : MonoBehaviour
                 return;
         }
 
-        // Save the updated data to disk.
         SaveManager.Instance.SaveGame();
     }
 
@@ -1239,25 +1235,21 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        // Get the material of the paint button we clicked.
         Material buttonMaterial = clickedButton.GetComponent<Image>().material;
         Color topColor, middleColor, bottomColor;
         Color buttonColor = new Color(0, 0, 0);
 
-        // Retrieve the three colors from the button if it is a pearlescent paint button.
         if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") && buttonMaterial.HasProperty("_MiddleColor") && buttonMaterial.HasProperty("_BottomColor"))
         {
-
             topColor = buttonMaterial.GetColor("_TopColor");
             middleColor = buttonMaterial.GetColor("_MiddleColor");
             bottomColor = buttonMaterial.GetColor("_BottomColor");
         }
-        else // Retrieve the main color of the button if it is any other paint type.
+        else
         {
             buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
         }
 
-        // Access the SaveData instance and get the current car's data.
         SaveData saveData = SaveManager.Instance.SaveData;
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
@@ -1265,54 +1257,51 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        // Update the color data based on the current part to paint.
         SaveData.ColorData colorData = carData.Colors[whichPartToPaint];
         colorData.BaseColor = new float[] { topColor.r, topColor.g, topColor.b, topColor.a };
-        if (currentPaintType == 1 || currentPaintType == 2) // For Fresnel colors (e.g., pearlescent paint).
+        if (currentPaintType == 1 || currentPaintType == 2)
         {
             colorData.FresnelColor = new float[] { middleColor.r, middleColor.g, middleColor.b, middleColor.a };
             colorData.FresnelColor2 = new float[] { bottomColor.r, bottomColor.g, bottomColor.b, bottomColor.a };
         }
-        else // For non-Fresnel colors.
+        else
         {
             colorData.FresnelColor = null;
             colorData.FresnelColor2 = null;
         }
 
-        // Get ColorType enum.
         Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
 
-        // Update the material of the car to reflect the new color.
         switch (colorType)
         {
             case Car.ColorType.PRIMARY_COLOR:
                 primaryColor.color = topColor;
-                primaryColor.SetColor("_FresnelColor", middleColor); // Using the middle color for FresnelColor.
-                primaryColor.SetColor("_FresnelColor2", bottomColor); // Using the bottom color for FresnelColor2.
+                primaryColor.SetColor("_FresnelColor", middleColor);
+                primaryColor.SetColor("_FresnelColor2", bottomColor);
                 break;
             case Car.ColorType.SECONDARY_COLOR:
                 secondaryColor.color = topColor;
                 secondaryColor.SetColor("_FresnelColor", middleColor);
                 secondaryColor.SetColor("_FresnelColor2", bottomColor);
-                if (currentPaintType == 1 || currentPaintType == 2) // Non-emissive color.
+                if (currentPaintType == 1 || currentPaintType == 2)
                 {
                     secondaryColor.SetColor("_FresnelColor", middleColor);
                     secondaryColor.SetColor("_FresnelColor2", bottomColor);
                     secondaryColor.SetColor("_EmissionColor", Color.black);
                     secondaryColor.DisableKeyword("_EMISSION");
                 }
-                else if (currentPaintType == 3) // Emissive color.
+                else if (currentPaintType == 3)
                 {
-                    secondaryColor.color = Color.black; // Set base color to black.
+                    secondaryColor.color = Color.black;
                     secondaryColor.SetColor("_EmissionColor", buttonColor);
                     secondaryColor.EnableKeyword("_EMISSION");
                 }
                 break;
             case Car.ColorType.RIM_COLOR:
                 rimColor.color = buttonColor;
-                if (currentPaintType == 3) // Emissive color.
+                if (currentPaintType == 3)
                 {
-                    rimColor.color = Color.black; // Set base color to black.
+                    rimColor.color = Color.black;
                     rimColor.SetColor("_EmissionColor", buttonColor);
                     rimColor.EnableKeyword("_EMISSION");
                 }
@@ -1336,40 +1325,34 @@ public class GarageUIManager : MonoBehaviour
                 return;
         }
 
-        // Save the updated data to disk.
         SaveManager.Instance.SaveGame();
     }
 
     /*----------------------------------------- OTHER FUNCTIONS --------------------------------------------*/
     public void UpdatePerformanceStats()
     {
-        // Access the SaveData instance and retrieve the car's data.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        var saveData = SaveManager.Instance.SaveData;
 
         int engineIndex = 0;
         int transmissionIndex = 0;
         int livesIndex = 0;
 
-        // Ensure the car exists in the dictionary.
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
             // Do nothing.
         }
         else
         {
-            // Retrieve the indices of the installed engine, transmission, and lives parts.
             Debug.Log(engineIndex + " " + carData.CarParts[8].CurrentInstalledPart);
-            engineIndex = engineIndex == -1 ? 0: carData.CarParts[8].CurrentInstalledPart;       // ENGINE
-            transmissionIndex = transmissionIndex == -1 ? 0: carData.CarParts[9].CurrentInstalledPart; // TRANSMISSION
-            livesIndex = livesIndex == -1 ? 0: carData.CarParts[10].CurrentInstalledPart;       // LIVES
+            engineIndex = engineIndex == -1 ? 0 : carData.CarParts[8].CurrentInstalledPart;            // ENGINE
+            transmissionIndex = transmissionIndex == -1 ? 0 : carData.CarParts[9].CurrentInstalledPart; // TRANSMISSION
+            livesIndex = livesIndex == -1 ? 0 : carData.CarParts[10].CurrentInstalledPart;              // LIVES
         }
 
-        // Update car stats based on the currently installed parts.
         if (engineIndex != -1) car.accelMaxValue = car.defaultAccelMaxValue * carParts[8][engineIndex].accelMaxValueUpgrade;
         if (transmissionIndex != -1) car.accelIncreaseRate = car.defaultAccelIncreaseRate * carParts[9][transmissionIndex].accelIncreaseRateUpgrade;
         if (livesIndex != -1) car.numlives = carParts[10][livesIndex].maxLives;
 
-        // Update the display.
         carDisplay.UpdateStats(car.accelMaxValue, car.accelIncreaseRate, car.numlives);
     }
 

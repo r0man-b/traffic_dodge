@@ -22,10 +22,10 @@ public class SaveData
     public bool TransatlanticTunnelEnvironmentPurchased = false;
 
     // Menu/Car.cs && Menu/CarDisplay.cs && Menu/GarageUIManager.cs && Game/PlayerController.cs
-    public Dictionary<(int CarType, int CarIndex), CarData> Cars = new Dictionary<(int, int), CarData>();
-    public int CurrentCarType;  // Currently displayed car type.
+    public Dictionary<(string CarType, int CarIndex), CarData> Cars = new Dictionary<(string, int), CarData>();
+    public string CurrentCarType;  // Currently displayed car type.
     public int CurrentCarIndex; // Currently displayed car index.
-    public int LastOwnedCarType;
+    public string LastOwnedCarType;
     public int LastOwnedCarIndex;
     public int NitroCount;
     public float DistanceUntilNextNitro = 100.0f;

@@ -18,7 +18,7 @@ public class PlayerController : MonoBehaviour
     private float lastXPosition;
     public int numlives = 0;
     public Car currentCar;
-    private int currentCarType;
+    private string currentCarType;
     private int currentCarIndex;
     public GameObject carObject;
     public GameObject sparks;
@@ -122,6 +122,16 @@ public class PlayerController : MonoBehaviour
 
     private int currentEnvironment;
 
+    // Map car type name -> index in CarCollection.carTypes
+    private Dictionary<string, int> carTypeIndexByName = new();
+
+    private int GetCarTypeIndex(string typeName)
+    {
+        if (!carTypeIndexByName.TryGetValue(typeName, out var idx))
+            throw new KeyNotFoundException($"Car type '{typeName}' not found in CarCollection.");
+        return idx;
+    }
+
     void Awake()
     {
         // Access the SaveData instance.
@@ -130,14 +140,40 @@ public class PlayerController : MonoBehaviour
         // Get current environment.
         currentEnvironment = saveData.CurrentEnvironment;
 
-        // Retrieve the current car type and index from SaveData.
+        // Retrieve the current car type (string) and index from SaveData.
         currentCarType = saveData.CurrentCarType;
         currentCarIndex = saveData.CurrentCarIndex;
 
-        currentCar = (Car)carCollection.carTypes[currentCarType].items[currentCarIndex];
+        // Build name -> index map once
+        carTypeIndexByName.Clear();
+        for (int i = 0; i < carCollection.carTypes.Count; i++)
+        {
+            var bucket = carCollection.carTypes[i];
+            if (bucket.items == null || bucket.items.Count == 0) continue;
+
+            // Preferred: Car ScriptableObject exposes a stable type name, e.g., public string TypeName
+            var firstCar = bucket.items[0] as Car;
+            if (firstCar == null)
+                throw new System.InvalidOperationException($"CarCollection.carTypes[{i}] contains a non-Car asset.");
+
+            string typeName = firstCar.car_name;      // if you have Car.TypeName
+            if (string.IsNullOrWhiteSpace(typeName))
+                typeName = firstCar.name;             // fallback to asset name if needed
+
+            if (carTypeIndexByName.ContainsKey(typeName))
+                throw new System.InvalidOperationException($"Duplicate car type name '{typeName}' in CarCollection.");
+
+            carTypeIndexByName[typeName] = i;
+        }
+
+        // Retrieve the Car instance from the collection using the string key.
+        int typeIdx = GetCarTypeIndex(currentCarType);
+        currentCar = (Car)carCollection.carTypes[typeIdx].items[currentCarIndex];
+
         currentCar.InitializeCar(currentCarType, currentCarIndex);
         carObject = Instantiate(currentCar.carModel, Vector3.zero, Quaternion.identity, this.transform);
         carObject.transform.localPosition = currentCar.raceSpawnPosition;
+
 
         accelMaxValue = currentCar.accelMaxValue;
         if (!invincible) numlives = currentCar.numlives;

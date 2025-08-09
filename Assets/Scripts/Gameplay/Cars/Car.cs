@@ -26,7 +26,7 @@ public class Car : ScriptableObject
         SECONDARY_LIGHT = 4,
         TAIL_LIGHT = 5
     }
-    private int currentCarType;
+    private string currentCarType;
     private int currentCarIndex;
 
     [Header("Soft Stats")]
@@ -511,7 +511,7 @@ public class Car : ScriptableObject
         tailLight.SetColor("_EmissionColor", defaultTailLightColor);
     }
 
-    public void InitializeCar(int carType, int carIndex, bool isOwned = true)
+    public void InitializeCar(string carType, int carIndex, bool isOwned = true)
     {
         currentCarType = carType;
         currentCarIndex = carIndex;
@@ -853,7 +853,7 @@ public class Car : ScriptableObject
     }
 
     // Spawn car with randomized customizations. Will be used for cars spawned from lootboxes.
-    public void RandomizeCar(int carType, int carIndex, bool isOwned = true)
+    public void RandomizeCar(string carType, int carIndex, bool isOwned = true)
     {
         currentCarType = carType;
         currentCarIndex = carIndex;
