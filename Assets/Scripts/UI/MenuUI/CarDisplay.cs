@@ -39,8 +39,8 @@ public class CarDisplay : MonoBehaviour
     public GameObject cannotSellPopUp;
     public TextMeshProUGUI cannotSellPopUpText;
 
-    [Header("Audiosource")]
-    public AudioSource audioSource;
+    [Header("Sound")]
+    public MenuSounds menuSounds;
 
     private Car currentCar;
     private int currentCarType;
@@ -165,7 +165,7 @@ public class CarDisplay : MonoBehaviour
         popUps.SetActive(false);
         buttonSet1.SetActive(false);
         buttonSet2.SetActive(true);
-        audioSource.Play();
+        menuSounds.PlayChaChing();
 
         // Save the last owned car and update the saved data.
         garageUIManager.SetLastOwnedCar();
@@ -176,6 +176,11 @@ public class CarDisplay : MonoBehaviour
         {
             garageUIManager.ChangeCar(numOfThisCarTypeOwned - currentCarIndex - 1);
         }
+
+        buyConfirmationPopUp.SetActive(false);
+        notEnoughCreditsPopUp.SetActive(false);
+        sellConfirmationPopUp.SetActive(false);
+        cannotSellPopUp.SetActive(false);
     }
 
 
@@ -244,7 +249,7 @@ public class CarDisplay : MonoBehaviour
             lockUiElement.SetActive(true);
             lockImage.SetActive(true);
             popUps.SetActive(false);
-            audioSource.Play();
+            menuSounds.PlayChaChing();
             garageUIManager.ChangeCar(-1);
         }
         else if (numOfThisCarTypeOwned > 0) // If selling a car in the middle, use different logic.
@@ -257,7 +262,7 @@ public class CarDisplay : MonoBehaviour
             lockUiElement.SetActive(true);
             lockImage.SetActive(true);
             popUps.SetActive(false);
-            audioSource.Play();
+            menuSounds.PlayChaChing();
             if (currentCarIndex == 0) garageUIManager.ChangeCar(0);
             else garageUIManager.ChangeCar(-1);
         }
@@ -271,11 +276,15 @@ public class CarDisplay : MonoBehaviour
             popUps.SetActive(false);
             buttonSet1.SetActive(true);
             buttonSet2.SetActive(false);
-            audioSource.Play();
+            menuSounds.PlayChaChing();
             //DisplayCar(currentCar, currentCarType, currentCarIndex);
         }
         garageUIManager.UpdatePerformanceStats();
         SaveManager.Instance.SaveGame(); // Save changes to the data.
+        buyConfirmationPopUp.SetActive(false);
+        notEnoughCreditsPopUp.SetActive(false);
+        sellConfirmationPopUp.SetActive(false);
+        cannotSellPopUp.SetActive(false);
     }
 
 

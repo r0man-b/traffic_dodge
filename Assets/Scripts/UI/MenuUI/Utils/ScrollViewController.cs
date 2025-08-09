@@ -28,6 +28,10 @@ public class ScrollViewController : MonoBehaviour
     public Button[] directionButtons;
     public Button backButton;
 
+    [Space(10)]
+    [Header("Sound")]
+    public MenuSounds menuSounds;
+
     // Scroll variables
     private Scrollbar scrollbarComponent;
     private float scrollPosition = 0;
@@ -57,7 +61,6 @@ public class ScrollViewController : MonoBehaviour
     private Vector3[] scrollRectCorners;
     private int tickCounter = 0;
     private bool endValuesSet;
-    private AudioSource clickSource;
     private bool clickplayed;
 
     private void Start()
@@ -82,9 +85,6 @@ public class ScrollViewController : MonoBehaviour
 
         // Update scrolling speed based on number of buttons.
         sideScrollSpeed /= buttons.Length;
-
-        // Get the clicking audio source.
-        clickSource = directionButtons[0].GetComponent<AudioSource>();
     }
 
     void Update()
@@ -205,7 +205,7 @@ public class ScrollViewController : MonoBehaviour
             // Once the index of the highlighted button has changed, highlight the new middle button.
             if (highlightedButtonIndex != oldHighlightedButtonIndex)
             {
-                clickSource.Play();
+                menuSounds.PlayButtonSwitch();
                 clickplayed = true;
                 HighlightMiddleButton();
                 oldHighlightedButtonIndex = highlightedButtonIndex;
@@ -244,7 +244,7 @@ public class ScrollViewController : MonoBehaviour
                         scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                         currentlyChangingButtons = true;
                         if (!clickplayed)
-                            clickSource.Play();
+                            menuSounds.PlayButtonSwitch();
                         HighlightMiddleButton();
                     }
                     else return;
@@ -264,7 +264,7 @@ public class ScrollViewController : MonoBehaviour
                         scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                         currentlyChangingButtons = true;
                         if (!clickplayed)
-                            clickSource.Play();
+                            menuSounds.PlayButtonSwitch();
                         HighlightMiddleButton();
                     }
                     else return;
@@ -510,7 +510,7 @@ public class ScrollViewController : MonoBehaviour
                     scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                     currentlyChangingButtons = true;
                     if (!clickplayed)
-                        clickSource.Play();
+                        menuSounds.PlayButtonSwitch();
                     HighlightMiddleButton();
                 }
                 else return;
@@ -530,7 +530,7 @@ public class ScrollViewController : MonoBehaviour
                     scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                     currentlyChangingButtons = true;
                     if (!clickplayed)
-                        clickSource.Play();
+                        menuSounds.PlayButtonSwitch();
                     HighlightMiddleButton();
                 }
                 else return;

@@ -31,6 +31,13 @@ public class SoundManager : MonoBehaviour
     public AudioSource windscreamsource;
     public AudioSource numberincreasesource;
     public AudioSource newrecordsource;
+    public AudioSource rainsource;
+    public AudioSource tornadowindsource;
+    public AudioSource tornadosirensource;
+    public AudioSource lanesplitsteamsource1;
+    public AudioSource lanesplitsteamsource2;
+    public AudioSource lanesplitsmashsource1;
+    public AudioSource lanesplitsmashsource2;
 
     // Variables for individual audio clips.
     public AudioClip explos;
@@ -65,7 +72,7 @@ public class SoundManager : MonoBehaviour
     public Dictionary<AudioSource, float> originalPitches = new Dictionary<AudioSource, float>();
     private PlayerController playerController;
     private UIManager uiManager;
-
+    public GameObject tornado;
 
     void Start()
     {
@@ -89,6 +96,15 @@ public class SoundManager : MonoBehaviour
 
         // Set up engine sounds.
         enginesounds = playerController.carObject.GetComponents<AudioSource>();
+
+        // Set up lane split steam sounds
+        lanesplitsteamsource1 = playerController.carObject.transform.Find("BODY").transform.Find("LeftSteam").GetComponent<AudioSource>();
+        lanesplitsteamsource2 = playerController.carObject.transform.Find("BODY").transform.Find("RightSteam").GetComponent<AudioSource>();
+
+        // Set up tornado sounds
+        AudioSource[] tornadosounds = tornado.transform.GetComponents<AudioSource>();
+        tornadowindsource = tornadosounds[0];
+        tornadosirensource = tornadosounds[1];
 
         // Find audio sources and store pitch.
         specificAudioSources = new AudioSource[]
@@ -125,6 +141,13 @@ public class SoundManager : MonoBehaviour
             windscreamsource.volume,
             numberincreasesource.volume,
             newrecordsource.volume,
+            rainsource.volume,
+            tornadowindsource.volume,
+            tornadosirensource.volume,
+            lanesplitsteamsource1.volume,
+            lanesplitsteamsource2.volume,
+            lanesplitsmashsource1.volume,
+            lanesplitsmashsource2.volume,
             enginesounds[0].volume,
             enginesounds[1].volume,
             enginesounds[2].volume,
@@ -148,7 +171,14 @@ public class SoundManager : MonoBehaviour
         RegisterAudioSource(windscreamsource,       14);
         RegisterAudioSource(numberincreasesource,   15);
         RegisterAudioSource(newrecordsource,        16);
-        int startingEngineIndex = 17;
+        RegisterAudioSource(rainsource,             17);
+        RegisterAudioSource(tornadowindsource,      18);
+        RegisterAudioSource(tornadosirensource,     19);
+        RegisterAudioSource(lanesplitsteamsource1,  20);
+        RegisterAudioSource(lanesplitsteamsource2,  21);
+        RegisterAudioSource(lanesplitsmashsource1,  22);
+        RegisterAudioSource(lanesplitsmashsource2,  23);
+        int startingEngineIndex = 24;
         foreach (AudioSource engineSource in enginesounds)
         {
             RegisterAudioSource(engineSource, startingEngineIndex);

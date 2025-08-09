@@ -7,8 +7,7 @@ public class CreditManager : MonoBehaviour
     public TMP_Text creditsText; // TMP Text component.
     public bool changeDone = false;
     private Coroutine creditChangeCoroutine;
-    private AudioSource creditincreasesource;
-    private float originalCreditIncreaseSourceVolume;
+    public MenuSounds menuSounds;
 
     void Awake()
     {
@@ -20,13 +19,6 @@ public class CreditManager : MonoBehaviour
 
         // Retrieve credits from SaveManager.
         long currentCredits = SaveManager.Instance.SaveData.GlobalCredits;
-
-        // Get the credit increase sound component.
-        creditincreasesource = GetComponent<AudioSource>();
-        originalCreditIncreaseSourceVolume = creditincreasesource.volume;
-
-        // Multiply audio source volume by global volume multiplier.
-        creditincreasesource.volume = originalCreditIncreaseSourceVolume * SaveManager.Instance.SaveData.EffectsVolumeMultiplier;
 
         // Initialize credits if they are zero or less.
         if (currentCredits <= 0)
@@ -87,7 +79,7 @@ public class CreditManager : MonoBehaviour
 
             SaveManager.Instance.SaveData.GlobalCredits = currentCredits;
             creditsText.text = $"{currentCredits:n0} cr";
-            creditincreasesource.Play();
+            menuSounds.PlayCreditChange();
 
             yield return new WaitForSeconds(stepDelay);
         }

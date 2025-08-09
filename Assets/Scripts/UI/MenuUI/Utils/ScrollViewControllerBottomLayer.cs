@@ -13,6 +13,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
     private float originalThreshold = 10f;
     private bool firstTouch = true;
     public GarageUIManager garageUI;
+    public MenuSounds menuSounds;
 
     [Header("Scrollables")]
     public GameObject scrollbar;
@@ -55,7 +56,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
     private Vector3[] scrollRectCorners;
     private int tickCounter = 0;
     private bool endValuesSet;
-    private AudioSource clickSource;
+    //private AudioSource clickSource;
     private bool clickplayed;
 
     public void Initialize()
@@ -80,9 +81,6 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
 
         // Update scrolling speed based on number of buttons.
         sideScrollSpeed = 0.03f / buttons.Count;
-
-        // Get the clicking audio source.
-        clickSource = directionButtons[0].GetComponent<AudioSource>();
 
         activated = true;
     }
@@ -210,7 +208,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
             // Once the index of the highlighted button has changed, highlight the new middle button.
             if (highlightedButtonIndex != oldHighlightedButtonIndex)
             {
-                clickSource.Play();
+                menuSounds.PlayButtonSwitch();
                 clickplayed = true;
                 HighlightMiddleButton();
                 oldHighlightedButtonIndex = highlightedButtonIndex;
@@ -248,7 +246,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
                         scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                         currentlyChangingButtons = true;
                         if (!clickplayed)
-                            clickSource.Play();
+                            menuSounds.PlayButtonSwitch();
                         HighlightMiddleButton();
                         garageUI.ChangeItem(highlightedButtonIndex);
                     }
@@ -268,7 +266,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
                         scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                         currentlyChangingButtons = true;
                         if (!clickplayed)
-                            clickSource.Play();
+                            menuSounds.PlayButtonSwitch();
                         HighlightMiddleButton();
                         garageUI.ChangeItem(highlightedButtonIndex);
                     }
@@ -469,7 +467,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
                     scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                     currentlyChangingButtons = true;
                     if (!clickplayed)
-                        clickSource.Play();
+                        menuSounds.PlayButtonSwitch();
                     HighlightMiddleButton();
                     garageUI.ChangeItem(highlightedButtonIndex);
                 }
@@ -489,7 +487,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
                     scrollPosition = (buttonPositions[buttonIndexToChangeTo]);
                     currentlyChangingButtons = true;
                     if (!clickplayed)
-                        clickSource.Play();
+                        menuSounds.PlayButtonSwitch();
                     HighlightMiddleButton();
                     garageUI.ChangeItem(highlightedButtonIndex);
                 }

@@ -39,5 +39,20 @@ public class MenuSounds : MonoBehaviour
     {
         menuSourceSounds[2].Play();
     }
+
+    public void PlayButtonSwitch()
+    {
+        menuSourceSounds[3].Play();
+    }
+    
+    public void PlayChaChing()
+    {
+        menuSourceSounds[4].Play();
+    }
+
+    public void PlayCreditChange()
+    {
+        menuSourceSounds[5].Play();
+    }
 }
 
