@@ -138,6 +138,7 @@ public class GarageUIManager : MonoBehaviour
     private const string defaultCar = "OWNED_0_0";
     private const string carsOwned = "CARS_OWNED";
 
+    private int counter = 0;
     private void Awake()
     {
         // Access the SaveData instance.
@@ -775,6 +776,7 @@ public class GarageUIManager : MonoBehaviour
         {
             buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price + "?";
             notEnoughCreditsPopUp.SetActive(false);
+            buyButton.onClick.RemoveAllListeners();
             buyButton.onClick.AddListener(() => BuyPart(partType, partIndex));
             buyConfirmationPopUp.SetActive(true);
         }
@@ -828,10 +830,13 @@ public class GarageUIManager : MonoBehaviour
         SaveManager.Instance.SaveGame();
 
         // Update the button texts.
+        Debug.Log(counter++ + " | Old part name: " + carParts[partIndex][oldIndex].name + " index: " + oldIndex);
         scrollController.buttonPrices[oldIndex].text = "OWNED";
         scrollController.buttonPrices[partType].text = "INSTALLED";
 
         // Deactivate the UI popups
+        notEnoughCreditsPopUp.SetActive(false);
+        buyConfirmationPopUp.SetActive(false);
         popUps.SetActive(false);
     }
 
