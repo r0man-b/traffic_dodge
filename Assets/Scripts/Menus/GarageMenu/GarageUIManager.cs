@@ -38,6 +38,13 @@ public class GarageUIManager : MonoBehaviour
     public Button buyButton;
     public GameObject notEnoughCreditsPopUp;
     public TextMeshProUGUI notEnoughCreditsPopUpText;
+    [Header("UI Popups for buying paint")]
+    public GameObject paintPopUps;
+    public GameObject paintBuyConfirmationPopUp;
+    public TextMeshProUGUI paintBuyConfirmationPopUpText;
+    public Button paintBuyButton;
+    public GameObject paintNotEnoughCreditsPopUp;
+    public TextMeshProUGUI paintNotEnoughCreditsPopUpText;
 
     // Car variables.
     [Space(10)]
@@ -116,6 +123,10 @@ public class GarageUIManager : MonoBehaviour
     private Shader activeShader;
     private int currentPaintType;
     private int whichPartToPaint; // 0 = primary_color, 1 = secondary_color, 2 = rim_color, 3 = primary_light, 4 = secondary_light, 5 = tail_light
+
+    private readonly Dictionary<Car.ColorType, SaveData.ColorData> _pendingColors = new Dictionary<Car.ColorType, SaveData.ColorData>();
+    private static float[] ToArray(Color c) => new float[] { c.r, c.g, c.b, c.a };
+    private int currentPaintPrice;
 
     // Other buttons.
     [Space(10)]
@@ -1116,11 +1127,12 @@ public class GarageUIManager : MonoBehaviour
         return !noEmissiveSecondaryTypes.Contains(typeName);
     }
 
-    // Called when user clicks on a paint button. Sets the colour of the part to paint to the button's colour.
-    public void SetColor()
+    // Called when user clicks on a paint button. PREVIEWS the colour only.
+    public void SetColor(int paintPrice)
     {
         if (invokedFromUpdate) return;
-        Button clickedButton = EventSystem.current.currentSelectedGameObject.GetComponent<Button>();
+
+        Button clickedButton = EventSystem.current.currentSelectedGameObject?.GetComponent<Button>();
         if (clickedButton == null)
         {
             Debug.LogWarning("Current selected object is not a button.");
@@ -1128,10 +1140,14 @@ public class GarageUIManager : MonoBehaviour
         }
 
         Material buttonMaterial = clickedButton.GetComponent<Image>().material;
+
+        // Extract tri-tone or single color from the button
         Color topColor, middleColor, bottomColor;
         Color buttonColor = new Color(0, 0, 0);
 
-        if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") && buttonMaterial.HasProperty("_MiddleColor") && buttonMaterial.HasProperty("_BottomColor"))
+        if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") &&
+            buttonMaterial.HasProperty("_MiddleColor") &&
+            buttonMaterial.HasProperty("_BottomColor"))
         {
             topColor = buttonMaterial.GetColor("_TopColor");
             middleColor = buttonMaterial.GetColor("_MiddleColor");
@@ -1142,15 +1158,10 @@ public class GarageUIManager : MonoBehaviour
             buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
         }
 
-        SaveData saveData = SaveManager.Instance.SaveData;
-        if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
-        {
-            Debug.LogError($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
-            return;
-        }
-
         Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
-        SaveData.ColorData colorData = carData.Colors[whichPartToPaint];
+
+        // Apply to materials (preview only) and cache the pending selection
+        var pending = new SaveData.ColorData();
 
         switch (colorType)
         {
@@ -1158,11 +1169,14 @@ public class GarageUIManager : MonoBehaviour
                 primaryColor.color = topColor;
                 primaryColor.SetColor("_FresnelColor", middleColor);
                 primaryColor.SetColor("_FresnelColor2", bottomColor);
-                colorData.BaseColor = new float[] { topColor.r, topColor.g, topColor.b, topColor.a };
-                colorData.FresnelColor = new float[] { middleColor.r, middleColor.g, middleColor.b, middleColor.a };
-                colorData.FresnelColor2 = new float[] { bottomColor.r, bottomColor.g, bottomColor.b, bottomColor.a };
+
+                pending.BaseColor = ToArray(topColor);
+                pending.FresnelColor = ToArray(middleColor);
+                pending.FresnelColor2 = ToArray(bottomColor);
                 break;
+
             case Car.ColorType.SECONDARY_COLOR:
+                paintPrice /= 4;
                 if (currentPaintType == 1 || currentPaintType == 2) // Non-emissive
                 {
                     secondaryColor.color = topColor;
@@ -1170,60 +1184,207 @@ public class GarageUIManager : MonoBehaviour
                     secondaryColor.SetColor("_FresnelColor2", bottomColor);
                     secondaryColor.SetColor("_EmissionColor", Color.black);
                     secondaryColor.DisableKeyword("_EMISSION");
-                    colorData.BaseColor = new float[] { topColor.r, topColor.g, topColor.b, topColor.a };
-                    colorData.FresnelColor = new float[] { middleColor.r, middleColor.g, middleColor.b, middleColor.a };
-                    colorData.FresnelColor2 = new float[] { bottomColor.r, bottomColor.g, bottomColor.b, bottomColor.a };
-                    colorData.EmissionColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
+
+                    pending.BaseColor = ToArray(topColor);
+                    pending.FresnelColor = ToArray(middleColor);
+                    pending.FresnelColor2 = ToArray(bottomColor);
+                    pending.EmissionColor = ToArray(Color.black);
                 }
-                else
+                else // Emissive
                 {
                     secondaryColor.color = Color.black;
                     secondaryColor.SetColor("_FresnelColor", Color.black);
                     secondaryColor.SetColor("_FresnelColor2", Color.black);
                     secondaryColor.SetColor("_EmissionColor", buttonColor);
                     secondaryColor.EnableKeyword("_EMISSION");
-                    colorData.BaseColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
-                    colorData.FresnelColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
-                    colorData.FresnelColor2 = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
-                    colorData.EmissionColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
+
+                    pending.BaseColor = ToArray(Color.black);
+                    pending.FresnelColor = ToArray(Color.black);
+                    pending.FresnelColor2 = ToArray(Color.black);
+                    pending.EmissionColor = ToArray(buttonColor);
                 }
                 break;
+
             case Car.ColorType.RIM_COLOR:
+                paintPrice /= 10;
                 if (currentPaintType == 3) // Emissive
                 {
                     rimColor.color = Color.black;
                     rimColor.SetColor("_EmissionColor", buttonColor);
                     rimColor.EnableKeyword("_EMISSION");
-                    colorData.BaseColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
-                    colorData.EmissionColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
+
+                    pending.BaseColor = ToArray(Color.black);
+                    pending.EmissionColor = ToArray(buttonColor);
                 }
                 else
                 {
                     rimColor.color = buttonColor;
                     rimColor.SetColor("_EmissionColor", Color.black);
                     rimColor.DisableKeyword("_EMISSION");
-                    colorData.BaseColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
-                    colorData.EmissionColor = new float[] { Color.black.r, Color.black.g, Color.black.b, Color.black.a };
+
+                    pending.BaseColor = ToArray(buttonColor);
+                    pending.EmissionColor = ToArray(Color.black);
                 }
                 break;
+
             case Car.ColorType.PRIMARY_LIGHT:
+                paintPrice /= 10;
                 primaryLight.SetColor("_EmissionColor", buttonColor);
-                colorData.EmissionColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
+                pending.EmissionColor = ToArray(buttonColor);
                 break;
+
             case Car.ColorType.SECONDARY_LIGHT:
+                paintPrice /= 10;
                 secondaryLight.SetColor("_EmissionColor", buttonColor);
-                colorData.EmissionColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
+                pending.EmissionColor = ToArray(buttonColor);
                 break;
+
             case Car.ColorType.TAIL_LIGHT:
+                paintPrice /= 10;
                 tailLight.SetColor("_EmissionColor", buttonColor);
-                colorData.EmissionColor = new float[] { buttonColor.r, buttonColor.g, buttonColor.b, buttonColor.a };
+                pending.EmissionColor = ToArray(buttonColor);
                 break;
+
             default:
                 Debug.LogError("Invalid part to paint");
                 return;
         }
 
-        SaveManager.Instance.SaveGame();
+        paintNotEnoughCreditsPopUp.SetActive(false);
+        paintBuyConfirmationPopUp.SetActive(false);
+        paintPopUps.SetActive(true);
+        paintBuyConfirmationPopUpText.text = "\nBuy  paint  for  " + paintPrice.ToString("N0") + "  CR?";
+        paintBuyConfirmationPopUp.SetActive(true);
+
+        currentPaintPrice = paintPrice;
+
+        // Cache the pending change; overwrites any previous preview for this part
+        _pendingColors[colorType] = pending;
+    }
+
+
+    public void BuyColor()
+    {
+        if (creditManager.GetCredits() < currentPaintPrice)
+        {
+            paintBuyConfirmationPopUp.SetActive(false);
+            paintNotEnoughCreditsPopUpText.text = "\nYou  do  not  have  enough  credits  to  purchase  this  paint.  Required:\n" + currentPaintPrice.ToString("N0") + "  CR";
+            paintNotEnoughCreditsPopUp.SetActive(true);
+        }
+        else
+        {
+            // Verify there is a pending selection for the current part
+            Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
+            if (!_pendingColors.TryGetValue(colorType, out var pending))
+            {
+                Debug.LogWarning("No pending color to buy for current part.");
+                return;
+            }
+
+            SaveData saveData = SaveManager.Instance.SaveData;
+            if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
+            {
+                Debug.LogError($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
+                return;
+            }
+
+            creditManager.ChangeCredits(-currentPaintPrice);
+
+            // Persist to save data
+            SaveData.ColorData colorData = carData.Colors[whichPartToPaint];
+
+            // Copy fields that were set in preview
+            if (pending.BaseColor != null) colorData.BaseColor = pending.BaseColor;
+            if (pending.FresnelColor != null) colorData.FresnelColor = pending.FresnelColor;
+            if (pending.FresnelColor2 != null) colorData.FresnelColor2 = pending.FresnelColor2;
+            if (pending.EmissionColor != null) colorData.EmissionColor = pending.EmissionColor;
+
+            SaveManager.Instance.SaveGame();
+
+            // Optionally clear the pending entry for this part after purchase
+            _pendingColors.Remove(colorType);
+
+            paintPopUps.SetActive(false);
+            paintBuyConfirmationPopUp.SetActive(false);
+        }
+    }
+
+    // Revert car color back to currently saved color
+    public void RevertColor()
+    {
+        if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
+        {
+            Debug.LogError($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
+            return;
+        }
+
+        Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
+        if (whichPartToPaint < 0 || whichPartToPaint >= carData.Colors.Length)
+        {
+            Debug.LogError("Invalid color index for this car.");
+            return;
+        }
+
+        SaveData.ColorData saved = carData.Colors[whichPartToPaint];
+
+        Color baseColor = FromArray(saved.BaseColor);
+        Color fresnelColor = FromArray(saved.FresnelColor);
+        Color fresnelColor2 = FromArray(saved.FresnelColor2);
+        Color emissionColor = FromArray(saved.EmissionColor);
+
+        switch (colorType)
+        {
+            case Car.ColorType.PRIMARY_COLOR:
+                primaryColor.color = baseColor;
+                primaryColor.SetColor("_FresnelColor", fresnelColor);
+                primaryColor.SetColor("_FresnelColor2", fresnelColor2);
+                break;
+
+            case Car.ColorType.SECONDARY_COLOR:
+                secondaryColor.color = baseColor;
+                secondaryColor.SetColor("_FresnelColor", fresnelColor);
+                secondaryColor.SetColor("_FresnelColor2", fresnelColor2);
+                secondaryColor.SetColor("_EmissionColor", emissionColor);
+                if (emissionColor != Color.black)
+                    secondaryColor.EnableKeyword("_EMISSION");
+                else
+                    secondaryColor.DisableKeyword("_EMISSION");
+                break;
+
+            case Car.ColorType.RIM_COLOR:
+                rimColor.color = baseColor;
+                rimColor.SetColor("_EmissionColor", emissionColor);
+                if (emissionColor != Color.black)
+                    rimColor.EnableKeyword("_EMISSION");
+                else
+                    rimColor.DisableKeyword("_EMISSION");
+                break;
+
+            case Car.ColorType.PRIMARY_LIGHT:
+                primaryLight.SetColor("_EmissionColor", emissionColor);
+                break;
+
+            case Car.ColorType.SECONDARY_LIGHT:
+                secondaryLight.SetColor("_EmissionColor", emissionColor);
+                break;
+
+            case Car.ColorType.TAIL_LIGHT:
+                tailLight.SetColor("_EmissionColor", emissionColor);
+                break;
+
+            default:
+                Debug.LogError("Invalid part to revert");
+                break;
+        }
+
+        // Remove pending preview for this part, if any
+        _pendingColors.Remove(colorType);
+    }
+
+    private static Color FromArray(float[] arr)
+    {
+        if (arr == null || arr.Length < 4) return Color.black;
+        return new Color(arr[0], arr[1], arr[2], arr[3]);
     }
 
     // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard.
