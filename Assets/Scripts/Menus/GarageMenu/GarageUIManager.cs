@@ -29,6 +29,7 @@ public class GarageUIManager : MonoBehaviour
     public ScrollViewControllerBottomLayer scrollController;
     public CreditManager creditManager;
     public TextMeshProUGUI nitrocount;
+    public MenuSounds menuSounds;
 
     [Space(10)]
     [Header("UI Popups for buying items")]
@@ -1267,7 +1268,7 @@ public class GarageUIManager : MonoBehaviour
         currentPaintPrice = paintPrice;
     }
 
-
+    // Persists the color change and adjust player credits OR displays not enough credits message.
     public void BuyColor()
     {
         if (creditManager.GetCredits() < currentPaintPrice)
@@ -1294,6 +1295,8 @@ public class GarageUIManager : MonoBehaviour
                 return;
             }
 
+            if (currentPaintType == 0) menuSounds.PlayAirWrenchSound();
+            else menuSounds.PlaySprayCan();
             creditManager.ChangeCredits(-currentPaintPrice);
 
             // Persist to save data
