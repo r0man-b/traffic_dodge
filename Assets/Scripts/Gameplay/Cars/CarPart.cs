@@ -19,4 +19,9 @@ public class CarPart : MonoBehaviour
 
     public CarPartData carPartData;
     public float price => useCarPartData ? carPartData.price : customPrice;
+
+    public void SetPrice(float newPrice)
+    {
+        customPrice = newPrice;
+    }
 }

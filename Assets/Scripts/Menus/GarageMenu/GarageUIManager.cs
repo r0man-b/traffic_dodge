@@ -487,6 +487,24 @@ public class GarageUIManager : MonoBehaviour
         secondaryLight = currentCar.GetComponent<CarPart>().secondaryLight;
         tailLight = currentCar.GetComponent<CarPart>().tailLight;
 
+        // Calculate performance part prices
+        int carPrice = car.price;
+
+        // ENGINE (carParts[8])
+        carParts[8][0].SetPrice(0);
+        carParts[8][1].SetPrice(carPrice / 4);
+        carParts[8][2].SetPrice(carPrice);
+
+        // TRANSMISSION (carParts[9])
+        carParts[9][0].SetPrice(0);
+        carParts[9][1].SetPrice(carPrice / 8);
+        carParts[9][2].SetPrice(Mathf.RoundToInt(carPrice * 0.6f)); // 60% of car price
+
+        // LIVES (carParts[10])
+        carParts[10][0].SetPrice(0);
+        carParts[10][1].SetPrice(carPrice / 2);
+        carParts[10][2].SetPrice(carPrice * 2);
+
         // Sort each row by price
         for (int i = 0; i < carParts.Length; i++)
         {
@@ -737,20 +755,22 @@ public class GarageUIManager : MonoBehaviour
             image.color = new Color(image.color.r, image.color.g, image.color.b, alphaValue / 255f);
 
             texts[0].text = carParts[partIndex][i].name;
-            if (partIndex == 8)
-                texts[1].text = "+" + System.Math.Round((513.57616f * car.defaultAccelMaxValue * carParts[partIndex][i].accelMaxValueUpgrade - 608.44812f) - (513.57616f * car.defaultAccelMaxValue - 608.44812f)).ToString() + " HP";
-            else if (partIndex == 9)
-                texts[1].text = "0-60: -" + System.Math.Round((Mathf.Max(-12.28856f * car.defaultAccelIncreaseRate + 23.2393f, -5.484f * car.defaultAccelIncreaseRate + 12.068f) - Mathf.Max(-12.28856f * car.defaultAccelIncreaseRate * carParts[partIndex][i].accelIncreaseRateUpgrade + 23.2393f, -5.484f * car.defaultAccelIncreaseRate * carParts[partIndex][i].accelIncreaseRateUpgrade + 12.068f)), 1).ToString() + "s";
-            else if (partIndex == 10)
-                texts[1].text = "+" + (carParts[partIndex][i].maxLives - car.defaultNumLives) + " lives";
-            else
+
+            // If performance part, set button text to peformance effect of part. TODO: Move this elsewhere, each button text should be price only.
+            //if (partIndex == 8)
+            //    texts[1].text = "+" + System.Math.Round((513.57616f * car.defaultAccelMaxValue * carParts[partIndex][i].accelMaxValueUpgrade - 608.44812f) - (513.57616f * car.defaultAccelMaxValue - 608.44812f)).ToString() + " HP";
+            //else if (partIndex == 9)
+            //    texts[1].text = "0-60: -" + System.Math.Round((Mathf.Max(-12.28856f * car.defaultAccelIncreaseRate + 23.2393f, -5.484f * car.defaultAccelIncreaseRate + 12.068f) - Mathf.Max(-12.28856f * car.defaultAccelIncreaseRate * carParts[partIndex][i].accelIncreaseRateUpgrade + 23.2393f, -5.484f * car.defaultAccelIncreaseRate * carParts[partIndex][i].accelIncreaseRateUpgrade + 12.068f)), 1).ToString() + "s";
+            //else if (partIndex == 10)
+            //    texts[1].text = "+" + (carParts[partIndex][i].maxLives - car.defaultNumLives) + " lives";
+            //else
             {
                 if (i == startingIndex)
                     texts[1].text = "INSTALLED";
                 else if (isPartOwned)
                     texts[1].text = "OWNED";
                 else
-                    texts[1].text = carParts[partIndex][i].price.ToString() + " cr";
+                    texts[1].text = carParts[partIndex][i].price.ToString("F0") + " cr";
             }
 
             newButton.interactable = interactable;
@@ -815,7 +835,7 @@ public class GarageUIManager : MonoBehaviour
         }
         else
         {
-            buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price + "?";
+            buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price.ToString("N0") + "  CR?";
             notEnoughCreditsPopUp.SetActive(false);
             buyButton.onClick.RemoveAllListeners();
             buyButton.onClick.AddListener(() => BuyPart(partType, partIndex));
