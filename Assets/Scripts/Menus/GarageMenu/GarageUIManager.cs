@@ -123,9 +123,8 @@ public class GarageUIManager : MonoBehaviour
     private Shader activeShader;
     private int currentPaintType;
     private int whichPartToPaint; // 0 = primary_color, 1 = secondary_color, 2 = rim_color, 3 = primary_light, 4 = secondary_light, 5 = tail_light
-
     private readonly Dictionary<Car.ColorType, SaveData.ColorData> _pendingColors = new Dictionary<Car.ColorType, SaveData.ColorData>();
-    private static float[] ToArray(Color c) => new float[] { c.r, c.g, c.b, c.a };
+    private readonly Dictionary<Car.ColorType, (int paintType, int presetIndex)> _pendingPreset = new Dictionary<Car.ColorType, (int paintType, int presetIndex)>();
     private int currentPaintPrice;
 
     // Other buttons.
@@ -1032,6 +1031,7 @@ public class GarageUIManager : MonoBehaviour
         colors.SetActive(true);
 
         currentPaintType = 0;
+        RestoreCheckmarkFromSave(whichPartToPaint, currentPaintType);
         activeShader = matteShader;
     }
 
@@ -1118,6 +1118,7 @@ public class GarageUIManager : MonoBehaviour
             paintType.text = "EMISSIVE";
             activeShader = matteShader;
         }
+        RestoreCheckmarkFromSave(whichPartToPaint, currentPaintType);
     }
 
     private bool SupportsEmissiveSecondary(string typeName, Car carAsset)
@@ -1249,17 +1250,21 @@ public class GarageUIManager : MonoBehaviour
                 Debug.LogError("Invalid part to paint");
                 return;
         }
+        // Determine which palette button this was.
+        int presetIndex = GetPresetIndexInBucket(clickedButton);
+
+        // Cache both the color values.
+        _pendingColors[colorType] = pending;
+        _pendingPreset[colorType] = (currentPaintType, presetIndex);
 
         paintNotEnoughCreditsPopUp.SetActive(false);
         paintBuyConfirmationPopUp.SetActive(false);
         paintPopUps.SetActive(true);
-        paintBuyConfirmationPopUpText.text = "\nBuy  paint  for  " + paintPrice.ToString("N0") + "  CR?";
+        string typeOfPaint = (currentPaintType == 0) ? "lights" : "paint";
+        paintBuyConfirmationPopUpText.text = "\nBuy  " + typeOfPaint + "  for  " + paintPrice.ToString("N0") + "  CR?";
         paintBuyConfirmationPopUp.SetActive(true);
 
         currentPaintPrice = paintPrice;
-
-        // Cache the pending change; overwrites any previous preview for this part
-        _pendingColors[colorType] = pending;
     }
 
 
@@ -1268,7 +1273,8 @@ public class GarageUIManager : MonoBehaviour
         if (creditManager.GetCredits() < currentPaintPrice)
         {
             paintBuyConfirmationPopUp.SetActive(false);
-            paintNotEnoughCreditsPopUpText.text = "\nYou  do  not  have  enough  credits  to  purchase  this  paint.  Required:\n" + currentPaintPrice.ToString("N0") + "  CR";
+            string typeOfPaint = (currentPaintType == 0) ? "these  lights" : "this  paint";
+            paintNotEnoughCreditsPopUpText.text = "\nYou  do  not  have  enough  credits  to  purchase  " + typeOfPaint + ".  Required:\n" + currentPaintPrice.ToString("N0") + "  CR";
             paintNotEnoughCreditsPopUp.SetActive(true);
         }
         else
@@ -1299,10 +1305,20 @@ public class GarageUIManager : MonoBehaviour
             if (pending.FresnelColor2 != null) colorData.FresnelColor2 = pending.FresnelColor2;
             if (pending.EmissionColor != null) colorData.EmissionColor = pending.EmissionColor;
 
+            if (_pendingPreset.TryGetValue(colorType, out var sel))
+            {
+                colorData.SelectedPaintType = sel.paintType;
+                colorData.SelectedPresetIndex = sel.presetIndex;
+
+                // Immediately reflect in UI for the current bucket
+                ApplyCheckmarkForBucket(sel.paintType, sel.presetIndex);
+            }
+
             SaveManager.Instance.SaveGame();
 
             // Optionally clear the pending entry for this part after purchase
             _pendingColors.Remove(colorType);
+            _pendingPreset.Remove(colorType);
 
             paintPopUps.SetActive(false);
             paintBuyConfirmationPopUp.SetActive(false);
@@ -1381,10 +1397,57 @@ public class GarageUIManager : MonoBehaviour
         _pendingColors.Remove(colorType);
     }
 
+    private static float[] ToArray(Color c) => new[] { c.r, c.g, c.b, c.a };
     private static Color FromArray(float[] arr)
     {
         if (arr == null || arr.Length < 4) return Color.black;
         return new Color(arr[0], arr[1], arr[2], arr[3]);
+    }
+
+    // Get the palette "slot index" within the active bucket.
+    // If your bucket contains non-button children, prefer a dedicated component (see Note below).
+    private static int GetPresetIndexInBucket(Button b) => b.transform.GetSiblingIndex();
+
+    // Turn on a single child named "Checkmark" under the selected slot; turn off others
+    private void ApplyCheckmarkForBucket(int paintType, int presetIndex)
+    {
+        if (paintType < 0 || paintType >= colorBuckets.Count) return;
+        var bucket = colorBuckets[paintType].transform;
+
+        for (int i = 0; i < bucket.childCount; i++)
+        {
+            var mark = bucket.GetChild(i).Find("Checkmark");
+            if (mark != null) mark.gameObject.SetActive(i == presetIndex);
+        }
+    }
+
+    // Clear all checkmarks in a bucket
+    private void ClearCheckmarksForBucket(int paintType)
+    {
+        if (paintType < 0 || paintType >= colorBuckets.Count) return;
+        var bucket = colorBuckets[paintType].transform;
+
+        for (int i = 0; i < bucket.childCount; i++)
+        {
+            var mark = bucket.GetChild(i).Find("Checkmark");
+            if (mark != null) mark.gameObject.SetActive(false);
+        }
+    }
+
+    // Read saved selection for (PART, PAINT TYPE) and reflect it in UI
+    private void RestoreCheckmarkFromSave(int partIndex /*whichPartToPaint*/, int paintType)
+    {
+        if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
+        {
+            ClearCheckmarksForBucket(paintType);
+            return;
+        }
+
+        var saved = carData.Colors[partIndex];
+        if (saved.SelectedPaintType == paintType && saved.SelectedPresetIndex >= 0)
+            ApplyCheckmarkForBucket(paintType, saved.SelectedPresetIndex);
+        else
+            ClearCheckmarksForBucket(paintType);
     }
 
     // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard.

@@ -86,6 +86,9 @@ public class SaveData
         public float[] FresnelColor2 = { -1f, -1f, -1f, -1f };    // For Pearlescent colours only.
         public float[] EmissionColor = { -1f, -1f, -1f, -1f };    // For emissive colors.
         public bool Metallic;                           // For metallic colours.
+
+        public int SelectedPaintType = -1;    // 0=Matte, 1=Gloss, 2=Pearl, 3=Emissive
+        public int SelectedPresetIndex = -1;  // palette button index within that bucket
     }
 
     // Menu/GarageMusic.cs
