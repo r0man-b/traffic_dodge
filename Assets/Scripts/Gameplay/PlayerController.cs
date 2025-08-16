@@ -4,6 +4,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using CarPaintNew = AkilliMum.SRP.CarPaint.CarsPaint;
+using CarPaintOld = AkilliMum.SRP.CarPaintOld.CarsPaint;
+using BoundingBox_Old = AkilliMum.SRP.CarPaintOld.BoundingBox;
+using TextureSize_Old = AkilliMum.SRP.CarPaintOld.TextureSizeType;
 
 public class PlayerController : MonoBehaviour
 {
@@ -246,13 +250,58 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        CarsPaint carPaintScript = carObject.GetComponent<CarsPaint>();
-        if (carPaintScript != null)
+        // Remove/disable the new CarsPaint, add the old CarsPaint, copy parameters (except TextureSize and Xth frame).
+        var newCp = carObject.GetComponent<CarPaintNew>();
+
+        // Ensure we have an old component
+        var oldCp = carObject.GetComponent<CarPaintOld>();
+        if (oldCp == null)
         {
-            carPaintScript.TextureSize = TextureSizeType.x256;
-            carPaintScript.RunForEveryXthFrame = 2;
-            //currentCar.primColor.SetFloat("_Brightness", currentCar.primColor.GetFloat("_Brightness") * 2f);
+            oldCp = carObject.AddComponent<CarPaintOld>();
         }
+
+        // If the new component exists, copy matching settings over to old (except TextureSize and RunForEveryXthFrame)
+        if (newCp != null)
+        {
+            // Core toggles
+            oldCp.IsEnabled = newCp.IsEnabled;
+            oldCp.IsDebug = newCp.IsDebug;
+
+            // Bounding box (enum values match; cast via int)
+            oldCp.BoundingBox = (BoundingBox_Old)(int)newCp.BoundingBox;
+
+            // Performance / quality (exclude RunForEveryXthFrame and TextureSize here by requirement)
+            oldCp.UseOcclusionCulling = newCp.UseOcclusionCulling;
+            oldCp.HDR = newCp.HDR;
+            oldCp.CameraLODLevel = newCp.CameraLODLevel;
+            oldCp.DisablePixelLights = newCp.DisablePixelLights;
+            oldCp.ShadowDistance = newCp.ShadowDistance;
+
+            // Culling & clipping
+            oldCp.ReflectLayers = newCp.ReflectLayers;
+            oldCp.ClippingPlaneNear = newCp.ClippingPlaneNear;
+            oldCp.ClippingPlaneFar = newCp.ClippingPlaneFar;
+
+            // Material mixing
+            oldCp._MixMultiplier = newCp._MixMultiplier;
+
+            // Remove or disable the new component
+            // Option A (recommended at runtime): fully remove to avoid duplicate SRP callbacks
+            Destroy(newCp);
+
+            // Option B (editor-friendly): keep the component but disable it
+            // newCp.enabled = false;
+        }
+
+        // Set TextureSize and Xth frame explicitly for the old component
+        oldCp.TextureSize = TextureSize_Old.x256;  // per your requirement
+        oldCp.RunForEveryXthFrame = 2;                      // per your requirement
+        BoostBrightnessIfMetallic(currentCar.primColor, 3f);
+        BoostBrightnessIfMetallic(currentCar.secondColor, 3f);
+        BoostBrightnessIfMetallic(currentCar.rimColor, 3f);
+
+        // Initialize probe/renderers so it is ready on first frame
+        oldCp.InitializeProperties();
 
         // Set up camera type and sense of speed values from the gameplay options.
         cameraType = saveData.cameraType;
@@ -1444,6 +1493,31 @@ public class PlayerController : MonoBehaviour
                 rain.transform.SetPositionAndRotation(currentRainPosition, currentRainRotation);
             }
         }
+    }
+
+    // --- add inside PlayerController (e.g., under fields or at the end of the class) ---
+    static bool IsMetallic(Material m)
+    {
+        if (!m) return false;
+
+        // Slider-based metallic
+        float slider = m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0f;
+        bool sliderSaysMetal = slider >= 0.9f;     // your metals are set to 1, non-metal ≈ 0.304
+
+        // Texture-based metallic (keyword + texture)
+        bool hasMetalMap =
+            m.HasProperty("_MetallicGlossMap") &&
+            m.GetTexture("_MetallicGlossMap") != null &&
+            m.IsKeywordEnabled("_METALLICSPECGLOSSMAP");
+
+        return sliderSaysMetal || hasMetalMap;
+    }
+
+    static void BoostBrightnessIfMetallic(Material m, float factor)
+    {
+        if (!m || !m.HasProperty("_Brightness")) return;
+        if (IsMetallic(m))
+            m.SetFloat("_Brightness", m.GetFloat("_Brightness") * factor);
     }
 
     private float EaseOutCubic(float x)
