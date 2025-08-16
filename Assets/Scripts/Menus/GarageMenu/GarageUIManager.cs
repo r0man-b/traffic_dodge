@@ -127,8 +127,13 @@ public class GarageUIManager : MonoBehaviour
     private readonly Dictionary<Car.ColorType, SaveData.ColorData> _pendingColors = new Dictionary<Car.ColorType, SaveData.ColorData>();
     private readonly Dictionary<Car.ColorType, (int paintType, int presetIndex)> _pendingPreset = new Dictionary<Car.ColorType, (int paintType, int presetIndex)>();
     private int currentPaintPrice;
+
+    // Vars for metallic paints
     private readonly float nonMetallicVal = 0.304f;
     private readonly float metallicVal = 1f;
+    static readonly int ID_Metallic = Shader.PropertyToID("_Metallic");
+    static readonly int ID_MetallicGlossMap = Shader.PropertyToID("_MetallicGlossMap");
+    static readonly int KW_MetallicMap = Shader.PropertyToID("_METALLICSPECGLOSSMAP"); // keyword string used below
 
     // Other buttons.
     [Space(10)]
@@ -1074,7 +1079,7 @@ public class GarageUIManager : MonoBehaviour
             case 0: // Primary colors can be gloss, pearlescent, or metal NOT emissive
             {
                 if (change < 0 && currentPaintType == 4) currentPaintType = 2;
-                else if (change > 1 && currentPaintType == 2) currentPaintType = 4;
+                else if (change > 0 && currentPaintType == 2) currentPaintType = 4;
                 else currentPaintType += change;
                 currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
                 break;
@@ -1090,7 +1095,7 @@ public class GarageUIManager : MonoBehaviour
                 else
                 {
                     if (change < 0 && currentPaintType == 4) currentPaintType = 2;
-                    else if (change > 1 && currentPaintType == 2) currentPaintType = 4;
+                    else if (change > 0 && currentPaintType == 2) currentPaintType = 4;
                     else currentPaintType += change;
                     currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
                 }
@@ -1101,7 +1106,7 @@ public class GarageUIManager : MonoBehaviour
             {
                 // Skip pearlescents
                 if (change < 0 && currentPaintType == 3) currentPaintType = 1;
-                else if (change > 1 && currentPaintType == 1) currentPaintType = 3;
+                else if (change > 0 && currentPaintType == 1) currentPaintType = 3;
 
                 else currentPaintType += change;
                 currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
@@ -1184,122 +1189,198 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        Material buttonMaterial = clickedButton.GetComponent<Image>().material;
-
-        // Extract tri-tone or single color from the button
+        // ---- NEW: choose colors depending on paint type ----
         Color topColor, middleColor, bottomColor;
         Color buttonColor = new Color(0, 0, 0);
 
-        if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") &&
-            buttonMaterial.HasProperty("_MiddleColor") &&
-            buttonMaterial.HasProperty("_BottomColor"))
+        bool isMetal = (currentPaintType == 4);
+        if (isMetal)
         {
-            topColor = buttonMaterial.GetColor("_TopColor");
-            middleColor = buttonMaterial.GetColor("_MiddleColor");
-            bottomColor = buttonMaterial.GetColor("_BottomColor");
+            // Metallic buttons have no images/materials; select by button name
+            GetMetallicPreset(clickedButton.name, out topColor, out middleColor, out bottomColor);
+            buttonColor = topColor; // for emissive branches we keep black; otherwise use base
         }
         else
         {
-            buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
+            // Existing logic for non-metal buttons (may use Image.material or Image.color)
+            Material buttonMaterial = clickedButton.GetComponent<Image>().material;
+
+            if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") &&
+                buttonMaterial.HasProperty("_MiddleColor") &&
+                buttonMaterial.HasProperty("_BottomColor"))
+            {
+                topColor = buttonMaterial.GetColor("_TopColor");
+                middleColor = buttonMaterial.GetColor("_MiddleColor");
+                bottomColor = buttonMaterial.GetColor("_BottomColor");
+            }
+            else
+            {
+                buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
+            }
         }
 
         Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
 
-        // Apply to materials (preview only) and cache the pending selection
+        // Apply to materials (preview) and cache the pending selection
         var pending = new SaveData.ColorData();
 
+        // ---- Apply preview per part ----
         switch (colorType)
         {
             case Car.ColorType.PRIMARY_COLOR:
-                primaryColor.color = topColor;
-                primaryColor.SetColor("_FresnelColor", middleColor);
-                primaryColor.SetColor("_FresnelColor2", bottomColor);
+                if (isMetal)
+                {
+                    primaryColor.color = topColor;
+                    primaryColor.SetColor("_FresnelColor", middleColor);
+                    primaryColor.SetColor("_FresnelColor2", bottomColor);
+                    primaryColor.SetColor("_EmissionColor", Color.black);
+                    primaryColor.DisableKeyword("_EMISSION");
+                    SetMaterialMetallic(primaryColor, metallicVal);          // << set metallic
+                }
+                else
+                {
+                    primaryColor.color = topColor;
+                    primaryColor.SetColor("_FresnelColor", middleColor);
+                    primaryColor.SetColor("_FresnelColor2", bottomColor);
+                    primaryColor.SetColor("_EmissionColor", Color.black);
+                    primaryColor.DisableKeyword("_EMISSION");
+                    SetMaterialMetallic(primaryColor, nonMetallicVal);       // << ensure non-metal
+                }
 
                 pending.BaseColor = ToArray(topColor);
                 pending.FresnelColor = ToArray(middleColor);
                 pending.FresnelColor2 = ToArray(bottomColor);
+                pending.EmissionColor = ToArray(Color.black);
+                pending.MetallicMap = isMetal ? metallicVal : nonMetallicVal;  // << cache for save
                 break;
 
             case Car.ColorType.SECONDARY_COLOR:
                 paintPrice /= 4;
-                if (currentPaintType == 1 || currentPaintType == 2 || currentPaintType == 4) // Non-emissive
-                {
-                    secondaryColor.color = topColor;
-                    secondaryColor.SetColor("_FresnelColor", middleColor);
-                    secondaryColor.SetColor("_FresnelColor2", bottomColor);
-                    secondaryColor.SetColor("_EmissionColor", Color.black);
-                    secondaryColor.DisableKeyword("_EMISSION");
 
-                    pending.BaseColor = ToArray(topColor);
-                    pending.FresnelColor = ToArray(middleColor);
-                    pending.FresnelColor2 = ToArray(bottomColor);
-                    pending.EmissionColor = ToArray(Color.black);
-                }
-                else // Emissive
+                if (currentPaintType == 3) // Emissive
                 {
                     secondaryColor.color = Color.black;
                     secondaryColor.SetColor("_FresnelColor", Color.black);
                     secondaryColor.SetColor("_FresnelColor2", Color.black);
                     secondaryColor.SetColor("_EmissionColor", buttonColor);
                     secondaryColor.EnableKeyword("_EMISSION");
+                    SetMaterialMetallic(secondaryColor, nonMetallicVal);    // emissive is non-metal
 
                     pending.BaseColor = ToArray(Color.black);
                     pending.FresnelColor = ToArray(Color.black);
                     pending.FresnelColor2 = ToArray(Color.black);
                     pending.EmissionColor = ToArray(buttonColor);
+                    pending.MetallicMap = nonMetallicVal;
+                }
+                else if (isMetal) // Metallic non-emissive secondary
+                {
+                    secondaryColor.color = topColor;
+                    secondaryColor.SetColor("_FresnelColor", middleColor);
+                    secondaryColor.SetColor("_FresnelColor2", bottomColor);
+                    secondaryColor.SetColor("_EmissionColor", Color.black);
+                    secondaryColor.DisableKeyword("_EMISSION");
+                    SetMaterialMetallic(secondaryColor, metallicVal);
+
+                    pending.BaseColor = ToArray(topColor);
+                    pending.FresnelColor = ToArray(middleColor);
+                    pending.FresnelColor2 = ToArray(bottomColor);
+                    pending.EmissionColor = ToArray(Color.black);
+                    pending.MetallicMap = metallicVal;
+                }
+                else // Non-emissive, non-metal (gloss/pearl)
+                {
+                    secondaryColor.color = topColor;
+                    secondaryColor.SetColor("_FresnelColor", middleColor);
+                    secondaryColor.SetColor("_FresnelColor2", bottomColor);
+                    secondaryColor.SetColor("_EmissionColor", Color.black);
+                    secondaryColor.DisableKeyword("_EMISSION");
+                    SetMaterialMetallic(secondaryColor, nonMetallicVal);
+
+                    pending.BaseColor = ToArray(topColor);
+                    pending.FresnelColor = ToArray(middleColor);
+                    pending.FresnelColor2 = ToArray(bottomColor);
+                    pending.EmissionColor = ToArray(Color.black);
+                    pending.MetallicMap = nonMetallicVal;
                 }
                 break;
 
             case Car.ColorType.RIM_COLOR:
                 paintPrice /= 10;
-                if (currentPaintType == 3) // Emissive
+
+                if (currentPaintType == 3) // Emissive rims
                 {
                     rimColor.color = Color.black;
                     rimColor.SetColor("_EmissionColor", buttonColor);
                     rimColor.EnableKeyword("_EMISSION");
+                    SetMaterialMetallic(rimColor, nonMetallicVal);
 
                     pending.BaseColor = ToArray(Color.black);
                     pending.EmissionColor = ToArray(buttonColor);
+                    pending.MetallicMap = nonMetallicVal;
                 }
-                else
+                else if (isMetal) // Metallic rims
+                {
+                    rimColor.color = topColor;
+                    rimColor.SetColor("_EmissionColor", Color.black);
+                    rimColor.DisableKeyword("_EMISSION");
+                    SetMaterialMetallic(rimColor, metallicVal);
+
+                    pending.BaseColor = ToArray(topColor);
+                    pending.EmissionColor = ToArray(Color.black);
+                    pending.MetallicMap = metallicVal;
+                }
+                else // Non-metal rims
                 {
                     rimColor.color = buttonColor;
                     rimColor.SetColor("_EmissionColor", Color.black);
                     rimColor.DisableKeyword("_EMISSION");
+                    SetMaterialMetallic(rimColor, nonMetallicVal);
 
                     pending.BaseColor = ToArray(buttonColor);
                     pending.EmissionColor = ToArray(Color.black);
+                    pending.MetallicMap = nonMetallicVal;
                 }
                 break;
 
             case Car.ColorType.PRIMARY_LIGHT:
                 paintPrice /= 10;
                 primaryLight.SetColor("_EmissionColor", buttonColor);
+                // Lights are not metallic
+                SetMaterialMetallic(primaryLight, nonMetallicVal);
+
                 pending.EmissionColor = ToArray(buttonColor);
+                pending.MetallicMap = nonMetallicVal;
                 break;
 
             case Car.ColorType.SECONDARY_LIGHT:
                 paintPrice /= 10;
                 secondaryLight.SetColor("_EmissionColor", buttonColor);
+                SetMaterialMetallic(secondaryLight, nonMetallicVal);
+
                 pending.EmissionColor = ToArray(buttonColor);
+                pending.MetallicMap = nonMetallicVal;
                 break;
 
             case Car.ColorType.TAIL_LIGHT:
                 paintPrice /= 10;
                 tailLight.SetColor("_EmissionColor", buttonColor);
+                SetMaterialMetallic(tailLight, nonMetallicVal);
+
                 pending.EmissionColor = ToArray(buttonColor);
+                pending.MetallicMap = nonMetallicVal;
                 break;
 
             default:
                 Debug.LogError("Invalid part to paint");
                 return;
         }
+
         // Determine which palette button this was.
         int presetIndex = GetPresetIndexInBucket(clickedButton);
 
-        // Cache both the color values.
-        _pendingColors[colorType] = pending;
-        _pendingPreset[colorType] = (currentPaintType, presetIndex);
+        // Cache pending selection
+        _pendingColors[(Car.ColorType)whichPartToPaint] = pending;
+        _pendingPreset[(Car.ColorType)whichPartToPaint] = (currentPaintType, presetIndex);
 
         paintNotEnoughCreditsPopUp.SetActive(false);
         paintBuyConfirmationPopUp.SetActive(false);
@@ -1351,6 +1432,9 @@ public class GarageUIManager : MonoBehaviour
             if (pending.FresnelColor2 != null) colorData.FresnelColor2 = pending.FresnelColor2;
             if (pending.EmissionColor != null) colorData.EmissionColor = pending.EmissionColor;
 
+            // Save metallic color
+            colorData.MetallicMap = pending.MetallicMap;
+
             if (_pendingPreset.TryGetValue(colorType, out var sel))
             {
                 colorData.SelectedPaintType = sel.paintType;
@@ -1400,6 +1484,7 @@ public class GarageUIManager : MonoBehaviour
                 primaryColor.color = baseColor;
                 primaryColor.SetColor("_FresnelColor", fresnelColor);
                 primaryColor.SetColor("_FresnelColor2", fresnelColor2);
+                SetMaterialMetallic(primaryColor, saved.MetallicMap);
                 break;
 
             case Car.ColorType.SECONDARY_COLOR:
@@ -1411,6 +1496,7 @@ public class GarageUIManager : MonoBehaviour
                     secondaryColor.EnableKeyword("_EMISSION");
                 else
                     secondaryColor.DisableKeyword("_EMISSION");
+                SetMaterialMetallic(secondaryColor, saved.MetallicMap);
                 break;
 
             case Car.ColorType.RIM_COLOR:
@@ -1420,18 +1506,22 @@ public class GarageUIManager : MonoBehaviour
                     rimColor.EnableKeyword("_EMISSION");
                 else
                     rimColor.DisableKeyword("_EMISSION");
+                SetMaterialMetallic(rimColor, saved.MetallicMap);
                 break;
 
             case Car.ColorType.PRIMARY_LIGHT:
                 primaryLight.SetColor("_EmissionColor", emissionColor);
+                SetMaterialMetallic(primaryLight, saved.MetallicMap);
                 break;
 
             case Car.ColorType.SECONDARY_LIGHT:
                 secondaryLight.SetColor("_EmissionColor", emissionColor);
+                SetMaterialMetallic(secondaryLight, saved.MetallicMap);
                 break;
 
             case Car.ColorType.TAIL_LIGHT:
                 tailLight.SetColor("_EmissionColor", emissionColor);
+                SetMaterialMetallic(tailLight, saved.MetallicMap);
                 break;
 
             default:
@@ -1441,6 +1531,56 @@ public class GarageUIManager : MonoBehaviour
 
         // Remove pending preview for this part, if any
         _pendingColors.Remove(colorType);
+    }
+
+    // Helper function for retrieving metallic colors from button name
+    private static void GetMetallicPreset(string buttonName, out Color baseColor, out Color fresnel1, out Color fresnel2)
+    {
+        switch (buttonName)
+        {
+            case "Gold":
+                // Rich yellow-gold
+                baseColor = new Color(1.00f, 0.75f, 0f, 1f);
+                fresnel1 = new Color(1.00f, 0.75f, 0f, 1f);
+                fresnel2 = new Color(1.00f, 0.75f, 0f, 1f);
+                break;
+
+            case "Bronze":
+                // Warmer, punchier bronze
+                baseColor = new Color(0.760f, 0.490f, 0.170f, 1f); // ~#C27D2B
+                fresnel1 = new Color(1.000f, 0.820f, 0.640f, 1f); // ~#FFD1A4 (highlight)
+                fresnel2 = new Color(0.353f, 0.176f, 0.047f, 1f); // ~#5A2D0C (shadow)
+                break;
+
+            case "Silver":
+            default:
+                baseColor = Color.white;
+                fresnel1 = Color.white;
+                fresnel2 = Color.white;
+                break;
+        }
+    }
+
+
+    // Set the metallic property of a material
+    private void SetMaterialMetallic(Material m, float value, bool useTexture = false)
+    {
+        if (m == null) return;
+
+        // If you want to force the slider to drive the look, ensure no metallic map is bound
+        if (!useTexture)
+        {
+            m.SetTexture(ID_MetallicGlossMap, null);
+            m.DisableKeyword("_METALLICSPECGLOSSMAP");
+        }
+        else
+        {
+            // If you later introduce a metallic texture, assign it and enable the keyword:
+            // m.SetTexture(ID_MetallicGlossMap, yourTexture);
+            m.EnableKeyword("_METALLICSPECGLOSSMAP");
+        }
+
+        m.SetFloat(ID_Metallic, value);
     }
 
     private static float[] ToArray(Color c) => new[] { c.r, c.g, c.b, c.a };
