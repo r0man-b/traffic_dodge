@@ -111,6 +111,7 @@ public class GarageUIManager : MonoBehaviour
     [Space(10)]
     [Header("Paint Menu Objects / Buttons")]
     public GameObject colors;
+    public GameObject metalSpheres;
     public Button buttonPrimaryColor;
     public Button buttonSecondaryColor;
     public Button buttonSwitchPaintTypeLeft;
@@ -987,6 +988,7 @@ public class GarageUIManager : MonoBehaviour
                 customizationBuckets[i].SetActive(false);
             }
         }
+        metalSpheres.SetActive(false);
     }
 
     private void ResetBuckets()
@@ -1122,6 +1124,7 @@ public class GarageUIManager : MonoBehaviour
                 colorBuckets[2].SetActive(false);
                 colorBuckets[3].SetActive(false);
                 colorBuckets[4].SetActive(false);
+                metalSpheres.SetActive(false);
                 paintType.text = "";
                 activeShader = matteShader;
                 break;
@@ -1132,6 +1135,7 @@ public class GarageUIManager : MonoBehaviour
                 colorBuckets[2].SetActive(false);
                 colorBuckets[3].SetActive(false);
                 colorBuckets[4].SetActive(false);
+                metalSpheres.SetActive(false);
                 paintType.text = "GLOSS";
                 activeShader = glossShader;
                 break;
@@ -1142,6 +1146,7 @@ public class GarageUIManager : MonoBehaviour
                 colorBuckets[2].SetActive(true);
                 colorBuckets[3].SetActive(false);
                 colorBuckets[4].SetActive(false);
+                metalSpheres.SetActive(false);
                 paintType.text = "PEARLESCENT";
                 activeShader = glossShader;
                 break;
@@ -1152,6 +1157,7 @@ public class GarageUIManager : MonoBehaviour
                 colorBuckets[2].SetActive(false);
                 colorBuckets[3].SetActive(true);
                 colorBuckets[4].SetActive(false);
+                metalSpheres.SetActive(false);
                 paintType.text = "EMISSIVE";
                 activeShader = matteShader;
                 break;
@@ -1162,6 +1168,7 @@ public class GarageUIManager : MonoBehaviour
                 colorBuckets[2].SetActive(false);
                 colorBuckets[3].SetActive(false);
                 colorBuckets[4].SetActive(true);
+                metalSpheres.SetActive(true);
                 paintType.text = "METALS";
                 activeShader = glossShader;
                 break;
@@ -1386,7 +1393,7 @@ public class GarageUIManager : MonoBehaviour
         paintBuyConfirmationPopUp.SetActive(false);
         paintPopUps.SetActive(true);
         string typeOfPaint = (currentPaintType == 0) ? "lights" : "paint";
-        paintBuyConfirmationPopUpText.text = "\nBuy  " + typeOfPaint + "  for  " + paintPrice.ToString("N0") + "  CR?";
+        paintBuyConfirmationPopUpText.text = "Buy  " + typeOfPaint + "  for  " + paintPrice.ToString("N0") + "  CR?";
         paintBuyConfirmationPopUp.SetActive(true);
 
         currentPaintPrice = paintPrice;
@@ -1547,15 +1554,15 @@ public class GarageUIManager : MonoBehaviour
 
             case "Bronze":
                 // Warmer, punchier bronze
-                baseColor = new Color(0.760f, 0.490f, 0.170f, 1f); // ~#C27D2B
-                fresnel1 = new Color(1.000f, 0.820f, 0.640f, 1f); // ~#FFD1A4 (highlight)
-                fresnel2 = new Color(0.353f, 0.176f, 0.047f, 1f); // ~#5A2D0C (shadow)
+                baseColor = new Color(0.98f, 0.61f, 0.33f, 1f);
+                fresnel1 = new Color(1.000f, 0.820f, 0.640f, 1f);
+                fresnel2 = new Color(0.353f, 0.176f, 0.047f, 1f); 
                 break;
 
             case "Silver":
             default:
                 baseColor = Color.white;
-                fresnel1 = Color.white;
+                fresnel1 = new Color(0.698f, 0.698f, 0.698f, 1f);
                 fresnel2 = Color.white;
                 break;
         }
