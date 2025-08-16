@@ -127,6 +127,8 @@ public class GarageUIManager : MonoBehaviour
     private readonly Dictionary<Car.ColorType, SaveData.ColorData> _pendingColors = new Dictionary<Car.ColorType, SaveData.ColorData>();
     private readonly Dictionary<Car.ColorType, (int paintType, int presetIndex)> _pendingPreset = new Dictionary<Car.ColorType, (int paintType, int presetIndex)>();
     private int currentPaintPrice;
+    private readonly float nonMetallicVal = 0.304f;
+    private readonly float metallicVal = 1f;
 
     // Other buttons.
     [Space(10)]
@@ -935,6 +937,7 @@ public class GarageUIManager : MonoBehaviour
             colorBuckets[1].SetActive(false);
             colorBuckets[2].SetActive(false);
             colorBuckets[3].SetActive(false);
+            colorBuckets[4].SetActive(false);
 
             activeShader = matteShader;
 
@@ -1020,26 +1023,29 @@ public class GarageUIManager : MonoBehaviour
         whichPartToPaint = part;
         isPlayerInPaintMenu = true;
 
-        if (whichPartToPaint == 0 || whichPartToPaint == 1)
+        if (whichPartToPaint == 0 || whichPartToPaint == 1) // Primary or Secondary color
         {
+            currentPaintType = 1;
             buttonPrimaryColor.gameObject.SetActive(false);
             buttonSecondaryColor.gameObject.SetActive(false);
             buttonSwitchPaintTypeLeft.gameObject.SetActive(true);
             buttonSwitchPaintTypeRight.gameObject.SetActive(true);
         }
-        else if (whichPartToPaint == 2)
+        else if (whichPartToPaint == 2) // Rim Color
         {
+            currentPaintType = 1;
             frontRimButton.gameObject.SetActive(false);
             rearRimButton.gameObject.SetActive(false);
             allRimButton.gameObject.SetActive(false);
             rimColorButton.gameObject.SetActive(false);
             buttonSwitchPaintTypeLeft.gameObject.SetActive(true);
             buttonSwitchPaintTypeRight.gameObject.SetActive(true);
-            paintType.text = "MATTE";
+            paintType.text = "GLOSS";
             garageCamera.SetCameraPosition(9);
         }
         else
         {
+            currentPaintType = 0;
             primaryLightButton.gameObject.SetActive(false);
             secondaryLightButton.gameObject.SetActive(false);
             tailLightButton.gameObject.SetActive(false);
@@ -1049,96 +1055,113 @@ public class GarageUIManager : MonoBehaviour
         leftButton.gameObject.SetActive(false);
         rightButton.gameObject.SetActive(false);
 
+        ChangePaintType(0);
         colors.SetActive(true);
 
-        currentPaintType = 0;
         RestoreCheckmarkFromSave(whichPartToPaint, currentPaintType);
         activeShader = matteShader;
     }
 
+    // Change the type of paint to put on the car by setting 'currentPaintType'
+    /* currentPaintType settings: 0 = Lighting, 1 = Gloss, 2 = Pearlescent, 3 = Emissive, 4 = Metal */
     public void ChangePaintType(int change)
     {
-        if (whichPartToPaint == 2)
-        {
-            if (change < 0) currentPaintType = 0;
-            else currentPaintType = 3;
-        }
-        else
-            currentPaintType += change;
-
         bool supportsEmissiveSecondary = SupportsEmissiveSecondary(currentCarType, car);
 
-        if (whichPartToPaint == 0) // Primary color doesn't include emissive colors.
+        // Determine which color bucket to display depending on which part we are painting
+        switch (whichPartToPaint)
         {
-            if (currentPaintType < 0 || currentPaintType > 2)
+            case 0: // Primary colors can be gloss, pearlescent, or metal NOT emissive
             {
-                currentPaintType = Mathf.Clamp(currentPaintType, 0, 2);
-                return;
+                if (change < 0 && currentPaintType == 4) currentPaintType = 2;
+                else if (change > 1 && currentPaintType == 2) currentPaintType = 4;
+                else currentPaintType += change;
+                currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
+                break;
             }
-        }
-        else if (whichPartToPaint == 1) // Secondary color includes emissive colors conditionally.
-        {
-            if (!supportsEmissiveSecondary)
+
+            case 1: // Secondary colors can be gloss, pearlescent, emissive (depending on the car), or metal
             {
-                if (currentPaintType < 0 || currentPaintType > 2)
+                if (supportsEmissiveSecondary)
                 {
-                    currentPaintType = Mathf.Clamp(currentPaintType, 0, 2);
-                    return;
+                    currentPaintType += change;
+                    currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
                 }
+                else
+                {
+                    if (change < 0 && currentPaintType == 4) currentPaintType = 2;
+                    else if (change > 1 && currentPaintType == 2) currentPaintType = 4;
+                    else currentPaintType += change;
+                    currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
+                }
+                break;
             }
-            else if (currentPaintType < 0 || currentPaintType > 3)
+            
+            case 2: // Rim Colors can be gloss, emissive, or metal NOT pearlescent
             {
-                currentPaintType = Mathf.Clamp(currentPaintType, 0, 3);
-                return;
-            }
-        }
-        else if (whichPartToPaint == 2) // Rim color includes emissive colors.
-        {
-            if (currentPaintType < 0 || currentPaintType > 3)
-            {
-                currentPaintType = Mathf.Clamp(currentPaintType, 0, 3);
-                return;
+                // Skip pearlescents
+                if (change < 0 && currentPaintType == 3) currentPaintType = 1;
+                else if (change > 1 && currentPaintType == 1) currentPaintType = 3;
+
+                else currentPaintType += change;
+                currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
+                break;
             }
         }
 
-        if (currentPaintType == 0) // MATTE.
+        switch (currentPaintType)
         {
-            colorBuckets[0].SetActive(true);
-            colorBuckets[1].SetActive(false);
-            colorBuckets[2].SetActive(false);
-            colorBuckets[3].SetActive(false);
-            paintType.text = "MATTE";
-            activeShader = matteShader;
+            case 0: // LIGHTING
+                colorBuckets[0].SetActive(true);
+                colorBuckets[1].SetActive(false);
+                colorBuckets[2].SetActive(false);
+                colorBuckets[3].SetActive(false);
+                colorBuckets[4].SetActive(false);
+                paintType.text = "";
+                activeShader = matteShader;
+                break;
+
+            case 1: // GLOSS
+                colorBuckets[0].SetActive(false);
+                colorBuckets[1].SetActive(true);
+                colorBuckets[2].SetActive(false);
+                colorBuckets[3].SetActive(false);
+                colorBuckets[4].SetActive(false);
+                paintType.text = "GLOSS";
+                activeShader = glossShader;
+                break;
+
+            case 2: // PEARLESCENT
+                colorBuckets[0].SetActive(false);
+                colorBuckets[1].SetActive(false);
+                colorBuckets[2].SetActive(true);
+                colorBuckets[3].SetActive(false);
+                colorBuckets[4].SetActive(false);
+                paintType.text = "PEARLESCENT";
+                activeShader = glossShader;
+                break;
+
+            case 3: // EMISSIVE
+                colorBuckets[0].SetActive(false);
+                colorBuckets[1].SetActive(false);
+                colorBuckets[2].SetActive(false);
+                colorBuckets[3].SetActive(true);
+                colorBuckets[4].SetActive(false);
+                paintType.text = "EMISSIVE";
+                activeShader = matteShader;
+                break;
+
+            case 4: // METAL
+                colorBuckets[0].SetActive(false);
+                colorBuckets[1].SetActive(false);
+                colorBuckets[2].SetActive(false);
+                colorBuckets[3].SetActive(false);
+                colorBuckets[4].SetActive(true);
+                paintType.text = "METALS";
+                activeShader = glossShader;
+                break;
         }
 
-        else if (currentPaintType == 1) // GLOSS.
-        {
-            colorBuckets[0].SetActive(false);
-            colorBuckets[1].SetActive(true);
-            colorBuckets[2].SetActive(false);
-            colorBuckets[3].SetActive(false);
-            paintType.text = "GLOSS";
-            activeShader = glossShader;
-        }
-
-        else if (currentPaintType == 2) // PEARLESCENT.
-        {
-            colorBuckets[0].SetActive(false);
-            colorBuckets[1].SetActive(false);
-            colorBuckets[2].SetActive(true);
-            colorBuckets[3].SetActive(false);
-            paintType.text = "PEARLESCENT";
-            activeShader = glossShader;
-        }
-        else if (currentPaintType == 3) // EMISSIVE.
-        {
-            colorBuckets[0].SetActive(false);
-            colorBuckets[1].SetActive(false);
-            colorBuckets[2].SetActive(false);
-            colorBuckets[3].SetActive(true);
-            paintType.text = "EMISSIVE";
-            activeShader = matteShader;
-        }
         RestoreCheckmarkFromSave(whichPartToPaint, currentPaintType);
     }
 
@@ -1199,7 +1222,7 @@ public class GarageUIManager : MonoBehaviour
 
             case Car.ColorType.SECONDARY_COLOR:
                 paintPrice /= 4;
-                if (currentPaintType == 1 || currentPaintType == 2) // Non-emissive
+                if (currentPaintType == 1 || currentPaintType == 2 || currentPaintType == 4) // Non-emissive
                 {
                     secondaryColor.color = topColor;
                     secondaryColor.SetColor("_FresnelColor", middleColor);
