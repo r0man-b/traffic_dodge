@@ -50,20 +50,21 @@ public class CarDisplay : MonoBehaviour
     private const string carsOwned = "CARS_OWNED";
 
     // -------------------- Loot-box style randomizer --------------------
-    private int spinCount = 100;
-    private float startDelay = 0.05f;   // fast at start
-    private float endDelay = 0.7f;   // slow at end
-    private float slowDownBias = 6f;
+    private readonly int spinCount = 100;
+    private readonly float startDelay = 0.05f;   // fast at start
+    private readonly float endDelay = 0.7f;   // slow at end
+    private readonly float slowDownBias = 6f;
     public CarCollection carCollection;
     Coroutine _spinCo;
 
-    // Public entrypoint
+    // Randomize car for lootboxes.
     public void RandomizeCar()
     {
         if (_spinCo != null) StopCoroutine(_spinCo);
         _spinCo = StartCoroutine(SpinRoutine());
     }
 
+    // Couroutine that spins the turntable and spawns randomized cars until it stops.
     IEnumerator SpinRoutine()
     {
         // Rarity weights by top-level index in carCollection (sum = 100)
@@ -72,7 +73,7 @@ public class CarDisplay : MonoBehaviour
         // 10 Accenditore 0.5, 11 Cmiesta 0.25, 12 Intervento 0.2, 13 Valen 0.05
         float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
 
-        // Precompute cumulative distribution
+        // Precompute cumulative distribution.
         float total = 0f;
         float[] cum = new float[weights.Length];
         for (int i = 0; i < weights.Length; i++)
@@ -83,10 +84,10 @@ public class CarDisplay : MonoBehaviour
 
         for (int i = 0; i < spinCount; i++)
         {
-            // Weighted pick of top-level type index (0..13)
+            // Weighted pick of top-level type index (0..13).
             int typeIdx = WeightedPick(cum, total);
 
-            // Guard against mismatched data
+            // Guard against mismatched data.
             typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
 
             var bucket = carCollection.carTypes[typeIdx];
@@ -95,7 +96,7 @@ public class CarDisplay : MonoBehaviour
             // Choose a random variant within that type (0..count-1)
             int variantIdx = Random.Range(0, variantCount);
 
-            // Get the Car asset and its display name
+            // Get the Car asset and its display name.
             var carAsset = bucket.items[variantIdx] as Car;
             if (carAsset != null)
             {
@@ -103,18 +104,18 @@ public class CarDisplay : MonoBehaviour
                 DisplayCar(carAsset, string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name, variantIdx, true);
             }
 
-            // Ease-out timing: quick at start, slows toward the end
+            // Ease-out timing: quick at start, slows toward the end.
             float tLin = (spinCount <= 1) ? 1f : (float)i / (spinCount - 1);
-            float tBias = Mathf.Pow(tLin, slowDownBias);        // stays near 0 for most of the run
+            float tBias = Mathf.Pow(tLin, slowDownBias);        // Stays near 0 for most of the run.
             float delay = Mathf.Lerp(startDelay, endDelay, tBias);
 
             yield return new WaitForSecondsRealtime(delay);
         }
 
-        _spinCo = null; // finished
+        _spinCo = null; // finished.
     }
 
-    // Map a random number onto the cumulative weights
+    // Map a random number onto the cumulative weights.
     int WeightedPick(float[] cumulative, float total)
     {
         float r = Random.value * total; // [0,total)
@@ -123,8 +124,7 @@ public class CarDisplay : MonoBehaviour
         return cumulative.Length - 1;
     }
 
-    // NOTE: Update caller sites to pass car type as string.
-    // If your Car.InitializeCar previously accepted an int type, update it to accept string.
+    // Instantiate and display car on turntable in garage.
     public GameObject DisplayCar(Car _car, string carType, int carIndex, bool lootboxCar)
     {
         currentCar = _car;
@@ -305,9 +305,6 @@ public class CarDisplay : MonoBehaviour
     // Sell the car. Set car to unowned, add car's value to player currency.
     public void SellCar()
     {
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
-
         numOfThisCarTypeOwned -= 1;
 
         if (currentCarIndex == numOfThisCarTypeOwned && numOfThisCarTypeOwned > 0) // Selling the last type of this car.
@@ -357,6 +354,7 @@ public class CarDisplay : MonoBehaviour
         cannotSellPopUp.SetActive(false);
     }
 
+    // Update performance stats text
     public void UpdateStats(float accelMaxValue, float accelIncreaseRate, int numlives)
     {
         bool isImperial = SaveManager.Instance.SaveData.ImperialUnits;

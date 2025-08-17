@@ -87,7 +87,7 @@ public class SaveData
         public float[] EmissionColor = { -1f, -1f, -1f, -1f };    // For emissive colors.
         public float MetallicMap = 0.304f;                        // For metallic colours.
 
-        public int SelectedPaintType = -1;    // 0=Matte, 1=Gloss, 2=Pearl, 3=Emissive
+        public int SelectedPaintType = -1;    // 0=Matte, 1=Gloss, 2=Pearl, 3=Emissive, 4=Metal
         public int SelectedPresetIndex = -1;  // palette button index within that bucket
     }
 

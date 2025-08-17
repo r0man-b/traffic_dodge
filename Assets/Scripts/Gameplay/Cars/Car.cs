@@ -29,6 +29,7 @@ public class Car : ScriptableObject
     private string currentCarType;
     private int currentCarIndex;
     private const float NON_METALLIC_DEFAULT = 0.304f; // nonMetallicVal
+    private const float RIM_NON_METALLIC_DEFAULT = 0.001f; // nonMetallicVal for rims
     private const float METALLIC_DEFAULT = 1.0f;   // metallicVal
     // URP Lit property IDs
     private static readonly int ID_Metallic = Shader.PropertyToID("_Metallic");
@@ -202,18 +203,17 @@ public class Car : ScriptableObject
                     colorData.BaseColor[2] = defaultColor.b;
                     colorData.BaseColor[3] = defaultColor.a;
 
-                    /*  UNCOMMENT WHEN RIMS GET CONVERTED TO METALLIC
                     colorData.FresnelColor[0] = defaultColor.r;
                     colorData.FresnelColor[1] = defaultColor.g;
                     colorData.FresnelColor[2] = defaultColor.b;
                     colorData.FresnelColor[3] = defaultColor.a;
 
-                    colorData.FresnelColor[0] = defaultColor.r;
-                    colorData.FresnelColor[1] = defaultColor.g;
-                    colorData.FresnelColor[2] = defaultColor.b;
-                    colorData.FresnelColor[3] = defaultColor.a;*/
+                    colorData.FresnelColor2[0] = defaultColor.r;
+                    colorData.FresnelColor2[1] = defaultColor.g;
+                    colorData.FresnelColor2[2] = defaultColor.b;
+                    colorData.FresnelColor2[3] = defaultColor.a;
 
-                    colorData.MetallicMap = NON_METALLIC_DEFAULT;
+                    colorData.MetallicMap = RIM_NON_METALLIC_DEFAULT;
                     break;
 
                 case (int)ColorType.PRIMARY_LIGHT:
@@ -262,10 +262,6 @@ public class Car : ScriptableObject
                     return Color.black; // Fallback to black if index is out of range.
             }
 
-            // Ensure metallic value is saved as default value
-            if (colorData.MetallicMap <= 0f)
-                colorData.MetallicMap = NON_METALLIC_DEFAULT;
-
             // Save the default color in SaveData.
             SaveManager.Instance.SaveGame();
         }
@@ -297,7 +293,7 @@ public class Car : ScriptableObject
         // Load the base color.
         Color? baseColor = LoadColorFromSaveData(carData, colorIndex) ?? defaultColor;
 
-        if (isEmissiveMaterial)
+        if (isEmissiveMaterial) // Lighting materials only.
         {
             Color emissionColor = baseColor.Value * 3f; // 3x intensity
             targetMaterial.SetColor("_EmissionColor", emissionColor);
@@ -334,7 +330,7 @@ public class Car : ScriptableObject
         // Handle emissive rims & secondary colors
         if (colorType == ColorType.SECONDARY_COLOR || colorType == ColorType.RIM_COLOR)
         {
-            if (!(colorData.EmissionColor[0] == 0f && colorData.EmissionColor[1] == 0f && colorData.EmissionColor[2] == 0f && colorData.EmissionColor[3] == 0f)
+            if (!(colorData.EmissionColor[0] == 0f && colorData.EmissionColor[1] == 0f && colorData.EmissionColor[2] == 0f)
                 && !(colorData.EmissionColor[0] == -1f && colorData.EmissionColor[1] == -1f && colorData.EmissionColor[2] == -1f && colorData.EmissionColor[3] == -1f))
             {
                 targetMaterial.color = Color.black;
@@ -440,12 +436,10 @@ public class Car : ScriptableObject
 
     public void SetDefaultColors()
     {
-        float metallicValue = NON_METALLIC_DEFAULT;
-
         primColor.color = defaultPrimaryColor;
         primColor.SetColor("_FresnelColor", defaultPrimaryColor);
         primColor.SetColor("_FresnelColor2", defaultPrimaryColor);
-        primColor.SetFloat("_Metallic", metallicValue);
+        ApplyMetallicToMaterial(primColor, NON_METALLIC_DEFAULT);
 
         if (emmissiveDefaultSecondaryColor)
         {
@@ -454,7 +448,7 @@ public class Car : ScriptableObject
             secondColor.SetColor("_FresnelColor2", Color.black);
             secondColor.SetColor("_EmissionColor", defaultSecondaryColor);
             secondColor.EnableKeyword("_EMISSION");
-            secondColor.SetFloat("_Metallic", metallicValue);
+            ApplyMetallicToMaterial(secondColor, NON_METALLIC_DEFAULT);
         }
         else
         {
@@ -463,26 +457,29 @@ public class Car : ScriptableObject
             secondColor.SetColor("_FresnelColor2", defaultSecondaryColor);
             secondColor.SetColor("_EmissionColor", Color.black);
             secondColor.DisableKeyword("_EMISSION");
-            secondColor.SetFloat("_Metallic", metallicValue);
+            ApplyMetallicToMaterial(secondColor, NON_METALLIC_DEFAULT);
         }
 
         rimColor.color = defaultRimColor;
         rimColor.SetColor("_EmissionColor", Color.black);
         rimColor.DisableKeyword("_EMISSION");
-        rimColor.SetFloat("_Metallic", metallicValue);
-        /*  UNCOMMENT WHEN RIMS GET CONVERTED TO METALLIC
+
         rimColor.SetColor("_Color", defaultRimColor);
         rimColor.SetColor("_FresnelColor", defaultRimColor);
-        rimColor.SetColor("_FresnelColor2", defaultRimColor);*/
+        rimColor.SetColor("_FresnelColor2", defaultRimColor);
+        ApplyMetallicToMaterial(rimColor, RIM_NON_METALLIC_DEFAULT);
 
         primLight.color = Color.black;
         primLight.SetColor("_EmissionColor", defaultPrimaryLightColor);
+        ApplyMetallicToMaterial(primLight, NON_METALLIC_DEFAULT);
 
         secondLight.color = Color.black;
         secondLight.SetColor("_EmissionColor", defaultSecondaryLightColor);
+        ApplyMetallicToMaterial(secondLight, NON_METALLIC_DEFAULT);
 
         tailLight.color = Color.black;
         tailLight.SetColor("_EmissionColor", defaultTailLightColor);
+        ApplyMetallicToMaterial(tailLight, NON_METALLIC_DEFAULT);
     }
 
     public void InitializeCar(string carType, int carIndex, bool isOwned = true)

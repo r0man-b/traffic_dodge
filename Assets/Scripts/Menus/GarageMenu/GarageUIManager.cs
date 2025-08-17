@@ -131,6 +131,7 @@ public class GarageUIManager : MonoBehaviour
 
     // Vars for metallic paints
     private readonly float nonMetallicVal = 0.304f;
+    private readonly float rimNonMetallicVal = 0.001f;
     private readonly float metallicVal = 1f;
     static readonly int ID_Metallic = Shader.PropertyToID("_Metallic");
     static readonly int ID_MetallicGlossMap = Shader.PropertyToID("_MetallicGlossMap");
@@ -1073,12 +1074,12 @@ public class GarageUIManager : MonoBehaviour
     /* currentPaintType settings: 0 = Lighting, 1 = Gloss, 2 = Pearlescent, 3 = Emissive, 4 = Metal */
     public void ChangePaintType(int change)
     {
-        bool supportsEmissiveSecondary = SupportsEmissiveSecondary(currentCarType, car);
+        bool supportsEmissiveSecondary = SupportsEmissiveSecondary(currentCarType);
 
-        // Determine which color bucket to display depending on which part we are painting
+        // Determine which color bucket to display depending on which part we are painting.
         switch (whichPartToPaint)
         {
-            case 0: // Primary colors can be gloss, pearlescent, or metal NOT emissive
+            case 0: // Primary colors can be gloss, pearlescent, or metal NOT emissive.
             {
                 if (change < 0 && currentPaintType == 4) currentPaintType = 2;
                 else if (change > 0 && currentPaintType == 2) currentPaintType = 4;
@@ -1087,7 +1088,7 @@ public class GarageUIManager : MonoBehaviour
                 break;
             }
 
-            case 1: // Secondary colors can be gloss, pearlescent, emissive (depending on the car), or metal
+            case 1: // Secondary colors can be gloss, pearlescent, emissive (depending on the car), or metal.
             {
                 if (supportsEmissiveSecondary)
                 {
@@ -1104,7 +1105,7 @@ public class GarageUIManager : MonoBehaviour
                 break;
             }
             
-            case 2: // Rim Colors can be gloss, emissive, or metal NOT pearlescent
+            case 2: // Rim Colors can be gloss, emissive, or metal NOT pearlescent.
             {
                 // Skip pearlescents
                 if (change < 0 && currentPaintType == 3) currentPaintType = 1;
@@ -1177,10 +1178,8 @@ public class GarageUIManager : MonoBehaviour
         RestoreCheckmarkFromSave(whichPartToPaint, currentPaintType);
     }
 
-    private bool SupportsEmissiveSecondary(string typeName, Car carAsset)
+    private bool SupportsEmissiveSecondary(string typeName)
     {
-        // Preferred: return carAsset.SupportsEmissiveSecondary; // if your Car scriptable exposes this
-        // Temporary: name-based exclusion
         return !noEmissiveSecondaryTypes.Contains(typeName);
     }
 
@@ -1196,22 +1195,23 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        // ---- NEW: choose colors depending on paint type ----
+        // Choose colors depending on paint type.
         Color topColor, middleColor, bottomColor;
         Color buttonColor = new Color(0, 0, 0);
 
         bool isMetal = (currentPaintType == 4);
         if (isMetal)
         {
-            // Metallic buttons have no images/materials; select by button name
+            // Metallic buttons have no images/materials; select by button name.
             GetMetallicPreset(clickedButton.name, out topColor, out middleColor, out bottomColor);
-            buttonColor = topColor; // for emissive branches we keep black; otherwise use base
+            buttonColor = topColor; // For emissive branches we keep black; otherwise use base.
         }
         else
         {
-            // Existing logic for non-metal buttons (may use Image.material or Image.color)
+            // Existing logic for non-metal buttons (may use Image.material or Image.color).
             Material buttonMaterial = clickedButton.GetComponent<Image>().material;
 
+            // Pearlescent paint buttons have 3 different colours.
             if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") &&
                 buttonMaterial.HasProperty("_MiddleColor") &&
                 buttonMaterial.HasProperty("_BottomColor"))
@@ -1220,7 +1220,7 @@ public class GarageUIManager : MonoBehaviour
                 middleColor = buttonMaterial.GetColor("_MiddleColor");
                 bottomColor = buttonMaterial.GetColor("_BottomColor");
             }
-            else
+            else // Gloss paint buttons have only one color, set all 3 properties to it.
             {
                 buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
             }
@@ -1228,7 +1228,7 @@ public class GarageUIManager : MonoBehaviour
 
         Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
 
-        // Apply to materials (preview) and cache the pending selection
+        // Apply to materials (preview) and cache the pending selection.
         var pending = new SaveData.ColorData();
 
         // ---- Apply preview per part ----
@@ -1317,35 +1317,47 @@ public class GarageUIManager : MonoBehaviour
                 if (currentPaintType == 3) // Emissive rims
                 {
                     rimColor.color = Color.black;
+                    rimColor.SetColor("_FresnelColor", Color.black);
+                    rimColor.SetColor("_FresnelColor2", Color.black);
                     rimColor.SetColor("_EmissionColor", buttonColor);
                     rimColor.EnableKeyword("_EMISSION");
-                    SetMaterialMetallic(rimColor, nonMetallicVal);
+                    SetMaterialMetallic(rimColor, rimNonMetallicVal);
 
                     pending.BaseColor = ToArray(Color.black);
+                    pending.FresnelColor = ToArray(Color.black);
+                    pending.FresnelColor2 = ToArray(Color.black);
                     pending.EmissionColor = ToArray(buttonColor);
-                    pending.MetallicMap = nonMetallicVal;
+                    pending.MetallicMap = rimNonMetallicVal;
                 }
                 else if (isMetal) // Metallic rims
                 {
                     rimColor.color = topColor;
+                    rimColor.SetColor("_FresnelColor", middleColor);
+                    rimColor.SetColor("_FresnelColor2", bottomColor);
                     rimColor.SetColor("_EmissionColor", Color.black);
                     rimColor.DisableKeyword("_EMISSION");
                     SetMaterialMetallic(rimColor, metallicVal);
 
                     pending.BaseColor = ToArray(topColor);
+                    pending.FresnelColor = ToArray(middleColor);
+                    pending.FresnelColor2 = ToArray(bottomColor);
                     pending.EmissionColor = ToArray(Color.black);
                     pending.MetallicMap = metallicVal;
                 }
                 else // Non-metal rims
                 {
-                    rimColor.color = buttonColor;
+                    rimColor.color = topColor;
+                    rimColor.SetColor("_FresnelColor", middleColor);
+                    rimColor.SetColor("_FresnelColor2", bottomColor);
                     rimColor.SetColor("_EmissionColor", Color.black);
                     rimColor.DisableKeyword("_EMISSION");
-                    SetMaterialMetallic(rimColor, nonMetallicVal);
+                    SetMaterialMetallic(rimColor, rimNonMetallicVal);
 
-                    pending.BaseColor = ToArray(buttonColor);
+                    pending.BaseColor = ToArray(topColor);
+                    pending.FresnelColor = ToArray(middleColor);
+                    pending.FresnelColor2 = ToArray(bottomColor);
                     pending.EmissionColor = ToArray(Color.black);
-                    pending.MetallicMap = nonMetallicVal;
+                    pending.MetallicMap = rimNonMetallicVal;
                 }
                 break;
 
@@ -1354,7 +1366,7 @@ public class GarageUIManager : MonoBehaviour
                 primaryLight.SetColor("_EmissionColor", buttonColor);
                 // Lights are not metallic
                 SetMaterialMetallic(primaryLight, nonMetallicVal);
-
+                pending.BaseColor = ToArray(Color.black);
                 pending.EmissionColor = ToArray(buttonColor);
                 pending.MetallicMap = nonMetallicVal;
                 break;
@@ -1363,7 +1375,7 @@ public class GarageUIManager : MonoBehaviour
                 paintPrice /= 10;
                 secondaryLight.SetColor("_EmissionColor", buttonColor);
                 SetMaterialMetallic(secondaryLight, nonMetallicVal);
-
+                pending.BaseColor = ToArray(Color.black);
                 pending.EmissionColor = ToArray(buttonColor);
                 pending.MetallicMap = nonMetallicVal;
                 break;
@@ -1372,7 +1384,7 @@ public class GarageUIManager : MonoBehaviour
                 paintPrice /= 10;
                 tailLight.SetColor("_EmissionColor", buttonColor);
                 SetMaterialMetallic(tailLight, nonMetallicVal);
-
+                pending.BaseColor = ToArray(Color.black);
                 pending.EmissionColor = ToArray(buttonColor);
                 pending.MetallicMap = nonMetallicVal;
                 break;
@@ -1385,10 +1397,11 @@ public class GarageUIManager : MonoBehaviour
         // Determine which palette button this was.
         int presetIndex = GetPresetIndexInBucket(clickedButton);
 
-        // Cache pending selection
+        // Cache pending selection.
         _pendingColors[(Car.ColorType)whichPartToPaint] = pending;
         _pendingPreset[(Car.ColorType)whichPartToPaint] = (currentPaintType, presetIndex);
 
+        // UI popup elements.
         paintNotEnoughCreditsPopUp.SetActive(false);
         paintBuyConfirmationPopUp.SetActive(false);
         paintPopUps.SetActive(true);
@@ -1402,6 +1415,7 @@ public class GarageUIManager : MonoBehaviour
     // Persists the color change and adjust player credits OR displays not enough credits message.
     public void BuyColor()
     {
+        // Tell player they are poor if they don't have enough credits.
         if (creditManager.GetCredits() < currentPaintPrice)
         {
             paintBuyConfirmationPopUp.SetActive(false);
@@ -1409,7 +1423,7 @@ public class GarageUIManager : MonoBehaviour
             paintNotEnoughCreditsPopUpText.text = "\nYou  do  not  have  enough  credits  to  purchase  " + typeOfPaint + ".  Required:\n" + currentPaintPrice.ToString("N0") + "  CR";
             paintNotEnoughCreditsPopUp.SetActive(true);
         }
-        else
+        else // Purchase the paint.
         {
             // Verify there is a pending selection for the current part
             Car.ColorType colorType = (Car.ColorType)whichPartToPaint;
@@ -1426,8 +1440,8 @@ public class GarageUIManager : MonoBehaviour
                 return;
             }
 
-            if (currentPaintType == 0) menuSounds.PlayAirWrenchSound();
-            else menuSounds.PlaySprayCan();
+            if (currentPaintType == 0) menuSounds.PlayAirWrenchSound(); // Play air wrench sound if installing new lighting color.
+            else menuSounds.PlaySprayCan(); // Otherwise play paint spray can sound.
             creditManager.ChangeCredits(-currentPaintPrice);
 
             // Persist to save data
@@ -1439,30 +1453,32 @@ public class GarageUIManager : MonoBehaviour
             if (pending.FresnelColor2 != null) colorData.FresnelColor2 = pending.FresnelColor2;
             if (pending.EmissionColor != null) colorData.EmissionColor = pending.EmissionColor;
 
-            // Save metallic color
+            // Save metallic color.
             colorData.MetallicMap = pending.MetallicMap;
-
+            
+            // Display checkmark on newly purchased paint button.
             if (_pendingPreset.TryGetValue(colorType, out var sel))
             {
                 colorData.SelectedPaintType = sel.paintType;
                 colorData.SelectedPresetIndex = sel.presetIndex;
 
-                // Immediately reflect in UI for the current bucket
+                // Immediately reflect in UI for the current bucket.
                 ApplyCheckmarkForBucket(sel.paintType, sel.presetIndex);
             }
 
             SaveManager.Instance.SaveGame();
 
-            // Optionally clear the pending entry for this part after purchase
+            // Clear the pending entry for this part after purchase.
             _pendingColors.Remove(colorType);
             _pendingPreset.Remove(colorType);
 
+            // TODO: Might need to set more popups to false here.
             paintPopUps.SetActive(false);
             paintBuyConfirmationPopUp.SetActive(false);
         }
     }
 
-    // Revert car color back to currently saved color
+    // Revert car color back to currently saved color.
     public void RevertColor()
     {
         if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
@@ -1508,6 +1524,8 @@ public class GarageUIManager : MonoBehaviour
 
             case Car.ColorType.RIM_COLOR:
                 rimColor.color = baseColor;
+                rimColor.SetColor("_FresnelColor", fresnelColor);
+                rimColor.SetColor("_FresnelColor2", fresnelColor2);
                 rimColor.SetColor("_EmissionColor", emissionColor);
                 if (emissionColor != Color.black)
                     rimColor.EnableKeyword("_EMISSION");
@@ -1536,24 +1554,22 @@ public class GarageUIManager : MonoBehaviour
                 break;
         }
 
-        // Remove pending preview for this part, if any
+        // Remove pending preview for this part, if any.
         _pendingColors.Remove(colorType);
     }
 
-    // Helper function for retrieving metallic colors from button name
+    // Helper function for retrieving metallic colors from button name.
     private static void GetMetallicPreset(string buttonName, out Color baseColor, out Color fresnel1, out Color fresnel2)
     {
         switch (buttonName)
         {
             case "Gold":
-                // Rich yellow-gold
                 baseColor = new Color(1.00f, 0.75f, 0f, 1f);
                 fresnel1 = new Color(1.00f, 0.75f, 0f, 1f);
                 fresnel2 = new Color(1.00f, 0.75f, 0f, 1f);
                 break;
 
             case "Bronze":
-                // Warmer, punchier bronze
                 baseColor = new Color(0.98f, 0.61f, 0.33f, 1f);
                 fresnel1 = new Color(1.000f, 0.820f, 0.640f, 1f);
                 fresnel2 = new Color(0.353f, 0.176f, 0.047f, 1f); 
@@ -1569,12 +1585,12 @@ public class GarageUIManager : MonoBehaviour
     }
 
 
-    // Set the metallic property of a material
+    // Set the metallic property of a material.
     private void SetMaterialMetallic(Material m, float value, bool useTexture = false)
     {
         if (m == null) return;
 
-        // If you want to force the slider to drive the look, ensure no metallic map is bound
+        // If slider forced to drive the look, ensure no metallic map is bound.
         if (!useTexture)
         {
             m.SetTexture(ID_MetallicGlossMap, null);
@@ -1582,8 +1598,6 @@ public class GarageUIManager : MonoBehaviour
         }
         else
         {
-            // If you later introduce a metallic texture, assign it and enable the keyword:
-            // m.SetTexture(ID_MetallicGlossMap, yourTexture);
             m.EnableKeyword("_METALLICSPECGLOSSMAP");
         }
 
@@ -1598,10 +1612,9 @@ public class GarageUIManager : MonoBehaviour
     }
 
     // Get the palette "slot index" within the active bucket.
-    // If your bucket contains non-button children, prefer a dedicated component (see Note below).
     private static int GetPresetIndexInBucket(Button b) => b.transform.GetSiblingIndex();
 
-    // Turn on a single child named "Checkmark" under the selected slot; turn off others
+    // Turn on a single child named "Checkmark" under the selected slot; turn off others.
     private void ApplyCheckmarkForBucket(int paintType, int presetIndex)
     {
         if (paintType < 0 || paintType >= colorBuckets.Count) return;
@@ -1614,7 +1627,7 @@ public class GarageUIManager : MonoBehaviour
         }
     }
 
-    // Clear all checkmarks in a bucket
+    // Clear all checkmarks in a bucket.
     private void ClearCheckmarksForBucket(int paintType)
     {
         if (paintType < 0 || paintType >= colorBuckets.Count) return;
@@ -1627,7 +1640,7 @@ public class GarageUIManager : MonoBehaviour
         }
     }
 
-    // Read saved selection for (PART, PAINT TYPE) and reflect it in UI
+    // Read saved selection for (PART, PAINT TYPE) and reflect it in UI.
     private void RestoreCheckmarkFromSave(int partIndex /*whichPartToPaint*/, int paintType)
     {
         if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
@@ -1643,7 +1656,7 @@ public class GarageUIManager : MonoBehaviour
             ClearCheckmarksForBucket(paintType);
     }
 
-    // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard.
+    // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard. (DEPRECATED)
     public void SetColor(Button clickedButton)
     {
         if (clickedButton == null)
@@ -1773,6 +1786,7 @@ public class GarageUIManager : MonoBehaviour
         carDisplay.UpdateStats(car.accelMaxValue, car.accelIncreaseRate, car.numlives);
     }
 
+    // Get the index of a default installed part
     public int GetDefaultPartIndex(int inputPartIndex)
     {
         switch (inputPartIndex)
