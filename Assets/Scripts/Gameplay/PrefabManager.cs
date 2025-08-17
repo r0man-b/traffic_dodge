@@ -623,7 +623,7 @@ public class PrefabManager : MonoBehaviour
                         newPos = new Vector3(-133.3f, 0, activeLeftBuildings[^1].transform.position.z + 200);
                     
                     else // Otherwise spawn building normally.
-                        newPos = new Vector3(xPos, Random.Range(-82.1f, 1), activeLeftBuildings[^1].transform.position.z + 200);
+                        newPos = new Vector3(xPos, Random.Range(-56.4f, 1), activeLeftBuildings[^1].transform.position.z + 200);
                 }
 
                 else // If this is the first time we are spawning a left building, initialize the Z position to 100.
@@ -632,7 +632,7 @@ public class PrefabManager : MonoBehaviour
                         newPos = new Vector3(-133.3f, 0, 100);
 
                     else // Otherwise spawn building normally.
-                        newPos = new Vector3(xPos, Random.Range(-82.1f, 1), 100);
+                        newPos = new Vector3(xPos, Random.Range(-56.4f, 1), 100);
                 }
                 
                 leftBuilding.transform.position = newPos;
@@ -652,10 +652,10 @@ public class PrefabManager : MonoBehaviour
                 Vector3 newPos;
 
                 if (activeRightBuildings.Count > 0)
-                    newPos = new Vector3(xPos, Random.Range(-82.1f, 1), activeRightBuildings[^1].transform.position.z + 200);
+                    newPos = new Vector3(xPos, Random.Range(-56.4f, 1), activeRightBuildings[^1].transform.position.z + 200);
 
                 else // If this is the first time we are spawning a right building, initialize the Z position to 100.
-                    newPos = new Vector3(xPos, Random.Range(-82.1f, 1), 100);
+                    newPos = new Vector3(xPos, Random.Range(-56.4f, 1), 100);
  
                 rightBuilding.transform.position = newPos;
                 activeRightBuildings.Add(rightBuilding);
