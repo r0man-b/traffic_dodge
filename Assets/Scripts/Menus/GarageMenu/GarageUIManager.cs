@@ -900,14 +900,19 @@ public class GarageUIManager : MonoBehaviour
 
     public void EnterPreviousBucket()
     {
+        // Escape the bottom level customization buckets where individual parts are bought.
         if (inItemDisplayMenu)
         {
+            // Reset garage camera to default position.
             garageCamera.SetCameraPosition(0);
+
+            // Destroy the buttons instantiated for the individual parts.
             for (int i = 0; i < instantiatedButtons.Length; i++)
             {
                 Destroy(instantiatedButtons[i].gameObject);
             }
             bucketButtons[currentBucketIndex][bucketSubIndex].interactable = true;
+
 
             for (int i = 0; i < customizationSubBuckets[currentBucketIndex].items.Length; i++)
             {
@@ -921,23 +926,40 @@ public class GarageUIManager : MonoBehaviour
                     AdjustAlpha(rawImages[currentBucketIndex][i], textMeshPros[currentBucketIndex][i], bucketImages[currentBucketIndex][i], 10f);
             }
 
+            // Reset installed car parts.
             carParts[currentPartIndex][currentInstantiatedButtonIndex].gameObject.SetActive(false);
             carParts[currentPartIndex][startingIndex].gameObject.SetActive(true);
 
+            // Reset rims.
             if (isPlayerInAllRimsMenu)
             {
                 carParts[4][currentInstantiatedButtonIndex].gameObject.SetActive(false);
                 carParts[4][rearRims].gameObject.SetActive(true);
             }
+            // Reset suspension height.
             else if (currentPartIndex == 7)
             {
                 suspensionHolder.SetSuspensionHeight(startingIndex);
             }
+            // Reset livery.
+            else if (currentPartIndex == 12)
+            {
+                if (startingIndex == 0)
+                {
+                    primaryColor.SetTexture("_LiveryMap", null);
+                    primaryColor.DisableKeyword("_AKMU_CARPAINT_LIVERY");
+                    return;
+                }
+                primaryColor.SetTexture("_LiveryMap", liveries[startingIndex]);
+                primaryColor.EnableKeyword("_AKMU_CARPAINT_LIVERY");
+            }
+
             isPlayerInAllRimsMenu = false;
             didPlayerPurchaseNewPart = false;
             inItemDisplayMenu = false;
         }
 
+        // Escape the paint menu.
         else if (isPlayerInPaintMenu)
         {
             colorBuckets[0].SetActive(true);
@@ -972,12 +994,15 @@ public class GarageUIManager : MonoBehaviour
             leftButton.gameObject.SetActive(true);
             rightButton.gameObject.SetActive(true);
 
+            metalSpheres.SetActive(false);
             colors.SetActive(false);
             buttonSwitchPaintTypeLeft.gameObject.SetActive(false);
             buttonSwitchPaintTypeRight.gameObject.SetActive(false);
             paintType.text = "MATTE";
             isPlayerInPaintMenu = false;
         }
+
+        // Escape the customization menu entirely.
         else
         {
             ResetBuckets();
@@ -989,7 +1014,6 @@ public class GarageUIManager : MonoBehaviour
                 customizationBuckets[i].SetActive(false);
             }
         }
-        metalSpheres.SetActive(false);
     }
 
     private void ResetBuckets()
