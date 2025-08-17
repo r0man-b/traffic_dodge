@@ -348,76 +348,6 @@ public class Car : ScriptableObject
         float metallic = Mathf.Clamp01(colorData.MetallicMap);
         ApplyMetallicToMaterial(targetMaterial, metallic);
     }
-    
-    // Randomize colors for randomly customized cars from lootboxes.
-    /*public void RandomizeColors(Material targetMaterial, string colorType, bool isEmissiveMaterial)
-    {
-        Color? baseColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-        Color? fresnelColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-        Color? fresnelColor2 = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-
-        // If the material is emissive, we set the emissive color property.
-        // NOTE: This bool's name is misleading. It only refers to the lighting colors eg. headlight, taillight, secondary light. It does NOT refer to emissive secondary colors / emissive rims.
-        if (isEmissiveMaterial)
-        {
-            baseColor = colorPresets[UnityEngine.Random.Range(2, colorPresets.Length)];
-            if (baseColor.HasValue)
-            {
-                targetMaterial.SetColor("_EmissionColor", baseColor.Value);
-                targetMaterial.EnableKeyword("_EMISSION");
-            }
-        }
-        else
-        {
-            // If not emissive, we set the base color property.
-            if (baseColor.HasValue)
-            {
-                targetMaterial.color = baseColor.Value;
-                if (colorType == "_PRIMARY_COLOR") // Set secondary colour equal to primary.
-                {
-                    secondColor.color = baseColor.Value;
-                }
-            }
-
-            if (targetMaterial.HasProperty("_FresnelColor") && fresnelColor.HasValue)
-            {
-                targetMaterial.SetColor("_FresnelColor", fresnelColor.Value);
-                if (colorType == "_PRIMARY_COLOR") // Set secondary colour equal to primary.
-                {
-                    secondColor.SetColor("_FresnelColor", fresnelColor.Value);
-                }
-            }
-
-            if (targetMaterial.HasProperty("_FresnelColor2") && fresnelColor2.HasValue)
-            {
-                targetMaterial.SetColor("_FresnelColor2", fresnelColor2.Value);
-                if (colorType == "_PRIMARY_COLOR") // Set secondary colour equal to primary.
-                {
-                    secondColor.SetColor("_FresnelColor2", fresnelColor2.Value);
-                }
-            }
-
-            if (colorType == "_PRIMARY_COLOR")
-            {
-                // 1/100 chance for metallic map value of 1, otherwise 0.304
-                float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : 0.304f;
-                targetMaterial.SetFloat("_Metallic", metallicValue); // Set metallic value.
-                secondColor.SetFloat("_Metallic", metallicValue);
-            }
-        }
-
-        if (colorType == "_SECONDARY_COLOR")
-        {
-            targetMaterial.SetColor("_EmissionColor", Color.black);
-            targetMaterial.EnableKeyword("_EMISSION");
-        }
-
-        if (colorType == "_RIM_COLOR")
-        {
-            targetMaterial.SetColor("_EmissionColor", Color.black);
-            targetMaterial.EnableKeyword("_EMISSION");
-        }
-    }*/
 
     public void RandomizeColors(Material targetMaterial, ColorType colorType, bool isEmissiveMaterial)         // TODO: ADD SAVING LOGIC TO THIS FUNCTION
     {
@@ -503,7 +433,6 @@ public class Car : ScriptableObject
         }
         else
         {
-            //primaryColor.mainTexture = liveries[change]; // Assuming liveries is an accessible member of this class
             primColor.SetTexture("_LiveryMap", liveries[index]); // Assuming you have a shader property named _LiveryMap
             primColor.EnableKeyword("_AKMU_CARPAINT_LIVERY");
         }
