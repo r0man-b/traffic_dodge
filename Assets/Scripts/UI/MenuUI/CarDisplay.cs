@@ -49,9 +49,83 @@ public class CarDisplay : MonoBehaviour
     private int sellPrice;
     private const string carsOwned = "CARS_OWNED";
 
+    // -------------------- Loot-box style randomizer --------------------
+    private int spinCount = 100;
+    private float startDelay = 0.05f;   // fast at start
+    private float endDelay = 0.7f;   // slow at end
+    private float slowDownBias = 6f;
+    public CarCollection carCollection;
+    Coroutine _spinCo;
+
+    // Public entrypoint
+    public void RandomizeCar()
+    {
+        if (_spinCo != null) StopCoroutine(_spinCo);
+        _spinCo = StartCoroutine(SpinRoutine());
+    }
+
+    IEnumerator SpinRoutine()
+    {
+        // Rarity weights by top-level index in carCollection (sum = 100)
+        // 0 Ferret 40, 1 Viking HD 20, 2 Cambrioleur 10, 3 Scythe 8, 4 Leischer 1000 6,
+        // 5 Raion 5, 6 Katana 4, 7 Leischer TTRR 3, 8 Veloci 2, 9 Rapid Poision 1,
+        // 10 Accenditore 0.5, 11 Cmiesta 0.25, 12 Intervento 0.2, 13 Valen 0.05
+        float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
+
+        // Precompute cumulative distribution
+        float total = 0f;
+        float[] cum = new float[weights.Length];
+        for (int i = 0; i < weights.Length; i++)
+        {
+            total += weights[i];
+            cum[i] = total;
+        }
+
+        for (int i = 0; i < spinCount; i++)
+        {
+            // Weighted pick of top-level type index (0..13)
+            int typeIdx = WeightedPick(cum, total);
+
+            // Guard against mismatched data
+            typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
+
+            var bucket = carCollection.carTypes[typeIdx];
+            int variantCount = Mathf.Max(1, bucket.items.Count);
+
+            // Choose a random variant within that type (0..count-1)
+            int variantIdx = Random.Range(0, variantCount);
+
+            // Get the Car asset and its display name
+            var carAsset = bucket.items[variantIdx] as Car;
+            if (carAsset != null)
+            {
+                // Show it using the existing pipeline (updates UI, replaces model, etc.)
+                DisplayCar(carAsset, string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name, variantIdx, true);
+            }
+
+            // Ease-out timing: quick at start, slows toward the end
+            float tLin = (spinCount <= 1) ? 1f : (float)i / (spinCount - 1);
+            float tBias = Mathf.Pow(tLin, slowDownBias);        // stays near 0 for most of the run
+            float delay = Mathf.Lerp(startDelay, endDelay, tBias);
+
+            yield return new WaitForSecondsRealtime(delay);
+        }
+
+        _spinCo = null; // finished
+    }
+
+    // Map a random number onto the cumulative weights
+    int WeightedPick(float[] cumulative, float total)
+    {
+        float r = Random.value * total; // [0,total)
+        for (int i = 0; i < cumulative.Length; i++)
+            if (r < cumulative[i]) return i;
+        return cumulative.Length - 1;
+    }
+
     // NOTE: Update caller sites to pass car type as string.
     // If your Car.InitializeCar previously accepted an int type, update it to accept string.
-    public GameObject DisplayCar(Car _car, string carType, int carIndex)
+    public GameObject DisplayCar(Car _car, string carType, int carIndex, bool lootboxCar)
     {
         currentCar = _car;
         currentCarType = carType;
@@ -89,8 +163,8 @@ public class CarDisplay : MonoBehaviour
         Debug.Log(Time.time + " NUM OF " + currentCar.name + "s OWNED: " + numOfThisCarTypeOwned);
 
         // Ensure Car.InitializeCar signature supports string carType
-        _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
-        // _car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
+        if (lootboxCar) _car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
+        else _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
 
         GameObject carModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
         return carModel;

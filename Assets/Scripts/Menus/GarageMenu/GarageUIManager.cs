@@ -465,7 +465,7 @@ public class GarageUIManager : MonoBehaviour
         if (carDisplay != null)
         {
             // Ensure CarDisplay supports string carType. If not, map to index via GetCarTypeIndex(currentCarType).
-            currentCar = carDisplay.DisplayCar(car, currentCarType, currentCarIndex);
+            currentCar = carDisplay.DisplayCar(car, currentCarType, currentCarIndex, false);
         }
 
         Transform carTransform = currentCar.transform.Find("BODY").transform;

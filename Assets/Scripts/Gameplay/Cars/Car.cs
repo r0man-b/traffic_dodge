@@ -421,10 +421,22 @@ public class Car : ScriptableObject
 
     public void RandomizeColors(Material targetMaterial, ColorType colorType, bool isEmissiveMaterial)         // TODO: ADD SAVING LOGIC TO THIS FUNCTION
     {
+        Color baseColor;
+        Color fresnelColor;
+        Color fresnelColor2;
         // Generate random base color and Fresnel colors.
-        Color baseColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-        Color fresnelColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-        Color fresnelColor2 = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+        if (colorType == ColorType.RIM_COLOR)
+        {
+            baseColor = Color.black;
+            fresnelColor = Color.black;
+            fresnelColor2 = Color.black;
+        }
+        else
+        {
+            baseColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+            fresnelColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+            fresnelColor2 = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+        }
 
         // If the material is emissive, we set the emissive color property.
         // NOTE: This bool's name is misleading. It only refers to the lighting colors eg. headlight, taillight, secondary light. It does NOT refer to emissive secondary colors / emissive rims.
@@ -460,8 +472,8 @@ public class Car : ScriptableObject
                 if (secondColor.HasProperty("_FresnelColor2"))
                     secondColor.SetColor("_FresnelColor2", fresnelColor2);
 
-                // 1/100 chance for metallic value of 1, otherwise 0.1.
-                float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : 0.1f;
+                // 1/100 chance for metallic value of 1.
+                float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : NON_METALLIC_DEFAULT;
                 targetMaterial.SetFloat("_Metallic", metallicValue);
                 secondColor.SetFloat("_Metallic", metallicValue);
             }
@@ -1057,7 +1069,11 @@ public class Car : ScriptableObject
 
         // Randomize the decals.
         PartHolder decalsHolder = carTransform.Find("DECALS").GetComponent<PartHolder>();
-        int randomDecalsIndex = UnityEngine.Random.Range(0, decalsHolder.GetPartArray().Length);
+        int randomDecalValue = UnityEngine.Random.Range(1, 11);
+        int randomDecalsIndex;
+        if (randomDecalValue == 1) randomDecalsIndex = UnityEngine.Random.Range(0, decalsHolder.GetPartArray().Length);
+        else randomDecalsIndex = 0;
+
         foreach (CarPart decal in decalsHolder.GetPartArray())
         {
             decal.gameObject.SetActive(false);
@@ -1068,9 +1084,10 @@ public class Car : ScriptableObject
             carData.CarParts[11].CurrentInstalledPart = randomDecalsIndex;
             carData.CarParts[11].Ownership[randomDecalsIndex] = true;
         }
+        
 
         // Randomize the liveries.
-        int randomNumber = UnityEngine.Random.Range(1, 11); // 10% chance of having car spawn with custom livery.
+        int randomNumber = UnityEngine.Random.Range(1, 25);
         PartHolder liveryHolder = carTransform.Find("LIVERIES").GetComponent<PartHolder>();
         foreach (CarPart livery in liveryHolder.GetPartArray())
         {
