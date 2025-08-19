@@ -1259,6 +1259,22 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
+        // Determine which palette button this was.
+        int presetIndex = GetPresetIndexInBucket(clickedButton);
+
+        var saveData = SaveManager.Instance.SaveData;
+        if (saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
+        {
+            var saved = carData.Colors[whichPartToPaint];
+
+            // With the current data model, "owned" == currently installed
+            if (saved.SelectedPaintType == currentPaintType &&
+                saved.SelectedPresetIndex == presetIndex)
+            {
+                return; // do nothing
+            }
+        }
+
         // Choose colors depending on paint type.
         Color topColor, middleColor, bottomColor;
         Color buttonColor = new Color(0, 0, 0);
@@ -1457,9 +1473,6 @@ public class GarageUIManager : MonoBehaviour
                 Debug.LogError("Invalid part to paint");
                 return;
         }
-
-        // Determine which palette button this was.
-        int presetIndex = GetPresetIndexInBucket(clickedButton);
 
         // Cache pending selection.
         _pendingColors[(Car.ColorType)whichPartToPaint] = pending;
