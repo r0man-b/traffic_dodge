@@ -818,6 +818,8 @@ public class Car : ScriptableObject
         }
 
         primColor.SetFloat("_Brightness", 1.21f);
+        secondColor.SetFloat("_Brightness", 1.21f);
+        rimColor.SetFloat("_Brightness", 1.21f);
 
         // Save the updated data to disk.
         SaveManager.Instance.SaveGame();
