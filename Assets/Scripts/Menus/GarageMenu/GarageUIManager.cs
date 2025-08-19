@@ -835,20 +835,61 @@ public class GarageUIManager : MonoBehaviour
 
     private void ConfirmBuyPart(int partType, int partIndex)
     {
-        popUps.SetActive(true);
-        if (creditManager.GetCredits() < carParts[partIndex][partType].price)
+        var saveData = SaveManager.Instance.SaveData;
+
+        if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
         {
-            notEnoughCreditsPopUpText.text = "You  do  not  have  enough  credits  to   purchase  this  part";
-            notEnoughCreditsPopUp.SetActive(true);
-            buyConfirmationPopUp.SetActive(false);
+            throw new KeyNotFoundException($"Car data not found for CarType: {currentCarType}, CarIndex: {currentCarIndex}");
+        }
+
+        if (partType == carData.CarParts[partIndex].CurrentInstalledPart) return;
+
+        bool isPartOwned = carData.CarParts[partIndex].Ownership.TryGetValue(partType, out bool owned) && owned;
+
+        if (!isPartOwned)
+        {
+            popUps.SetActive(true);
+            if (creditManager.GetCredits() < carParts[partIndex][partType].price)
+            {
+                notEnoughCreditsPopUpText.text = "You  do  not  have  enough  credits  to   purchase  this  part";
+                notEnoughCreditsPopUp.SetActive(true);
+                buyConfirmationPopUp.SetActive(false);
+            }
+            else
+            {
+                buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price.ToString("N0") + "  CR?";
+                notEnoughCreditsPopUp.SetActive(false);
+                buyButton.onClick.RemoveAllListeners();
+                buyButton.onClick.AddListener(() => BuyPart(partType, partIndex));
+                buyConfirmationPopUp.SetActive(true);
+            }
         }
         else
         {
-            buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price.ToString("N0") + "  CR?";
-            notEnoughCreditsPopUp.SetActive(false);
-            buyButton.onClick.RemoveAllListeners();
-            buyButton.onClick.AddListener(() => BuyPart(partType, partIndex));
-            buyConfirmationPopUp.SetActive(true);
+            int oldIndex = carData.CarParts[partIndex].CurrentInstalledPart;
+            if (oldIndex == -1) oldIndex = GetDefaultPartIndex(partIndex);
+
+            carData.CarParts[partIndex].CurrentInstalledPart = partType;
+
+            if (isPlayerInAllRimsMenu)
+            {
+                carData.CarParts[4].CurrentInstalledPart = partType; // Rear wheels
+                rearRims = partType;
+            }
+
+            if (partIndex > 7 && partIndex < 11)
+            {
+                UpdatePerformanceStats();
+            }
+
+            startingIndex = partType;
+
+            SaveManager.Instance.SaveGame();
+
+            scrollController.buttonPrices[oldIndex].text = "OWNED";
+            scrollController.buttonPrices[partType].text = "INSTALLED";
+
+            menuSounds.PlayAirWrenchSound();
         }
     }
 
@@ -889,7 +930,6 @@ public class GarageUIManager : MonoBehaviour
 
         SaveManager.Instance.SaveGame();
 
-        Debug.Log(counter++ + " | Old part name: " + carParts[partIndex][oldIndex].name + " index: " + oldIndex);
         scrollController.buttonPrices[oldIndex].text = "OWNED";
         scrollController.buttonPrices[partType].text = "INSTALLED";
 
