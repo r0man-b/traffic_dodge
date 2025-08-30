@@ -1863,6 +1863,11 @@ public class GarageUIManager : MonoBehaviour
         carDisplay.UpdateStats(car.accelMaxValue, car.accelIncreaseRate, car.numlives);
     }
 
+    public void UpdateNitroCount()
+    {
+        nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
+    }
+
     // Get the index of a default installed part
     public int GetDefaultPartIndex(int inputPartIndex)
     {
