@@ -3,7 +3,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-// If you use Unity IAP, uncomment the next line and add the package.
 // using UnityEngine.Purchasing;
 
 public class ShopMenu : MonoBehaviour
@@ -12,15 +11,18 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private GameObject topLevelButtons;
     [SerializeField] private GameObject menu;
     [SerializeField] private GameObject popups;
+    [SerializeField] private GameObject nitroImage;              // Shows a nitro-can icon when buying Credits
+    [SerializeField] private GameObject notEnoughNitroPopUp;     // Shown when player lacks nitros for a Credits purchase
+    [SerializeField] private CreditManager CreditManager;           // Object holding a `CreditManager` component
     public TextMeshProUGUI nitrocount;
 
     [Header("Popup UI")]
-    [SerializeField] private TMP_Text packTitleText;       // "NITRO PACK OF X"
-    [SerializeField] private TMP_Text quantityHeaderText;  // "QUANTITY:" label (optional; can be null)
-    [SerializeField] private TMP_Text quantityValueText;   // numeric value between +/- buttons
-    [SerializeField] private TMP_Text totalText;           // "TOTAL: X NITROS"
-    [SerializeField] private TMP_Text buyButtonText;       // "BUY: $xxxxx.xx" (outline handled in your button component, if any)
-    [SerializeField] private TMP_Text buyButtonTextOutline;// "BUY: $xxxxx.xx" (outline handled in your button component, if any)
+    [SerializeField] private TMP_Text packTitleText;       // e.g., "NITRO PACK OF X" or "X CR"
+    [SerializeField] private TMP_Text quantityHeaderText;  // "QUANTITY:" (optional)
+    [SerializeField] private TMP_Text quantityValueText;   // number between +/- buttons
+    [SerializeField] private TMP_Text totalText;           // e.g., "TOTAL: X NITROS" or "TOTAL: X CR"
+    [SerializeField] private TMP_Text buyButtonText;       // main buy label
+    [SerializeField] private TMP_Text buyButtonTextOutline;// outline label (mirrors main)
 
     [SerializeField] private Button minusButton;
     [SerializeField] private Button plusButton;
@@ -47,17 +49,23 @@ public class ShopMenu : MonoBehaviour
     private float _plusTimer;
     private float _minusTimer;
 
+    private float _plusHoldDuration;
+    private float _minusHoldDuration;
+
     private void Awake()
     {
-        nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
+        if (nitrocount != null && SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
+            nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
     }
 
     #region Public entry point (called by your Shop button)
     /// <summary>
-    /// Call this to show/populate the popup for a given ShopItem. Only Nitro is implemented.
+    /// Show/populate the popup for a given ShopItem.
     /// </summary>
     public void Show(ShopItem item)
     {
+        if (notEnoughNitroPopUp != null) notEnoughNitroPopUp.SetActive(false);
+
         menu.SetActive(false);
         popups.SetActive(true);
 
@@ -71,8 +79,7 @@ public class ShopMenu : MonoBehaviour
                 break;
 
             case ShopItem.ItemType.Credits:
-                // Intentionally not implemented in this version.
-                ConfigureUIForCreditsPlaceholder();
+                ConfigureUIForCredits();
                 break;
         }
 
@@ -97,31 +104,47 @@ public class ShopMenu : MonoBehaviour
     #region UI Configuration
     private void ConfigureUIForNitro()
     {
+        if (nitroImage != null) nitroImage.SetActive(false);
+
         if (packTitleText != null)
             packTitleText.text = $"NITRO PACK OF {_currentItem.quantityOfItem}";
-        // quantityHeaderText may already say "QUANTITY:" in the art; leave it if null.
+
+        // Center alignment and larger auto-size cap for Nitro buy text
+        ApplyBuyTextStyle(TextAlignmentOptions.Center, 72f);
     }
 
-    private void ConfigureUIForCreditsPlaceholder()
+    private void ConfigureUIForCredits()
     {
-        packTitleText.text = "CREDITS (NOT IMPLEMENTED)";
-        quantityValueText.text = "-";
-        totalText.text = "-";
-        buyButtonText.text = "BUY";
-        buyButtonTextOutline.text = "BUY";
+        if (nitroImage != null) nitroImage.SetActive(true);
+
+        if (packTitleText != null)
+            packTitleText.text = $"{_currentItem.quantityOfItem:N0} CR";
+
+        // Left alignment and smaller auto-size cap for Credits buy text
+        ApplyBuyTextStyle(TextAlignmentOptions.Center, 45f);
+    }
+
+    private void ApplyBuyTextStyle(TextAlignmentOptions alignment, float maxAutoSize)
+    {
+        if (buyButtonText != null)
+        {
+            buyButtonText.enableAutoSizing = true;
+            buyButtonText.fontSizeMax = maxAutoSize;
+            buyButtonText.alignment = alignment;
+        }
+        if (buyButtonTextOutline != null)
+        {
+            buyButtonTextOutline.enableAutoSizing = true;
+            buyButtonTextOutline.fontSizeMax = maxAutoSize;
+            buyButtonTextOutline.alignment = alignment;
+        }
     }
     #endregion
 
-    #region Update loop (hold-to-repeat)
-    // Add fields
-    private float _plusHoldDuration;
-    private float _minusHoldDuration;
-
-    // Replace Update() with this accelerated version
+    #region Update loop (hold-to-repeat with acceleration)
     private void Update()
     {
-        if (_currentItem == null || _currentItem.typeOfItem != ShopItem.ItemType.Nitro)
-            return;
+        if (_currentItem == null) return;
 
         // Track hold durations
         if (_holdingPlus) _plusHoldDuration += Time.unscaledDeltaTime;
@@ -152,7 +175,6 @@ public class ShopMenu : MonoBehaviour
             }
         }
     }
-
     #endregion
 
     #region Quantity & UI refresh
@@ -166,78 +188,143 @@ public class ShopMenu : MonoBehaviour
 
     private void RefreshAllTexts()
     {
-        nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
+        if (nitrocount != null && SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
+            nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
 
         if (_currentItem == null) return;
 
+        // Quantity numeric field
+        if (quantityValueText != null)
+            quantityValueText.text = _selectedQuantity.ToString();
+
         if (_currentItem.typeOfItem == ShopItem.ItemType.Nitro)
         {
-            // Quantity numeric field
-            if (quantityValueText != null)
-                quantityValueText.text = _selectedQuantity.ToString();
-
-            // Total nitros = quantityOfItem * selectedQuantity
+            // TOTAL line
             int totalNitros = _currentItem.quantityOfItem * _selectedQuantity;
             if (totalText != null)
                 totalText.text = $"TOTAL: {totalNitros:N0} NITROS";
 
-            // Buy price = quantityOfItem * selectedQuantity * priceOfItem  (as requested)
+            // BUY price (money), 2 decimals with thousands separators
             double price = _selectedQuantity * _currentItem.priceOfItem;
-            buyButtonText.text = $"BUY: ${price:N2}";
-            buyButtonTextOutline.text = $"BUY: ${price:N2}";
+            SetBuyTexts($"BUY: ${price:N2}");
         }
-        else
+        else // Credits
         {
-            // Credits path intentionally not implemented
+            // Title already set in ConfigureUIForCredits()
+
+            // TOTAL line (credits)
+            int totalCredits = _currentItem.quantityOfItem * _selectedQuantity;
+            if (totalText != null)
+                totalText.text = $"TOTAL: {totalCredits:N0} CR";
+
+            // BUY cost in nitro cans (no commas, rounded to int)
+            int nitroCost = Mathf.RoundToInt(_selectedQuantity * _currentItem.priceOfItem);
+            SetBuyTexts($"BUY: {nitroCost:0}");
         }
+    }
+
+    private void SetBuyTexts(string value)
+    {
+        if (buyButtonText != null) buyButtonText.text = value;
+        if (buyButtonTextOutline != null) buyButtonTextOutline.text = value;
     }
     #endregion
 
-    #region Buy flow (Unity IAP integration point)
+    #region Buy flow
     private void OnBuyClicked()
     {
-        // Initiate purchase with your configured IAP product id.
-        // You must have this product configured in the IAP catalog.
-        // The actual fulfillment (granting items) should occur **after** a successful purchase.
-        //
-        // Example using Codeless IAP:
-        // CodelessIAPStoreListener.instance.InitiatePurchase(nitroProductId);
-        //
-        // If you have a custom IAP manager, replace this call accordingly and make sure
-        // that it invokes OnNitroPurchaseSucceeded() upon confirmed success.
+        if (_currentItem == null) return;
 
-        // Placeholder: call your IAP manager here.
-        // IAPManager.Instance.BuyProductId(nitroProductId, OnNitroPurchaseSucceeded, OnPurchaseFailed);
+        switch (_currentItem.typeOfItem)
+        {
+            case ShopItem.ItemType.Nitro:
+                // Example codeless call:
+                // CodelessIAPStoreListener.instance.InitiatePurchase(nitroProductId);
+                // Or custom manager:
+                // IAPManager.Instance.BuyProductId(nitroProductId, OnNitroPurchaseSucceeded, OnPurchaseFailed);
 
-        // Remove the following line in production. It simulates an immediate success to demonstrate wiring.
-        // --- Simulation start ---
-        OnNitroPurchaseSucceeded();
-        // --- Simulation end ---
+                // Simulation:
+                OnNitroPurchaseSucceeded();
+                break;
+
+            case ShopItem.ItemType.Credits:
+                OnCreditsPurchaseAttempt();
+                break;
+        }
     }
 
-    /// <summary>
-    /// Call this from your IAP success callback (after the transaction is confirmed).
-    /// This method performs the actual fulfillment: add nitros to saved data.
-    /// </summary>
+    // Nitro fulfillment after verified purchase
     public void OnNitroPurchaseSucceeded()
     {
         int grant = _currentItem.quantityOfItem * _selectedQuantity;
 
-        // Guard for your SaveManager singleton.
         if (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
         {
             SaveManager.Instance.SaveData.NitroCount += grant;
             SaveManager.Instance.SaveGame();
         }
 
-        // Optionally close the popup or refresh other UI here.
         RefreshAllTexts();
+        HandleBackButton();
     }
 
-    // Optional failure hook
+    private void OnCreditsPurchaseAttempt()
+    {
+        // Cost is in nitro cans; must have enough nitro to proceed.
+        int nitroCost = Mathf.RoundToInt(_selectedQuantity * _currentItem.priceOfItem);
+        int playerNitro = (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
+            ? SaveManager.Instance.SaveData.NitroCount
+            : 0;
+
+        if (playerNitro < nitroCost)
+        {
+            if (notEnoughNitroPopUp != null) notEnoughNitroPopUp.SetActive(true);
+            return;
+        }
+
+        // Deduct nitro and grant credits
+        int grantCredits = _currentItem.quantityOfItem * _selectedQuantity;
+
+        if (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
+        {
+            SaveManager.Instance.SaveData.NitroCount = Mathf.Max(0, playerNitro - nitroCost);
+            SaveManager.Instance.SaveGame();
+        }
+
+        // Update credits via CreditManager
+        if (CreditManager != null)
+        {
+            CreditManager.ChangeCredits(grantCredits);
+        }
+        else
+        {
+            Debug.LogWarning("ShopMenu: CreditManager GameObject is not assigned.");
+        }
+
+        RefreshAllTexts();
+        HandleBackButton();
+    }
+
     private void OnPurchaseFailed()
     {
-        // Handle failure UI/telemetry as needed.
+        // Handle purchase failure if needed.
+    }
+    #endregion
+
+    #region Back navigation
+    public void HandleBackButton()
+    {
+        if (popups != null && popups.activeSelf)
+        {
+            notEnoughNitroPopUp.SetActive(false);
+            popups.SetActive(false);
+            menu.SetActive(true);
+        }
+        else
+        {
+            gameObject.SetActive(false);
+            if (topLevelButtons != null) topLevelButtons.SetActive(true);
+        }
     }
     #endregion
 
@@ -247,56 +334,35 @@ public class ShopMenu : MonoBehaviour
         var trigger = go.GetComponent<EventTrigger>();
         if (trigger == null) trigger = go.AddComponent<EventTrigger>();
 
-        // Clear existing entries we may have added earlier
         trigger.triggers ??= new System.Collections.Generic.List<EventTrigger.Entry>();
 
-        // PointerDown
         var down = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
         down.callback.AddListener(_ => setHolding(true));
         trigger.triggers.Add(down);
 
-        // PointerUp
         var up = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
         up.callback.AddListener(_ => setHolding(false));
         trigger.triggers.Add(up);
 
-        // PointerExit (stop if the user drags off the button)
         var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
         exit.callback.AddListener(_ => setHolding(false));
         trigger.triggers.Add(exit);
     }
 
-    public void HandleBackButton()
-    {
-        if (popups != null && popups.activeSelf)
-        {
-            // Case: User is inside the quantity-purchase popup
-            popups.SetActive(false);
-            menu.SetActive(true);
-        }
-        else
-        {
-            // Case: User is not in the popup, go back to "Buttons"
-            gameObject.SetActive(false);
-            topLevelButtons.SetActive(true);
-        }
-    }
-
-
-    // Update Reset*Timer to initialize the first delay when a hold starts
+    // Initialize first delay when a hold starts
     private void ResetPlusTimer()
     {
         _plusTimer = _holdingPlus ? holdInitialDelay : 0f;
-        if (_holdingPlus) _plusHoldDuration = 0f;          // restart ramp each new hold
+        if (_holdingPlus) _plusHoldDuration = 0f; // restart ramp each new hold
     }
 
     private void ResetMinusTimer()
     {
         _minusTimer = _holdingMinus ? holdInitialDelay : 0f;
-        if (_holdingMinus) _minusHoldDuration = 0f;        // restart ramp each new hold
+        if (_holdingMinus) _minusHoldDuration = 0f; // restart ramp each new hold
     }
 
-    // Add these helpers (tune thresholds/values as desired)
+    // Acceleration helpers
     private int StepForHold(float secondsHeld)
     {
         if (secondsHeld >= 6f) return 100;
@@ -307,8 +373,6 @@ public class ShopMenu : MonoBehaviour
 
     private float IntervalForHold(float secondsHeld)
     {
-        // Start from your base holdRepeatInterval and reduce it as the hold continues.
-        // Example: base=0.05s → 0.05, 0.03, 0.018, 0.008
         if (secondsHeld >= 6f) return Mathf.Max(0.008f, holdRepeatInterval * 0.16f);
         if (secondsHeld >= 4f) return Mathf.Max(0.018f, holdRepeatInterval * 0.36f);
         if (secondsHeld >= 2f) return Mathf.Max(0.030f, holdRepeatInterval * 0.60f);

@@ -40,7 +40,7 @@ public class ShopItem : MonoBehaviour
                 quantityText.text = quantityOfItem.ToString("N0") + " CR:";
 
                 // Button formatting
-                string creditPrice = "BUY: " + ((int)priceOfItem).ToString("N0");
+                string creditPrice = "  BUY: " + ((int)priceOfItem).ToString("N0");
                 buttonText.text = creditPrice;
                 buttonTextOutline.text = creditPrice;
                 break;
