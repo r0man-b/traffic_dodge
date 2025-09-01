@@ -1,10 +1,10 @@
 using System.Collections;
 using UnityEngine;
-using TMPro; // Make sure to include this namespace for TextMeshPro.
+using TMPro;
 
 public class CreditManager : MonoBehaviour
 {
-    public TMP_Text creditsText; // TMP Text component.
+    public TMP_Text creditsText;          // TextMeshPro text component
     public bool changeDone = false;
     private Coroutine creditChangeCoroutine;
     public MenuSounds menuSounds;
@@ -13,7 +13,7 @@ public class CreditManager : MonoBehaviour
     {
         if (creditsText == null)
         {
-            Debug.LogError("TMP_Text component not found on the GameObject.");
+            Debug.LogError("CreditManager: creditsText (TMP_Text) is not assigned.");
             return;
         }
 
@@ -23,24 +23,27 @@ public class CreditManager : MonoBehaviour
         // Initialize credits if they are zero or less.
         if (currentCredits <= 0)
         {
-            currentCredits = 999999999;
+            currentCredits = 999_999_999;
             SaveManager.Instance.SaveData.GlobalCredits = currentCredits;
-            SaveManager.Instance.SaveGame(); // Save the initial credits.
+            SaveManager.Instance.SaveGame();
         }
 
         // Format the credits with commas and append " cr".
-        creditsText.text = $"{currentCredits:n0} cr";
+        creditsText.text = $"{currentCredits:N0} cr";
     }
 
-    // Public method to change the credit amount.
-    public void ChangeCredits(int change, bool stop = false)
+    /// <summary>
+    /// Public method to change the credit amount (supports long).
+    /// </summary>
+    public void ChangeCredits(long change, bool stop = false)
     {
         if (creditChangeCoroutine != null)
         {
-            StopCoroutine(creditChangeCoroutine); // Stop the current coroutine if it's running.
+            StopCoroutine(creditChangeCoroutine);
         }
-        
-        if (!stop) creditChangeCoroutine = StartCoroutine(AnimateCreditChange(change));
+
+        if (!stop)
+            creditChangeCoroutine = StartCoroutine(AnimateCreditChange(change));
     }
 
     public long GetCredits()
@@ -48,19 +51,20 @@ public class CreditManager : MonoBehaviour
         return SaveManager.Instance.SaveData.GlobalCredits;
     }
 
-    private IEnumerator AnimateCreditChange(int change)
+    private IEnumerator AnimateCreditChange(long change)
     {
         changeDone = false;
 
-        const int maxSteps = 100;                  // 2 seconds / 0.01s = 200 updates
+        const int maxSteps = 100;
         const float stepDelay = 0.01f;
-        int absChange = Mathf.Abs(change);
+
+        long absChange = System.Math.Abs(change);
         int direction = change >= 0 ? 1 : -1;
 
         long currentCredits = SaveManager.Instance.SaveData.GlobalCredits;
 
         // Determine actual number of steps needed
-        int steps = Mathf.Min(absChange, maxSteps);
+        int steps = (int)System.Math.Min(absChange, maxSteps);
 
         // If no change is needed, exit immediately
         if (steps == 0)
@@ -69,17 +73,21 @@ public class CreditManager : MonoBehaviour
             yield break;
         }
 
-        int baseStepAmount = absChange / steps;
-        int remainder = absChange % steps;
+        long baseStepAmount = absChange / steps; // >= 1
+        long remainder = absChange % steps;      // < steps
 
         for (int i = 0; i < steps; i++)
         {
-            int stepAmount = baseStepAmount + (i < remainder ? 1 : 0);
-            currentCredits += direction * stepAmount;
+            long stepAmount = baseStepAmount + (i < remainder ? 1L : 0L);
 
+            // Apply step
+            currentCredits += (long)direction * stepAmount;
+
+            // Persist and update UI
             SaveManager.Instance.SaveData.GlobalCredits = currentCredits;
-            creditsText.text = $"{currentCredits:n0} cr";
-            menuSounds.PlayCreditChange();
+            creditsText.text = $"{currentCredits:N0} cr";
+
+            if (menuSounds != null) menuSounds.PlayCreditChange();
 
             yield return new WaitForSeconds(stepDelay);
         }
@@ -87,9 +95,4 @@ public class CreditManager : MonoBehaviour
         SaveManager.Instance.SaveGame();
         changeDone = true;
     }
-
-
-
-
-
 }

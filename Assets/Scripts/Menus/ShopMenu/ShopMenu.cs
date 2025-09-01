@@ -199,8 +199,8 @@ public class ShopMenu : MonoBehaviour
 
         if (_currentItem.typeOfItem == ShopItem.ItemType.Nitro)
         {
-            // TOTAL line
-            int totalNitros = _currentItem.quantityOfItem * _selectedQuantity;
+            // Use long for total
+            long totalNitros = (long)_currentItem.quantityOfItem * _selectedQuantity;
             if (totalText != null)
                 totalText.text = $"TOTAL: {totalNitros:N0} NITROS";
 
@@ -210,10 +210,8 @@ public class ShopMenu : MonoBehaviour
         }
         else // Credits
         {
-            // Title already set in ConfigureUIForCredits()
-
-            // TOTAL line (credits)
-            int totalCredits = _currentItem.quantityOfItem * _selectedQuantity;
+            // TOTAL line (credits) as long
+            long totalCredits = (long)_currentItem.quantityOfItem * _selectedQuantity;
             if (totalText != null)
                 totalText.text = $"TOTAL: {totalCredits:N0} CR";
 
@@ -256,11 +254,16 @@ public class ShopMenu : MonoBehaviour
     // Nitro fulfillment after verified purchase
     public void OnNitroPurchaseSucceeded()
     {
-        int grant = _currentItem.quantityOfItem * _selectedQuantity;
+        long grant = (long)_currentItem.quantityOfItem * _selectedQuantity;
 
         if (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
         {
-            SaveManager.Instance.SaveData.NitroCount += grant;
+            // Clamp to int range if SaveData.NitroCount is an int
+            long newValue = (long)SaveManager.Instance.SaveData.NitroCount + grant;
+            if (newValue > int.MaxValue) newValue = int.MaxValue;
+            if (newValue < int.MinValue) newValue = int.MinValue;
+            SaveManager.Instance.SaveData.NitroCount = (int)newValue;
+
             SaveManager.Instance.SaveGame();
         }
 
@@ -283,7 +286,7 @@ public class ShopMenu : MonoBehaviour
         }
 
         // Deduct nitro and grant credits
-        int grantCredits = _currentItem.quantityOfItem * _selectedQuantity;
+        long grantCreditsLong = (long)_currentItem.quantityOfItem * _selectedQuantity;
 
         if (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
         {
@@ -291,10 +294,10 @@ public class ShopMenu : MonoBehaviour
             SaveManager.Instance.SaveGame();
         }
 
-        // Update credits via CreditManager
+        // Update credits via CreditManager (method expects int)
         if (CreditManager != null)
         {
-            CreditManager.ChangeCredits(grantCredits);
+            CreditManager.ChangeCredits(grantCreditsLong);
         }
         else
         {
