@@ -30,6 +30,11 @@ public class GarageUIManager : MonoBehaviour
     public CreditManager creditManager;
     public TextMeshProUGUI nitrocount;
     public MenuSounds menuSounds;
+    public int previousPartType = -1;
+    public int previousPartIndex = -1;
+    public int previousPaintPrice;
+    private Button previousClickedPaintButton;
+    private bool useSavedPaintButton = false;
 
     [Space(10)]
     [Header("UI Popups for buying items")]
@@ -833,8 +838,11 @@ public class GarageUIManager : MonoBehaviour
         }
     }
 
-    private void ConfirmBuyPart(int partType, int partIndex)
+    public void ConfirmBuyPart(int partType, int partIndex)
     {
+        previousPartType = partType;
+        previousPartIndex = partIndex;
+
         var saveData = SaveManager.Instance.SaveData;
 
         if (!saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData carData))
@@ -1247,17 +1255,30 @@ public class GarageUIManager : MonoBehaviour
         return !noEmissiveSecondaryTypes.Contains(typeName);
     }
 
+    public void UseSavedPaintButton()
+    {
+        useSavedPaintButton = true;
+    }
+
     // Called when user clicks on a paint button. PREVIEWS the colour only.
     public void SetColor(int paintPrice)
     {
         if (invokedFromUpdate) return;
 
-        Button clickedButton = EventSystem.current.currentSelectedGameObject?.GetComponent<Button>();
+        Button clickedButton;
+        if (useSavedPaintButton) clickedButton = previousClickedPaintButton;
+        else clickedButton = EventSystem.current.currentSelectedGameObject?.GetComponent<Button>();
+
+        useSavedPaintButton = false;
+
         if (clickedButton == null)
         {
             Debug.LogWarning("Current selected object is not a button.");
             return;
         }
+
+        previousPaintPrice = paintPrice;
+        previousClickedPaintButton = clickedButton;
 
         // Determine which palette button this was.
         int presetIndex = GetPresetIndexInBucket(clickedButton);

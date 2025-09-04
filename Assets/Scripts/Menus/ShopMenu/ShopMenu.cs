@@ -14,6 +14,10 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private GameObject nitroImage;              // Shows a nitro-can icon when buying Credits
     [SerializeField] private GameObject notEnoughNitroPopUp;     // Shown when player lacks nitros for a Credits purchase
     [SerializeField] private CreditManager CreditManager;           // Object holding a `CreditManager` component
+    [SerializeField] private GameObject garageUI;
+    [SerializeField] private GarageUIManager garageUIManager;
+    [SerializeField] private GameObject mainMenuUI;
+    [SerializeField] private CarDisplay carDisplay;
     public TextMeshProUGUI nitrocount;
 
     [Header("Popup UI")]
@@ -37,6 +41,16 @@ public class ShopMenu : MonoBehaviour
     [Header("IAP")]
     [Tooltip("Product ID configured in Unity IAP for Nitro packs")]
     [SerializeField] private string nitroProductId = "nitro_pack"; // set this to your actual IAP id
+
+    public enum MenuType
+    {
+        DEFAULT = -1,
+        CAR_BUY_MENU = 0,
+        PART_BUY_MENU = 1,
+        PAINT_BUY_MENU = 2
+    }
+    private bool cameFromGarageMenu;
+    private MenuType previousMenuType = MenuType.DEFAULT;
 
     private ShopItem _currentItem;
     private int _selectedQuantity = 1;                       // starts at 1
@@ -317,11 +331,35 @@ public class ShopMenu : MonoBehaviour
     #region Back navigation
     public void HandleBackButton()
     {
-        if (popups != null && popups.activeSelf)
+        if(popups != null && popups.activeSelf)
         {
             notEnoughNitroPopUp.SetActive(false);
             popups.SetActive(false);
             menu.SetActive(true);
+        }
+        else if (cameFromGarageMenu)
+        {
+            mainMenuUI.SetActive(false);
+            topLevelButtons.SetActive(true);
+            gameObject.SetActive(false);
+            garageUI.SetActive(true);
+            cameFromGarageMenu = false;
+            switch (previousMenuType)
+            {
+                case MenuType.CAR_BUY_MENU:
+                    carDisplay.ConfirmBuy();
+                    break;
+                case MenuType.PART_BUY_MENU:
+                    garageUIManager.ConfirmBuyPart(garageUIManager.previousPartType, garageUIManager.previousPartIndex);
+                    break;
+                case MenuType.PAINT_BUY_MENU:
+                    garageUIManager.UseSavedPaintButton();
+                    garageUIManager.SetColor(garageUIManager.previousPaintPrice);
+                    break;
+                default:
+                    break;
+            }
+            previousMenuType = MenuType.DEFAULT;
         }
         else
         {
@@ -330,6 +368,12 @@ public class ShopMenu : MonoBehaviour
         }
     }
     #endregion
+
+    public void HandleEntranceFromGarageMenu(int previousMenu)
+    {
+        cameFromGarageMenu = true;
+        previousMenuType = (MenuType) previousMenu;
+    }
 
     #region Utility: attach hold handlers to buttons
     private void EnsureHoldHandlers(GameObject go, Action<bool> setHolding)
