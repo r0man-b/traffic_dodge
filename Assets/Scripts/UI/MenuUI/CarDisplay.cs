@@ -56,10 +56,9 @@ public class CarDisplay : MonoBehaviour
     private readonly float endDelay = 0.7f;   // slow at end
     private readonly float slowDownBias = 6f;
     public CarCollection carCollection;
-    public GameObject carContainer;
     Coroutine _spinCo;
     [Header("Turntable Spin")]
-    [SerializeField] private Transform turntable;     // Defaults to carHolder if left null
+    [SerializeField] private GameObject carContainer;
     [SerializeField] private float spinMaxSpeed = 720f;  // deg/sec at start of spin
     [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
 
@@ -119,7 +118,7 @@ public class CarDisplay : MonoBehaviour
     // Couroutine that spins the turntable.
     IEnumerator SpinTurntable(float totalDuration)
     {
-        var target = turntable != null ? turntable : carHolder;
+        var target = carContainer != null ? carContainer.transform : carHolder;
         if (target == null || totalDuration <= 0f) yield break;
 
         // Cache starting local rotation and spin accumulator
