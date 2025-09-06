@@ -43,6 +43,7 @@ public class CarDisplay : MonoBehaviour
     public MenuSounds menuSounds;
 
     private Car currentCar;
+    private GameObject _spawnedModel;
     private string currentCarType;   // switched to string
     private int currentCarIndex;
     private int numOfThisCarTypeOwned;
@@ -55,64 +56,97 @@ public class CarDisplay : MonoBehaviour
     private readonly float endDelay = 0.7f;   // slow at end
     private readonly float slowDownBias = 6f;
     public CarCollection carCollection;
+    public GameObject carContainer;
     Coroutine _spinCo;
+    [Header("Turntable Spin")]
+    [SerializeField] private Transform turntable;     // Defaults to carHolder if left null
+    [SerializeField] private float spinMaxSpeed = 720f;  // deg/sec at start of spin
+    [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
 
     // Randomize car for lootboxes.
     public void RandomizeCar()
     {
+        lockImage.SetActive(false);
         if (_spinCo != null) StopCoroutine(_spinCo);
         _spinCo = StartCoroutine(SpinRoutine());
     }
 
-    // Couroutine that spins the turntable and spawns randomized cars until it stops.
+    //  Coroutine that spawns randomized cars until it stops.
     IEnumerator SpinRoutine()
     {
-        // Rarity weights by top-level index in carCollection (sum = 100)
-        // 0 Ferret 40, 1 Viking HD 20, 2 Cambrioleur 10, 3 Scythe 8, 4 Leischer 1000 6,
-        // 5 Raion 5, 6 Katana 4, 7 Leischer TTRR 3, 8 Veloci 2, 9 Rapid Poision 1,
-        // 10 Accenditore 0.5, 11 Cmiesta 0.25, 12 Intervento 0.2, 13 Valen 0.05
-        float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
+        // Build the exact per-iteration delays so the spin matches timing perfectly
+        List<float> delays = BuildDelaySchedule();
+        float totalDuration = 0f;
+        for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
 
-        // Precompute cumulative distribution.
-        float total = 0f;
-        float[] cum = new float[weights.Length];
-        for (int i = 0; i < weights.Length; i++)
-        {
-            total += weights[i];
-            cum[i] = total;
-        }
+        // Start the decelerating spin in parallel
+        StartCoroutine(SpinTurntable(totalDuration));
 
         for (int i = 0; i < spinCount; i++)
         {
-            // Weighted pick of top-level type index (0..13).
-            int typeIdx = WeightedPick(cum, total);
+            // Weighted pick (unchanged)
+            float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
+            float total = 0f;
+            float[] cum = new float[weights.Length];
+            for (int w = 0; w < weights.Length; w++) { total += weights[w]; cum[w] = total; }
 
-            // Guard against mismatched data.
+            int typeIdx = WeightedPick(cum, total);
             typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
 
             var bucket = carCollection.carTypes[typeIdx];
             int variantCount = Mathf.Max(1, bucket.items.Count);
-
-            // Choose a random variant within that type (0..count-1)
             int variantIdx = Random.Range(0, variantCount);
 
-            // Get the Car asset and its display name.
             var carAsset = bucket.items[variantIdx] as Car;
             if (carAsset != null)
             {
-                // Show it using the existing pipeline (updates UI, replaces model, etc.)
-                DisplayCar(carAsset, string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name, variantIdx, true);
+                DisplayCar(
+                    carAsset,
+                    string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
+                    variantIdx,
+                    true
+                );
             }
 
-            // Ease-out timing: quick at start, slows toward the end.
-            float tLin = (spinCount <= 1) ? 1f : (float)i / (spinCount - 1);
-            float tBias = Mathf.Pow(tLin, slowDownBias);        // Stays near 0 for most of the run.
-            float delay = Mathf.Lerp(startDelay, endDelay, tBias);
-
-            yield return new WaitForSecondsRealtime(delay);
+            // Wait using the precomputed, eased delay (so spin matches exactly)
+            yield return new WaitForSecondsRealtime(delays[i]);
         }
 
-        _spinCo = null; // finished.
+        _spinCo = null; // finished
+    }
+
+
+    // Couroutine that spins the turntable.
+    IEnumerator SpinTurntable(float totalDuration)
+    {
+        var target = turntable != null ? turntable : carHolder;
+        if (target == null || totalDuration <= 0f) yield break;
+
+        // Cache starting local rotation and spin accumulator
+        Vector3 startEuler = target.localEulerAngles;
+        float elapsed = 0f;
+        float spinAccum = 0f; // track how much we’ve rotated (in degrees)
+
+        while (elapsed < totalDuration)
+        {
+            float dt = Time.unscaledDeltaTime;
+            elapsed += dt;
+
+            // Normalized progress through the spin [0..1]
+            float u = Mathf.Clamp01(elapsed / totalDuration);
+            float uBias = Mathf.Pow(u, slowDownBias);                 // same easing as picks
+            float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias); // deg/sec
+
+            float dTheta = omega * dt;
+            spinAccum += dTheta;
+
+            // Apply rotation around local Y
+            target.Rotate(0f, dTheta, 0f, Space.Self);
+            yield return null;
+        }
+
+        // Snap back to the exact starting rotation so the model ends where it began.
+        target.localEulerAngles = startEuler;
     }
 
     // Map a random number onto the cumulative weights.
@@ -141,8 +175,11 @@ public class CarDisplay : MonoBehaviour
         carPrice.text = currentCar.price.ToString("N0") + " cr";
         carPowerplant.text = currentCar.powerplant;
 
-        if (carHolder.childCount > 0)
-            Destroy(carHolder.GetChild(0).gameObject);
+        if (_spawnedModel != null)
+        {
+            Destroy(_spawnedModel);
+            _spawnedModel = null;
+        }
 
         bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
         if (isOwned)
@@ -166,8 +203,8 @@ public class CarDisplay : MonoBehaviour
         if (lootboxCar) _car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
         else _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
 
-        GameObject carModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
-        return carModel;
+        _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
+        return _spawnedModel;
     }
 
     // Display car purchase confirmation dialogue, check if player has enough currency.
@@ -366,5 +403,19 @@ public class CarDisplay : MonoBehaviour
         carHorsepower.text = System.Math.Round(513.57616f * accelMaxValue - 608.44812f).ToString() + " hp";
         carZerotosixty.text = System.Math.Round(Mathf.Max(-12.28856f * accelIncreaseRate + 23.2393f, -5.484f * accelIncreaseRate + 12.068f), 1).ToString() + "s";
         carLives.text = numlives.ToString();
+    }
+
+    // Build the exact delay schedule used by the randomizer so spin timing matches 1:1.
+    List<float> BuildDelaySchedule()
+    {
+        var delays = new List<float>(spinCount);
+        for (int i = 0; i < spinCount; i++)
+        {
+            float tLin = (spinCount <= 1) ? 1f : (float)i / (spinCount - 1);
+            float tBias = Mathf.Pow(tLin, slowDownBias);
+            float delay = Mathf.Lerp(startDelay, endDelay, tBias);
+            delays.Add(delay);
+        }
+        return delays;
     }
 }

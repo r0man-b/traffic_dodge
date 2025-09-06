@@ -8,13 +8,20 @@ public class ShopItem : MonoBehaviour
     public enum ItemType
     {
         Nitro,
-        Credits
+        Credits,
+        LootCrate
     }
 
     [Header("Item Characteristics")]
     public ItemType typeOfItem;     // Shows as dropdown in inspector
     public int quantityOfItem;
     public float priceOfItem;
+
+    [Header("Loot Crate Characteristics ONLY")]
+    public string itemDescription = "";
+    public string leftDescription = "";
+    public string rightDescription = "";
+    public Texture2D crateTexture;
 
     [Header("UI References")]
     public TextMeshProUGUI quantityText;
@@ -43,6 +50,16 @@ public class ShopItem : MonoBehaviour
                 string creditPrice = "  BUY: " + ((int)priceOfItem).ToString("N0");
                 buttonText.text = creditPrice;
                 buttonTextOutline.text = creditPrice;
+                break;
+
+            case ItemType.LootCrate:
+                // Quantity text turns into item description for loot crates
+                quantityText.text = itemDescription;
+
+                // Button formatting
+                string lootCratePrice = "     OPEN: " + ((int)priceOfItem).ToString("N0");
+                buttonText.text = lootCratePrice;
+                buttonTextOutline.text = lootCratePrice;
                 break;
         }
     }

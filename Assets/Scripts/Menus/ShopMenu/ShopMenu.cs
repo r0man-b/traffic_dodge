@@ -27,10 +27,18 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private TMP_Text totalText;           // e.g., "TOTAL: X NITROS" or "TOTAL: X CR"
     [SerializeField] private TMP_Text buyButtonText;       // main buy label
     [SerializeField] private TMP_Text buyButtonTextOutline;// outline label (mirrors main)
-
     [SerializeField] private Button minusButton;
     [SerializeField] private Button plusButton;
     [SerializeField] private Button buyButton;
+
+    [Header("Crate Open Confirmation UI")]
+    [SerializeField] private GameObject openLootCratePopup;
+    [SerializeField] private TMP_Text queryText;
+    [SerializeField] private TMP_Text leftInfoText;
+    [SerializeField] private TMP_Text rightInfoText;
+    [SerializeField] private TMP_Text openButtonText;       // main buy label
+    [SerializeField] private TMP_Text openButtonTextOutline;// outline label (mirrors main)
+    [SerializeField] private RawImage crateImage;
 
     [Header("Hold-to-Repeat")]
     [Tooltip("Delay (seconds) before repeating starts while holding +/-")]
@@ -114,6 +122,59 @@ public class ShopMenu : MonoBehaviour
         RefreshAllTexts();
     }
     #endregion
+
+    public void ConfirmOpenLootCrate(ShopItem lootCrate)
+    {
+        menu.SetActive(false);
+        openLootCratePopup.SetActive(true);
+
+        // Set the query text with underline on itemDescription
+        queryText.text = $"Open <u>{lootCrate.itemDescription}</u> Loot Crate?";
+
+        // Set the left and right info texts
+        leftInfoText.text = lootCrate.leftDescription;
+        rightInfoText.text = lootCrate.rightDescription;
+
+        // Set the crate image texture
+        crateImage.texture = lootCrate.crateTexture;
+
+        // Set the open button texts
+        string priceLabel = $"OPEN: {(int)lootCrate.priceOfItem}";
+        openButtonText.text = priceLabel;
+        openButtonTextOutline.text = priceLabel;
+
+        // Store the current item reference
+        _currentItem = lootCrate;
+    }
+
+    public void OpenLootCrate()
+    {
+        int nitroCost = Mathf.RoundToInt(_currentItem.priceOfItem);
+        int playerNitro = (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
+            ? SaveManager.Instance.SaveData.NitroCount
+            : 0;
+
+        // Check if the player has enough nitros
+        if (playerNitro < nitroCost)
+        {
+            notEnoughNitroPopUp.SetActive(true);
+            return;
+        }
+
+        // Deduct nitros
+        SaveManager.Instance.SaveData.NitroCount = Mathf.Max(0, playerNitro - nitroCost);
+        SaveManager.Instance.SaveGame();
+
+        // Update nitro count UI
+        RefreshAllTexts();
+
+        // Continue to open the crate
+        mainMenuUI.SetActive(false);
+        topLevelButtons.SetActive(true);
+        gameObject.SetActive(false);
+        garageUI.SetActive(true);
+        carDisplay.RandomizeCar();
+    }
 
     #region UI Configuration
     private void ConfigureUIForNitro()
@@ -331,10 +392,11 @@ public class ShopMenu : MonoBehaviour
     #region Back navigation
     public void HandleBackButton()
     {
-        if(popups != null && popups.activeSelf)
+        if((popups != null && popups.activeSelf) || (openLootCratePopup != null && openLootCratePopup.activeSelf))
         {
             notEnoughNitroPopUp.SetActive(false);
             popups.SetActive(false);
+            openLootCratePopup.SetActive(false);
             menu.SetActive(true);
         }
         else if (cameFromGarageMenu)
