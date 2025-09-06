@@ -27,6 +27,8 @@ public class CarDisplay : MonoBehaviour
     [Header("Bottom button sets")]
     public GameObject buttonSet1;
     public GameObject buttonSet2;
+    public GameObject leftButton;
+    public GameObject rightButton;
 
     [Header("Buy/sell confirmation popups")]
     public GameObject popUps;
@@ -93,16 +95,15 @@ public class CarDisplay : MonoBehaviour
             typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
 
             var bucket = carCollection.carTypes[typeIdx];
-            int variantCount = Mathf.Max(1, bucket.items.Count);
-            int variantIdx = Random.Range(0, variantCount);
+            int carIdx = 99;
 
-            var carAsset = bucket.items[variantIdx] as Car;
+            var carAsset = bucket.items[carIdx] as Car;
             if (carAsset != null)
             {
                 DisplayCar(
                     carAsset,
                     string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
-                    variantIdx,
+                    carIdx,
                     true
                 );
             }
@@ -183,37 +184,56 @@ public class CarDisplay : MonoBehaviour
         // Get the count of cars owned for the current car type (string).
         numOfThisCarTypeOwned = saveData.Cars.Count(car => car.Key.CarType == currentCarType);
 
-        carName.text = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
-        carPrice.text = currentCar.price.ToString("N0") + " cr";
-        carPowerplant.text = currentCar.powerplant;
-
-        if (_spawnedModel != null)
+        if (lootboxCar)
         {
-            Destroy(_spawnedModel);
-            _spawnedModel = null;
-        }
+            carName.text = currentCar.car_name;
 
-        bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
-        if (isOwned)
-        {
+            // Set all buttons and widges to be inactive
             lockUiElement.SetActive(false);
             lockImage.SetActive(false);
             buttonSet1.SetActive(false);
-            buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
+            buttonSet2.SetActive(false);
+            leftButton.SetActive(false);
+            rightButton.SetActive(false);
+
+            if (_spawnedModel != null)
+            {
+                Destroy(_spawnedModel);
+                _spawnedModel = null;
+            }
+
+            _car.RandomizeCar(currentCarType, currentCarIndex, false);
         }
         else
         {
-            lockUiElement.SetActive(true);
-            lockImage.SetActive(true);
-            buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
-            buttonSet2.SetActive(false);
+            carName.text = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
+            carPrice.text = currentCar.price.ToString("N0") + " cr";
+            carPowerplant.text = currentCar.powerplant;
+
+            if (_spawnedModel != null)
+            {
+                Destroy(_spawnedModel);
+                _spawnedModel = null;
+            }
+
+            bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
+            if (isOwned)
+            {
+                lockUiElement.SetActive(false);
+                lockImage.SetActive(false);
+                buttonSet1.SetActive(false);
+                buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
+            }
+            else
+            {
+                lockUiElement.SetActive(true);
+                lockImage.SetActive(true);
+                buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
+                buttonSet2.SetActive(false);
+            }
+
+            _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
         }
-
-        Debug.Log(Time.time + " NUM OF " + currentCar.name + "s OWNED: " + numOfThisCarTypeOwned);
-
-        // Ensure Car.InitializeCar signature supports string carType
-        if (lootboxCar) _car.RandomizeCar(currentCarType, currentCarIndex, isOwned);
-        else _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
 
         _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
         return _spawnedModel;
