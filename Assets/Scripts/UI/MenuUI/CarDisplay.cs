@@ -54,9 +54,9 @@ public class CarDisplay : MonoBehaviour
 
     // -------------------- Loot-box style randomizer --------------------
     private readonly int spinCount = 100;
-    private readonly float startDelay = 0.05f;   // fast at start
+    private readonly float startDelay = 0.1f;   // fast at start
     private readonly float endDelay = 0.7f;   // slow at end
-    private readonly float slowDownBias = 6f;
+    private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
     Coroutine _spinCo;
     [Header("Turntable Spin")]
