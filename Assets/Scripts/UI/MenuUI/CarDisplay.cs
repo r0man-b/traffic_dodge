@@ -81,7 +81,7 @@ public class CarDisplay : MonoBehaviour
         // Start the decelerating spin in parallel
         StartCoroutine(SpinTurntable(totalDuration));
 
-        for (int i = 0; i < spinCount; i++)
+        for (int i = 0; i < spinCount - 3; i++)
         {
             // Weighted pick (unchanged)
             float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
@@ -114,38 +114,51 @@ public class CarDisplay : MonoBehaviour
         _spinCo = null; // finished
     }
 
-
     // Couroutine that spins the turntable.
     IEnumerator SpinTurntable(float totalDuration)
     {
+        // Spin the container (falls back to carHolder if not set)
         var target = carContainer != null ? carContainer.transform : carHolder;
         if (target == null || totalDuration <= 0f) yield break;
 
-        // Cache starting local rotation and spin accumulator
-        Vector3 startEuler = target.localEulerAngles;
-        float elapsed = 0f;
-        float spinAccum = 0f; // track how much we’ve rotated (in degrees)
+        // Remember the exact starting WORLD rotation so we can return to it smoothly.
+        Quaternion startWorldRot = target.rotation;
 
+        float elapsed = 0f;
         while (elapsed < totalDuration)
         {
             float dt = Time.unscaledDeltaTime;
             elapsed += dt;
 
-            // Normalized progress through the spin [0..1]
+            // 0..1 time, eased with the same slowDownBias as your car picks
             float u = Mathf.Clamp01(elapsed / totalDuration);
-            float uBias = Mathf.Pow(u, slowDownBias);                 // same easing as picks
-            float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias); // deg/sec
+            float uBias = Mathf.Pow(u, slowDownBias);
 
-            float dTheta = omega * dt;
-            spinAccum += dTheta;
+            // Decaying angular speed (deg/sec)
+            float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias);
 
-            // Apply rotation around local Y
-            target.Rotate(0f, dTheta, 0f, Space.Self);
+            // Rotate around WORLD up so it’s always a horizontal spin
+            target.Rotate(Vector3.up, omega * dt, Space.World);
             yield return null;
         }
 
-        // Snap back to the exact starting rotation so the model ends where it began.
-        target.localEulerAngles = startEuler;
+        // --- Smoothly return to the exact starting rotation ---
+        const float returnDuration = 0.35f;  // tweak to taste
+        float t = 0f;
+        Quaternion from = target.rotation;
+
+        while (t < returnDuration)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = t / returnDuration;
+            // Ease-out (cubic): fast -> slow
+            k = 1f - Mathf.Pow(1f - Mathf.Clamp01(k), 3f);
+            target.rotation = Quaternion.Slerp(from, startWorldRot, k);
+            yield return null;
+        }
+
+        // Ensure perfect final alignment
+        target.rotation = startWorldRot;
     }
 
     // Map a random number onto the cumulative weights.
