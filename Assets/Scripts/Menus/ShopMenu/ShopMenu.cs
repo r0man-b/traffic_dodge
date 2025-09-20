@@ -173,6 +173,7 @@ public class ShopMenu : MonoBehaviour
         topLevelButtons.SetActive(true);
         gameObject.SetActive(false);
         garageUI.SetActive(true);
+        carDisplay.gameObject.SetActive(true);
         carDisplay.RandomizeCar();
     }
 

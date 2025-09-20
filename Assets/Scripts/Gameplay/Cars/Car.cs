@@ -7,6 +7,53 @@ public class Car : ScriptableObject
 {
     private Color[] colorPresets = new Color[]
     {
+    // --- Neutral Grays & Whites (brightened) ---
+    new Color(0.7f, 0.7f, 0.7f),   // medium-light gray
+    new Color(0.85f, 0.85f, 0.85f), // light silver gray
+    new Color(0.95f, 0.95f, 0.95f), // bright white
+    new Color(0.9f, 0.9f, 0.92f),   // cool white
+    new Color(0.88f, 0.88f, 0.88f), // pearl gray-white
+
+    // --- Blues (brightened but still car-like) ---
+    new Color(0.35f, 0.55f, 0.9f),  // bright steel blue
+    new Color(0.25f, 0.45f, 0.75f), // lighter navy
+    new Color(0.45f, 0.65f, 0.9f),  // sky blue
+    new Color(0.55f, 0.7f, 0.95f),  // light azure
+
+    // --- Greens ---
+    new Color(0.3f, 0.6f, 0.3f),    // brightened forest green
+    new Color(0.4f, 0.7f, 0.5f),    // jade
+    new Color(0.3f, 0.85f, 0.3f),   // light mint green
+
+    // --- Reds ---
+    new Color(0.75f, 0.2f, 0.2f),   // crimson
+    new Color(0.85f, 0.25f, 0.25f), // bright red
+
+    // --- Yellows & Golds ---
+    new Color(0.95f, 0.85f, 0.4f),  // warm golden yellow
+    new Color(1.0f, 0.9f, 0.5f),    // sandy yellow
+    new Color(1.0f, 0.95f, 0.6f),   // bright pastel yellow
+
+    // --- Browns / Beiges (brightened) ---
+    new Color(0.75f, 0.65f, 0.5f),  // light brown
+    new Color(0.85f, 0.75f, 0.6f),  // beige
+    new Color(0.9f, 0.8f, 0.65f),   // sand beige
+
+    // --- Abrasive / Bright Colors (rarities) ---
+    new Color(0.0f, 0.8f, 0.0f),      // neon lime green
+    new Color(1f, 0.0f, 1f),        // hot pink / magenta
+    new Color(1f, 0.5f, 0.0f),      // neon orange
+    new Color(1f, 1f, 0.0f),        // neon yellow
+    new Color(0.2f, 1f, 1f),        // neon cyan
+    new Color(0.5f, 0.0f, 1f),      // electric purple
+    new Color(1f, 0.3f, 0.0f),      // safety orange
+    new Color(0.0f, 0.9f, 0.9f),    // teal neon
+    new Color(0.8f, 1f, 0.0f),      // acid green
+    new Color(0.9f, 0.0f, 0.0f),    // firetruck red
+    };
+
+    private Color[] fresnelPresets = new Color[]
+    {
         Color.black,
         Color.gray,
         Color.white,
@@ -17,6 +64,35 @@ public class Car : ScriptableObject
         Color.red,
         Color.yellow
     };
+
+    // Primary shades that trigger fresnel palette rims if picked in the 10% bucket
+    private static readonly Color[] k_PrimaryRimFresnelTriggerShades = new Color[]
+    {
+        new Color(0.7f, 0.7f, 0.7f),   // medium-light gray
+        new Color(0.85f, 0.85f, 0.85f),// light silver gray
+        new Color(0.95f, 0.95f, 0.95f),// bright white
+        new Color(0.9f, 0.9f, 0.92f),  // cool white
+        new Color(0.88f, 0.88f, 0.88f) // pearl gray-white
+    };
+
+    private static bool Approximately(Color a, Color b, float eps = 0.02f)
+    {
+        return Mathf.Abs(a.r - b.r) <= eps &&
+               Mathf.Abs(a.g - b.g) <= eps &&
+               Mathf.Abs(a.b - b.b) <= eps &&
+               Mathf.Abs(a.a - b.a) <= eps;
+    }
+
+    private static bool IsInTriggerShades(Color c)
+    {
+        for (int i = 0; i < k_PrimaryRimFresnelTriggerShades.Length; i++)
+        {
+            if (Approximately(c, k_PrimaryRimFresnelTriggerShades[i]))
+                return true;
+        }
+        return false;
+    }
+
     public enum ColorType
     {
         PRIMARY_COLOR = 0,
@@ -31,6 +107,7 @@ public class Car : ScriptableObject
     private const float NON_METALLIC_DEFAULT = 0.304f; // nonMetallicVal
     private const float RIM_NON_METALLIC_DEFAULT = 0.001f; // nonMetallicVal for rims
     private const float METALLIC_DEFAULT = 1.0f;   // metallicVal
+    private bool forceNeutralBodyColors = false;
     // URP Lit property IDs
     private static readonly int ID_Metallic = Shader.PropertyToID("_Metallic");
     private static readonly int ID_MetallicGlossMap = Shader.PropertyToID("_MetallicGlossMap");
@@ -350,18 +427,80 @@ public class Car : ScriptableObject
         Color baseColor;
         Color fresnelColor;
         Color fresnelColor2;
+
         // Generate random base color and Fresnel colors.
         if (colorType == ColorType.RIM_COLOR)
         {
-            baseColor = Color.black;
-            fresnelColor = Color.black;
-            fresnelColor2 = Color.black;
+            // 30% black, 30% white, 30% gray, 10% match current primary
+            float p = UnityEngine.Random.value;
+
+            if (p < 0.3f)
+            {
+                baseColor = Color.black;
+                fresnelColor = Color.black;
+                fresnelColor2 = Color.black;
+            }
+            else if (p < 0.6f)
+            {
+                baseColor = Color.white;
+                fresnelColor = Color.white;
+                fresnelColor2 = Color.white;
+            }
+            else if (p < 0.9f)
+            {
+                baseColor = Color.gray;
+                fresnelColor = Color.gray;
+                fresnelColor2 = Color.gray;
+            }
+            else
+            {
+                Color primary = (primColor != null) ? primColor.color
+                                                    : colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+
+                if (IsInTriggerShades(primary))
+                {
+                    baseColor = fresnelPresets[UnityEngine.Random.Range(3, fresnelPresets.Length)];
+                    fresnelColor = fresnelPresets[UnityEngine.Random.Range(3, fresnelPresets.Length)];
+                    fresnelColor2 = fresnelPresets[UnityEngine.Random.Range(3, fresnelPresets.Length)];
+                }
+                else
+                {
+                    // If not in trigger set, just mirror primary as a sensible fallback.
+                    baseColor = primary;
+                    fresnelColor = primary;
+                    fresnelColor2 = primary;
+                }
+            }
         }
         else
         {
-            baseColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-            fresnelColor = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
-            fresnelColor2 = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+            // If decals are applied, lock body colors (primary/secondary) to neutral white/gray.
+            bool isBodyPaint = (colorType == ColorType.PRIMARY_COLOR || colorType == ColorType.SECONDARY_COLOR);
+
+            if (forceNeutralBodyColors && isBodyPaint)
+            {
+                // Pick from your neutral trigger shades, and bypass any neon/fresnel overrides.
+                Color c = k_PrimaryRimFresnelTriggerShades[UnityEngine.Random.Range(0, k_PrimaryRimFresnelTriggerShades.Length)];
+                baseColor = c;
+                fresnelColor = c;
+                fresnelColor2 = c;
+            }
+            else
+            {
+                // Default: pull from main palette
+                Color c = colorPresets[UnityEngine.Random.Range(0, colorPresets.Length)];
+                baseColor = c;
+                fresnelColor = c;
+                fresnelColor2 = c;
+
+                // 10% chance to override all three with a fresnelPresets color
+                if (UnityEngine.Random.value < 0.10f)
+                {
+                    baseColor = fresnelPresets[UnityEngine.Random.Range(0, fresnelPresets.Length)];
+                    fresnelColor = fresnelPresets[UnityEngine.Random.Range(0, fresnelPresets.Length)];
+                    fresnelColor2 = fresnelPresets[UnityEngine.Random.Range(0, fresnelPresets.Length)];
+                }
+            }
         }
 
         // If the material is emissive, we set the emissive color property.
@@ -391,30 +530,29 @@ public class Car : ScriptableObject
             // Special handling for primary color.
             if (colorType == ColorType.PRIMARY_COLOR)
             {
+                // 1/100 chance for metallic value of 1.
+                float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : NON_METALLIC_DEFAULT;
+                targetMaterial.SetFloat("_Metallic", metallicValue);
+
                 // Set secondary color to match primary color.
                 secondColor.color = baseColor;
                 if (secondColor.HasProperty("_FresnelColor"))
                     secondColor.SetColor("_FresnelColor", fresnelColor);
                 if (secondColor.HasProperty("_FresnelColor2"))
                     secondColor.SetColor("_FresnelColor2", fresnelColor2);
-
-                // 1/100 chance for metallic value of 1.
-                float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : NON_METALLIC_DEFAULT;
-                targetMaterial.SetFloat("_Metallic", metallicValue);
                 secondColor.SetFloat("_Metallic", metallicValue);
-            }
-        }
 
-        // Special handling for secondary color.
-        if (colorType == ColorType.SECONDARY_COLOR)
-        {
-            targetMaterial.SetColor("_EmissionColor", Color.black);
-            targetMaterial.EnableKeyword("_EMISSION");
+                secondColor.SetColor("_EmissionColor", Color.black);
+                secondColor.DisableKeyword("_EMISSION");
+            }
         }
 
         // Special handling for rim color. ADD 1/20 CHANCE OF METALLIC RANDOMIZATION HERE
         if (colorType == ColorType.RIM_COLOR)
         {
+            float metallicValue = (UnityEngine.Random.Range(0, 5) == 0) ? 1f : RIM_NON_METALLIC_DEFAULT;
+            targetMaterial.SetFloat("_Metallic", metallicValue);
+
             targetMaterial.SetColor("_EmissionColor", Color.black);
             targetMaterial.EnableKeyword("_EMISSION");
         }
@@ -1012,7 +1150,7 @@ public class Car : ScriptableObject
             carData.CarParts[11].CurrentInstalledPart = randomDecalsIndex;
             carData.CarParts[11].Ownership[randomDecalsIndex] = true;
         }
-        
+        forceNeutralBodyColors = (randomDecalsIndex != 0); // If decals are set, we only randomize the car's colors to neutral grays/whites to prevent hideousness.
 
         // Randomize the liveries.
         int randomNumber = UnityEngine.Random.Range(1, 25);

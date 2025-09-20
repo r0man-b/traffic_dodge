@@ -40,13 +40,13 @@ public class MainMenu : MonoBehaviour
         {
             MainMenuUI.SetActive(false);
             GarageUI.SetActive(true);
-            CarSelectorUI.SetActive(true);
+            //CarSelectorUI.SetActive(true); // TODO: Do I need this? Check exiting from customization submenu
         }
         else
         {
             MainMenuUI.SetActive(true);
             GarageUI.SetActive(false);
-            CarSelectorUI.SetActive(false);
+            //CarSelectorUI.SetActive(false); // TODO: Do I need this? Check exiting from customization submenu
         }
     }
 

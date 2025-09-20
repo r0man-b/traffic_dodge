@@ -54,7 +54,7 @@ public class CarDisplay : MonoBehaviour
 
     // -------------------- Loot-box style randomizer --------------------
     private readonly int spinCount = 100;
-    private readonly float startDelay = 0.1f;   // fast at start
+    private readonly float startDelay = 0.2f;   // fast at start
     private readonly float endDelay = 0.7f;   // slow at end
     private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
@@ -119,7 +119,7 @@ public class CarDisplay : MonoBehaviour
     IEnumerator SpinTurntable(float totalDuration)
     {
         // Spin the container (falls back to carHolder if not set)
-        var target = carContainer != null ? carContainer.transform : carHolder;
+        var target = carHolder;
         if (target == null || totalDuration <= 0f) yield break;
 
         // Remember the exact starting WORLD rotation so we can return to it smoothly.
@@ -203,6 +203,18 @@ public class CarDisplay : MonoBehaviour
             }
 
             _car.RandomizeCar(currentCarType, currentCarIndex, false);
+            _spawnedModel = Instantiate(currentCar.carModel, carHolder);
+
+            // If turntablePosition is WORLD space, convert it to LOCAL:
+            Vector3 local = carHolder.InverseTransformPoint(
+                new Vector3(currentCar.turntablePositon.x, currentCar.turntablePositon.y, currentCar.turntablePositon.z)
+            );
+
+            // Force local X to zero
+            local.x = currentCar.turntablePositon.x;
+            local.y = currentCar.turntablePositon.y;
+            local.z = currentCar.turntablePositon.z;
+            _spawnedModel.transform.localPosition = local;
         }
         else
         {
@@ -233,9 +245,9 @@ public class CarDisplay : MonoBehaviour
             }
 
             _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
+            _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
         }
 
-        _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
         return _spawnedModel;
     }
 
