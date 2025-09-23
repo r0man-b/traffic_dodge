@@ -1152,35 +1152,19 @@ public class Car : ScriptableObject
         }
         forceNeutralBodyColors = (randomDecalsIndex != 0); // If decals are set, we only randomize the car's colors to neutral grays/whites to prevent hideousness.
 
-        // Randomize the liveries.
-        int randomNumber = UnityEngine.Random.Range(1, 25);
+        // Don't randomize the liveries
         PartHolder liveryHolder = carTransform.Find("LIVERIES").GetComponent<PartHolder>();
         foreach (CarPart livery in liveryHolder.GetPartArray())
         {
             livery.gameObject.SetActive(false);
         }
-        if (randomNumber == 1) // Apply random livery.
+        liveryHolder.ActivatePart(0);
+        if (isOwned)
         {
-            int randomLiveryIndex = UnityEngine.Random.Range(0, liveryHolder.GetPartArray().Length);
-
-            liveryHolder.ActivatePart(randomLiveryIndex);
-            if (isOwned)
-            {
-                carData.CarParts[12].CurrentInstalledPart = randomLiveryIndex;
-                carData.CarParts[12].Ownership[randomLiveryIndex] = true;               
-            }
-            ApplyLivery(randomLiveryIndex);
+            carData.CarParts[12].CurrentInstalledPart = 0;
+            carData.CarParts[12].Ownership[0] = true;
         }
-        else // No random livery.
-        {
-            liveryHolder.ActivatePart(0);
-            if (isOwned)
-            {
-                carData.CarParts[12].CurrentInstalledPart = 0;
-                carData.CarParts[12].Ownership[0] = true;              
-            }
-            ApplyLivery(0);
-        }
+        ApplyLivery(0);
 
         // Randomize colors.
         RandomizeColors(primColor, ColorType.PRIMARY_COLOR, false);
