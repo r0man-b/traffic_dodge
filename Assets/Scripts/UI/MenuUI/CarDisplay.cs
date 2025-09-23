@@ -46,7 +46,7 @@ public class CarDisplay : MonoBehaviour
     public GameObject addOrSellPopUp;
     public TextMeshProUGUI addOrSellPopUpPopUpText;
     public GameObject returnOrSpinAgainPopUp;
-    public TextMeshProUGUI returnOrSpinAgainPopUpPopUpText;
+    public TextMeshProUGUI returnOrSpinAgainPopUpText;
 
     [Header("Sound")]
     public MenuSounds menuSounds;
@@ -181,10 +181,129 @@ public class CarDisplay : MonoBehaviour
 
     public void AddLootboxCarToGarage()
     {
+        var saveData = SaveManager.Instance.SaveData;
+
+        // Determine the next index for this car type and create the save record.
+        int nextIndex = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
+        var newCarKey = (CarType: currentCarType, CarIndex: nextIndex);
+
+        if (!saveData.Cars.TryGetValue(newCarKey, out SaveData.CarData carData))
+        {
+            carData = new SaveData.CarData();
+            saveData.Cars[newCarKey] = carData;
+        }
+
+        // ---- Read currently active parts from the displayed (spawned) model ----
+        // Fallback to prefab if needed (shouldn't usually be necessary).
+        Transform body = _spawnedModel != null
+            ? _spawnedModel.transform.Find("BODY")
+            : currentCar.carModel.transform.Find("BODY");
+
+        if (body == null)
+        {
+            Debug.LogWarning("AddLootboxCarToGarage: BODY transform not found.");
+            return;
+        }
+
+        // Minimal local helpers
+        int ActiveIndex(PartHolder h)
+        {
+            if (h == null) return 0;
+            var parts = h.GetPartArray();
+            for (int i = 0; i < parts.Length; i++)
+                if (parts[i].gameObject.activeSelf) return i;
+            return 0;
+        }
+
+        void SaveSlot(int slot, PartHolder holder)
+        {
+            if (holder == null) return;
+
+            int idx = ActiveIndex(holder);
+            carData.CarParts[slot].CurrentInstalledPart = idx;
+
+            // Ensure the dictionary exists
+            var own = carData.CarParts[slot].Ownership;
+            if (own == null)
+                carData.CarParts[slot].Ownership = own = new Dictionary<int, bool>();
+
+            // Mark this part as owned (Add or overwrite)
+            own[idx] = true;
+            // If you prefer the explicit form:
+            // if (!own.ContainsKey(idx)) own.Add(idx, true); else own[idx] = true;
+        }
+
+        // Cosmetic & aero
+        SaveSlot(0, body.Find("EXHAUSTS")?.GetComponent<PartHolder>());
+        SaveSlot(1, body.Find("FRONT_SPLITTERS")?.GetComponent<PartHolder>());
+        SaveSlot(2, _spawnedModel.transform.Find("FRONT_WHEELS")?.GetComponent<PartHolder>());
+        SaveSlot(3, body.Find("REAR_SPLITTERS")?.GetComponent<PartHolder>());
+        SaveSlot(4, _spawnedModel.transform.Find("REAR_WHEELS")?.GetComponent<PartHolder>());
+        SaveSlot(5, body.Find("SIDESKIRTS")?.GetComponent<PartHolder>());
+        SaveSlot(6, body.Find("SPOILERS")?.GetComponent<PartHolder>());
+        SaveSlot(7, body.GetComponent<PartHolder>()); // SUSPENSIONS lives on BODY
+
+        // Performance parts
+        var perf = body.Find("PERFORMANCE_PARTS");
+        SaveSlot(8, perf?.Find("ENGINE")?.GetComponent<PartHolder>());
+        SaveSlot(9, perf?.Find("TRANSMISSION")?.GetComponent<PartHolder>());
+        SaveSlot(10, perf?.Find("LIVES")?.GetComponent<PartHolder>());
+
+        // Decals & livery
+        SaveSlot(11, body.Find("DECALS")?.GetComponent<PartHolder>());
+        SaveSlot(12, body.Find("LIVERIES")?.GetComponent<PartHolder>());
+
+        // ---- Copy paint state from the randomized materials on the Car asset ----
+        // colorType indices: 0=PRIMARY,1=SECONDARY,2=RIM,3=PRIMARY_LIGHT,4=SECONDARY_LIGHT,5=TAIL_LIGHT
+
+        void PutColor(int idx, Material m, bool isLight)
+        {
+            if (m == null) return;
+            var cd = carData.Colors[idx];
+
+            // Read common channels safely
+            Color BaseOrBlack = m.HasProperty("_Color") ? m.color : Color.black;
+            Color F1 = m.HasProperty("_FresnelColor") ? m.GetColor("_FresnelColor") : BaseOrBlack;
+            Color F2 = m.HasProperty("_FresnelColor2") ? m.GetColor("_FresnelColor2") : BaseOrBlack;
+            Color Em = m.HasProperty("_EmissionColor") ? m.GetColor("_EmissionColor") : Color.black;
+            float met = m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0f;
+
+            if (isLight)
+            {
+                // Lights store their color in EmissionColor; Base is black.
+                cd.BaseColor[0] = 0; cd.BaseColor[1] = 0; cd.BaseColor[2] = 0; cd.BaseColor[3] = 1;
+                cd.EmissionColor[0] = Em.r; cd.EmissionColor[1] = Em.g; cd.EmissionColor[2] = Em.b; cd.EmissionColor[3] = Em.a;
+                cd.FresnelColor[0] = cd.FresnelColor[1] = cd.FresnelColor[2] = cd.FresnelColor[3] = 0;
+                cd.FresnelColor2[0] = cd.FresnelColor2[1] = cd.FresnelColor2[2] = cd.FresnelColor2[3] = 0;
+                cd.MetallicMap = met;
+            }
+            else
+            {
+                // Body/rims store color in Base; Em used only if you later set emissive rims/secondary.
+                cd.BaseColor[0] = BaseOrBlack.r; cd.BaseColor[1] = BaseOrBlack.g; cd.BaseColor[2] = BaseOrBlack.b; cd.BaseColor[3] = BaseOrBlack.a;
+                cd.FresnelColor[0] = F1.r; cd.FresnelColor[1] = F1.g; cd.FresnelColor[2] = F1.b; cd.FresnelColor[3] = F1.a;
+                cd.FresnelColor2[0] = F2.r; cd.FresnelColor2[1] = F2.g; cd.FresnelColor2[2] = F2.b; cd.FresnelColor2[3] = F2.a;
+                cd.EmissionColor[0] = Em.r; cd.EmissionColor[1] = Em.g; cd.EmissionColor[2] = Em.b; cd.EmissionColor[3] = Em.a;
+                cd.MetallicMap = met;
+            }
+        }
+
+        PutColor((int)Car.ColorType.PRIMARY_COLOR, currentCar.primColor, false);
+        PutColor((int)Car.ColorType.SECONDARY_COLOR, currentCar.secondColor, false);
+        PutColor((int)Car.ColorType.RIM_COLOR, currentCar.rimColor, false);
+        PutColor((int)Car.ColorType.PRIMARY_LIGHT, currentCar.primLight, true);
+        PutColor((int)Car.ColorType.SECONDARY_LIGHT, currentCar.secondLight, true);
+        PutColor((int)Car.ColorType.TAIL_LIGHT, currentCar.tailLight, true);
+
+        // Persist and show confirmation UI
+        SaveManager.Instance.SaveGame();
+
+        lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
+        returnOrSpinAgainPopUpText.text = $"You have added a <u>{currentCar.car_name}</u> to your garage.";
     }
-    
+
     public void SellLootboxCarForCredits()
     {
 
