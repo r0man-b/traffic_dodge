@@ -40,6 +40,13 @@ public class CarDisplay : MonoBehaviour
     public TextMeshProUGUI sellConfirmationPopUpText;
     public GameObject cannotSellPopUp;
     public TextMeshProUGUI cannotSellPopUpText;
+    
+    [Header("Loot crate popups")]
+    public GameObject lootCratePopUps;
+    public GameObject addOrSellPopUp;
+    public TextMeshProUGUI addOrSellPopUpPopUpText;
+    public GameObject returnOrSpinAgainPopUp;
+    public TextMeshProUGUI returnOrSpinAgainPopUpPopUpText;
 
     [Header("Sound")]
     public MenuSounds menuSounds;
@@ -61,7 +68,7 @@ public class CarDisplay : MonoBehaviour
     Coroutine _spinCo;
     [Header("Turntable Spin")]
     [SerializeField] private GameObject carContainer;
-    [SerializeField] private float spinMaxSpeed = 720f;  // deg/sec at start of spin
+    [SerializeField] private float spinMaxSpeed = 360f;  // deg/sec at start of spin
     [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
 
     // Randomize car for lootboxes.
@@ -113,6 +120,8 @@ public class CarDisplay : MonoBehaviour
         }
 
         _spinCo = null; // finished
+
+        HandlePostSpin();
     }
 
     // Couroutine that spins the turntable.
@@ -162,13 +171,43 @@ public class CarDisplay : MonoBehaviour
         target.rotation = startWorldRot;
     }
 
-    // Map a random number onto the cumulative weights.
-    int WeightedPick(float[] cumulative, float total)
+    private void HandlePostSpin()
     {
-        float r = Random.value * total; // [0,total)
-        for (int i = 0; i < cumulative.Length; i++)
-            if (r < cumulative[i]) return i;
-        return cumulative.Length - 1;
+        // Activate post-spin UI popups
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(true);
+        addOrSellPopUpPopUpText.text = "Congradulations you won a _, you can now choose to add it to your garage or sell it for credits.";
+    }
+
+    public void AddLootboxCarToGarage()
+    {
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(true);
+    }
+    
+    public void SellLootboxCarForCredits()
+    {
+
+    }
+
+    public void ReplaceOwnedCarWithLootboxCar()
+    {
+
+    }
+
+    public void OpenLootboxAgain()
+    {
+
+    }
+
+    public void ExitToShop()
+    {
+
+    }    
+    
+    public void ExitToGarage()
+    {
+
     }
 
     // Instantiate and display car on turntable in garage.
@@ -461,5 +500,14 @@ public class CarDisplay : MonoBehaviour
             delays.Add(delay);
         }
         return delays;
+    }
+
+    // Map a random number onto the cumulative weights.
+    int WeightedPick(float[] cumulative, float total)
+    {
+        float r = Random.value * total; // [0,total)
+        for (int i = 0; i < cumulative.Length; i++)
+            if (r < cumulative[i]) return i;
+        return cumulative.Length - 1;
     }
 }
