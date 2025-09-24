@@ -70,6 +70,9 @@ public class CarDisplay : MonoBehaviour
     [SerializeField] private GameObject carContainer;
     [SerializeField] private float spinMaxSpeed = 360f;  // deg/sec at start of spin
     [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
+    private float tapMaxHoldSeconds = 0.4f; // How long user has to hold tap until lootbox spin is skipped
+    private Coroutine _turntableCo;
+    private Quaternion _turntableStartRot;
 
     // Randomize car for lootboxes.
     public void RandomizeCar()
@@ -82,13 +85,15 @@ public class CarDisplay : MonoBehaviour
     //  Coroutine that spawns randomized cars until it stops.
     IEnumerator SpinRoutine()
     {
-        // Build the exact per-iteration delays so the spin matches timing perfectly
+        // Build delays and start the turntable spin
         List<float> delays = BuildDelaySchedule();
         float totalDuration = 0f;
         for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
 
-        // Start the decelerating spin in parallel
-        StartCoroutine(SpinTurntable(totalDuration));
+        _turntableStartRot = (carHolder != null) ? carHolder.rotation : Quaternion.identity;
+        _turntableCo = StartCoroutine(SpinTurntable(totalDuration));
+
+        bool skip = false;
 
         for (int i = 0; i < spinCount - 3; i++)
         {
@@ -103,7 +108,6 @@ public class CarDisplay : MonoBehaviour
 
             var bucket = carCollection.carTypes[typeIdx];
             int carIdx = 99;
-
             var carAsset = bucket.items[carIdx] as Car;
             if (carAsset != null)
             {
@@ -115,12 +119,128 @@ public class CarDisplay : MonoBehaviour
                 );
             }
 
-            // Wait using the precomputed, eased delay (so spin matches exactly)
-            yield return new WaitForSecondsRealtime(delays[i]);
+            // ---- Wait for next tick; detect quick tap vs hold ----
+            float wait = delays[i];
+            float t = 0f;
+
+            bool holding = false;
+            bool longPress = false;
+            float downAt = 0f;
+            int trackedFingerId = -1; // -1 = mouse, otherwise touch finger id
+
+            while (t < wait)
+            {
+                // ---- Mouse handling ----
+                if (!holding && Input.GetMouseButtonDown(0))
+                {
+                    holding = true; longPress = false; downAt = Time.unscaledTime; trackedFingerId = -1;
+                }
+                if (holding && trackedFingerId == -1)
+                {
+                    if (!longPress && (Time.unscaledTime - downAt) > tapMaxHoldSeconds)
+                        longPress = true;
+
+                    if (Input.GetMouseButtonUp(0))
+                    {
+                        if (!longPress) { skip = true; }
+                        holding = false; // release consumed
+                    }
+                }
+
+                // ---- Touch handling (first finger) ----
+                if (Input.touchCount > 0)
+                {
+                    // Start tracking on Began if not already
+                    if (!holding)
+                    {
+                        for (int ti = 0; ti < Input.touchCount; ti++)
+                        {
+                            var touch = Input.touches[ti];
+                            if (touch.phase == TouchPhase.Began)
+                            {
+                                holding = true; longPress = false; downAt = Time.unscaledTime; trackedFingerId = touch.fingerId;
+                                break;
+                            }
+                        }
+                    }
+                    // Update tracked finger
+                    if (holding && trackedFingerId != -1)
+                    {
+                        bool found = false;
+                        Touch tracked = default;
+                        for (int ti = 0; ti < Input.touchCount; ti++)
+                        {
+                            if (Input.touches[ti].fingerId == trackedFingerId)
+                            {
+                                tracked = Input.touches[ti];
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if (found)
+                        {
+                            if (!longPress && (Time.unscaledTime - downAt) > tapMaxHoldSeconds)
+                                longPress = true;
+
+                            if (tracked.phase == TouchPhase.Ended || tracked.phase == TouchPhase.Canceled)
+                            {
+                                if (!longPress) { skip = true; }
+                                holding = false; // release consumed
+                                trackedFingerId = -2; // consumed
+                            }
+                        }
+                        else
+                        {
+                            // Lost the finger somehow; stop tracking
+                            holding = false;
+                            trackedFingerId = -2;
+                        }
+                    }
+                }
+
+                if (skip) break;
+
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            if (skip) break;
+        }
+
+        // If skipped: stop spin, snap back, and spawn one last randomized car
+        if (skip)
+        {
+            if (_turntableCo != null)
+            {
+                StopCoroutine(_turntableCo);
+                _turntableCo = null;
+            }
+            if (carHolder != null) carHolder.rotation = _turntableStartRot;
+
+            float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
+            float total = 0f;
+            float[] cum = new float[weights.Length];
+            for (int w = 0; w < weights.Length; w++) { total += weights[w]; cum[w] = total; }
+
+            int typeIdx = WeightedPick(cum, total);
+            typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
+
+            var bucket = carCollection.carTypes[typeIdx];
+            int carIdx = 99;
+            var carAsset = bucket.items[carIdx] as Car;
+            if (carAsset != null)
+            {
+                DisplayCar(
+                    carAsset,
+                    string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
+                    carIdx,
+                    true
+                );
+            }
         }
 
         _spinCo = null; // finished
-
         HandlePostSpin();
     }
 
@@ -177,6 +297,9 @@ public class CarDisplay : MonoBehaviour
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(true);
         addOrSellPopUpPopUpText.text = "Congradulations you won a _, you can now choose to add it to your garage or sell it for credits.";
+
+        // Deactivate car name string
+        carName.gameObject.SetActive(false);
     }
 
     public void AddLootboxCarToGarage()
