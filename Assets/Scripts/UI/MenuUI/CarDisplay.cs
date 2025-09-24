@@ -70,22 +70,89 @@ public class CarDisplay : MonoBehaviour
     [SerializeField] private GameObject carContainer;
     [SerializeField] private float spinMaxSpeed = 360f;  // deg/sec at start of spin
     [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
-    private float tapMaxHoldSeconds = 0.3f; // How long user has to hold tap until lootbox spin is skipped
+    private float tapMaxDuration = 0.175f; // How long user has to hold tap until lootbox spin is skipped
     private Coroutine _turntableCo;
     private Quaternion _turntableStartRot;
+    private bool skipRequested;
+    private bool _listenForSkip;
+    private float _pressStart = -1f;
+    private int _skipFingerId = -1;
+
+    private void Update()
+    {
+        if (!_listenForSkip || skipRequested) return;
+
+        // ----- Mouse (Editor/Standalone) -----
+        if (Input.GetMouseButtonDown(0))
+        {
+            _pressStart = Time.unscaledTime;
+        }
+        if (Input.GetMouseButtonUp(0))
+        {
+            if (_pressStart >= 0f)
+            {
+                float held = Time.unscaledTime - _pressStart;
+                _pressStart = -1f;
+                if (held <= tapMaxDuration)
+                {
+                    skipRequested = true;  // quick tap => skip
+                    EndSkipListen();
+                    return;
+                }
+                // longer hold => ignore (keep listening)
+            }
+        }
+
+        // ----- Touch (Mobile) -----
+        if (Input.touchCount > 0)
+        {
+            // use the first active finger (or the one we captured)
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                Touch t = Input.GetTouch(i);
+
+                if (_skipFingerId == -1 && t.phase == TouchPhase.Began)
+                {
+                    _skipFingerId = t.fingerId;
+                    _pressStart = Time.unscaledTime;
+                }
+
+                if (t.fingerId != _skipFingerId) continue;
+
+                if (t.phase == TouchPhase.Ended || t.phase == TouchPhase.Canceled)
+                {
+                    if (_pressStart >= 0f)
+                    {
+                        float held = Time.unscaledTime - _pressStart;
+                        _pressStart = -1f;
+                        _skipFingerId = -1;
+
+                        if (held <= tapMaxDuration)
+                        {
+                            skipRequested = true;  // quick tap => skip
+                            EndSkipListen();
+                            return;
+                        }
+                        // longer hold => ignore (keep listening)
+                    }
+                }
+            }
+        }
+    }
+
 
     // Randomize car for lootboxes.
     public void RandomizeCar()
     {
         lockImage.SetActive(false);
+        skipRequested = false;     // reset each run
+        EndSkipListen();           // just to be safe
         if (_spinCo != null) StopCoroutine(_spinCo);
         _spinCo = StartCoroutine(SpinRoutine());
     }
 
-    //  Coroutine that spawns randomized cars until it stops.
     IEnumerator SpinRoutine()
     {
-        // Build delays and start the turntable spin
         List<float> delays = BuildDelaySchedule();
         float totalDuration = 0f;
         for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
@@ -93,166 +160,52 @@ public class CarDisplay : MonoBehaviour
         _turntableStartRot = (carHolder != null) ? carHolder.rotation : Quaternion.identity;
         _turntableCo = StartCoroutine(SpinTurntable(totalDuration));
 
-        bool skip = false;
+        BeginSkipListen();  // <-- start listening for a quick tap here
 
-        for (int i = 0; i < spinCount; i++)
+        bool earlySkipTriggered = false;
+        bool finalCarSpawned = false;
+
+        for (int i = 0; i < spinCount - 3; i++)
         {
-            // Weighted pick (unchanged)
-            float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
-            float total = 0f;
-            float[] cum = new float[weights.Length];
-            for (int w = 0; w < weights.Length; w++) { total += weights[w]; cum[w] = total; }
-
-            int typeIdx = WeightedPick(cum, total);
-            typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
-
-            var bucket = carCollection.carTypes[typeIdx];
-            int carIdx = 99;
-            var carAsset = bucket.items[carIdx] as Car;
-            if (carAsset != null)
+            if (skipRequested)
             {
-                DisplayCar(
-                    carAsset,
-                    string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
-                    carIdx,
-                    true
-                );
+                earlySkipTriggered = true;
+                break;
             }
 
-            // ---- Wait for next tick; detect quick tap vs hold ----
-            float wait = delays[i];
-            float t = 0f;
-
-            bool holding = false;
-            bool longPress = false;
-            float downAt = 0f;
-            int trackedFingerId = -1; // -1 = mouse, otherwise touch finger id
-
-            while (t < wait)
-            {
-                // ---- Mouse handling ----
-                if (!holding && Input.GetMouseButtonDown(0))
-                {
-                    holding = true; longPress = false; downAt = Time.unscaledTime; trackedFingerId = -1;
-                }
-                if (holding && trackedFingerId == -1)
-                {
-                    if (!longPress && (Time.unscaledTime - downAt) > tapMaxHoldSeconds)
-                        longPress = true;
-
-                    if (Input.GetMouseButtonUp(0))
-                    {
-                        if (!longPress) { skip = true; }
-                        holding = false; // release consumed
-                    }
-                }
-
-                // ---- Touch handling (first finger) ----
-                if (Input.touchCount > 0)
-                {
-                    // Start tracking on Began if not already
-                    if (!holding)
-                    {
-                        for (int ti = 0; ti < Input.touchCount; ti++)
-                        {
-                            var touch = Input.touches[ti];
-                            if (touch.phase == TouchPhase.Began)
-                            {
-                                holding = true; longPress = false; downAt = Time.unscaledTime; trackedFingerId = touch.fingerId;
-                                break;
-                            }
-                        }
-                    }
-                    // Update tracked finger
-                    if (holding && trackedFingerId != -1)
-                    {
-                        bool found = false;
-                        Touch tracked = default;
-                        for (int ti = 0; ti < Input.touchCount; ti++)
-                        {
-                            if (Input.touches[ti].fingerId == trackedFingerId)
-                            {
-                                tracked = Input.touches[ti];
-                                found = true;
-                                break;
-                            }
-                        }
-
-                        if (found)
-                        {
-                            if (!longPress && (Time.unscaledTime - downAt) > tapMaxHoldSeconds)
-                                longPress = true;
-
-                            if (tracked.phase == TouchPhase.Ended || tracked.phase == TouchPhase.Canceled)
-                            {
-                                if (!longPress) { skip = true; }
-                                holding = false; // release consumed
-                                trackedFingerId = -2; // consumed
-                            }
-                        }
-                        else
-                        {
-                            // Lost the finger somehow; stop tracking
-                            holding = false;
-                            trackedFingerId = -2;
-                        }
-                    }
-                }
-
-                if (skip) break;
-
-                t += Time.unscaledDeltaTime;
-                yield return null;
-            }
-
-            if (skip) break;
+            SpawnWeightedRandomCar();
+            yield return new WaitForSecondsRealtime(delays[i]);
         }
 
-        // If skipped: stop spin, snap back, and spawn one last randomized car
-        if (skip)
+        if (!earlySkipTriggered)
+            finalCarSpawned = true;
+
+        if (skipRequested)
         {
+            // stop spinning and snap to final pose
             if (_turntableCo != null)
             {
                 StopCoroutine(_turntableCo);
                 _turntableCo = null;
             }
-            if (carHolder != null) carHolder.rotation = _turntableStartRot;
+            if (carHolder != null)
+                carHolder.rotation = _turntableStartRot;
 
-            // Spawn one last randomized car
-            float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
-            float total = 0f;
-            float[] cum = new float[weights.Length];
-            for (int w = 0; w < weights.Length; w++) { total += weights[w]; cum[w] = total; }
+            if (!finalCarSpawned)
+                SpawnWeightedRandomCar();
 
-            int typeIdx = WeightedPick(cum, total);
-            typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
-
-            var bucket = carCollection.carTypes[typeIdx];
-            int carIdx = 99;
-            var carAsset = bucket.items[carIdx] as Car;
-            if (carAsset != null)
-            {
-                DisplayCar(
-                    carAsset,
-                    string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
-                    carIdx,
-                    true
-                );
-            }
-
-            // We’ve snapped already, so it’s safe to show the popup now
+            EndSkipListen();   // <-- stop listening
             _spinCo = null;
             HandlePostSpin();
             yield break;
         }
         else
         {
-            // Not skipped: wait until the Turntable finishes decelerating AND returns to start
             if (_turntableCo != null)
-                yield return _turntableCo;   // waits for SpinTurntable() to fully complete
+                yield return _turntableCo; // wait until turntable finishes/returns
         }
 
-        // Now the table is fully stopped and aligned — show the popup
+        EndSkipListen();       // <-- stop listening
         _spinCo = null;
         HandlePostSpin();
     }
@@ -743,6 +696,32 @@ public class CarDisplay : MonoBehaviour
         carLives.text = numlives.ToString();
     }
 
+    // Call this wherever you need to spawn a weighted random car once.
+    private void SpawnWeightedRandomCar()
+    {
+        float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
+        float total = 0f;
+        float[] cum = new float[weights.Length];
+        for (int w = 0; w < weights.Length; w++) { total += weights[w]; cum[w] = total; }
+
+        int typeIdx = WeightedPick(cum, total);
+        typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
+
+        var bucket = carCollection.carTypes[typeIdx];
+        int carIdx = 99; // your fixed pick
+
+        var carAsset = bucket.items[carIdx] as Car;
+        if (carAsset != null)
+        {
+            DisplayCar(
+                carAsset,
+                string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
+                carIdx,
+                true
+            );
+        }
+    }
+
     // Build the exact delay schedule used by the randomizer so spin timing matches 1:1.
     List<float> BuildDelaySchedule()
     {
@@ -765,4 +744,19 @@ public class CarDisplay : MonoBehaviour
             if (r < cumulative[i]) return i;
         return cumulative.Length - 1;
     }
+
+    private void BeginSkipListen()
+    {
+        _listenForSkip = true;
+        _pressStart = -1f;
+        _skipFingerId = -1;
+    }
+
+    private void EndSkipListen()
+    {
+        _listenForSkip = false;
+        _pressStart = -1f;
+        _skipFingerId = -1;
+    }
+
 }
