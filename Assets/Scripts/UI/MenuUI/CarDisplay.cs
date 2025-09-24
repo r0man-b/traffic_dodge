@@ -62,7 +62,7 @@ public class CarDisplay : MonoBehaviour
     // -------------------- Loot-box style randomizer --------------------
     private readonly int spinCount = 100;
     private readonly float startDelay = 0.2f;   // fast at start
-    private readonly float endDelay = 0.7f;   // slow at end
+    private readonly float endDelay = 0.8228f;   // slow at end
     private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
     Coroutine _spinCo;
@@ -70,7 +70,7 @@ public class CarDisplay : MonoBehaviour
     [SerializeField] private GameObject carContainer;
     [SerializeField] private float spinMaxSpeed = 360f;  // deg/sec at start of spin
     [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
-    private float tapMaxHoldSeconds = 0.4f; // How long user has to hold tap until lootbox spin is skipped
+    private float tapMaxHoldSeconds = 0.3f; // How long user has to hold tap until lootbox spin is skipped
     private Coroutine _turntableCo;
     private Quaternion _turntableStartRot;
 
@@ -95,7 +95,7 @@ public class CarDisplay : MonoBehaviour
 
         bool skip = false;
 
-        for (int i = 0; i < spinCount - 3; i++)
+        for (int i = 0; i < spinCount; i++)
         {
             // Weighted pick (unchanged)
             float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
@@ -218,6 +218,7 @@ public class CarDisplay : MonoBehaviour
             }
             if (carHolder != null) carHolder.rotation = _turntableStartRot;
 
+            // Spawn one last randomized car
             float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
             float total = 0f;
             float[] cum = new float[weights.Length];
@@ -238,9 +239,21 @@ public class CarDisplay : MonoBehaviour
                     true
                 );
             }
+
+            // We’ve snapped already, so it’s safe to show the popup now
+            _spinCo = null;
+            HandlePostSpin();
+            yield break;
+        }
+        else
+        {
+            // Not skipped: wait until the Turntable finishes decelerating AND returns to start
+            if (_turntableCo != null)
+                yield return _turntableCo;   // waits for SpinTurntable() to fully complete
         }
 
-        _spinCo = null; // finished
+        // Now the table is fully stopped and aligned — show the popup
+        _spinCo = null;
         HandlePostSpin();
     }
 
