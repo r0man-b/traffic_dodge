@@ -40,13 +40,24 @@ public class CarDisplay : MonoBehaviour
     public TextMeshProUGUI sellConfirmationPopUpText;
     public GameObject cannotSellPopUp;
     public TextMeshProUGUI cannotSellPopUpText;
-    
+
     [Header("Loot crate popups")]
     public GameObject lootCratePopUps;
     public GameObject addOrSellPopUp;
-    public TextMeshProUGUI addOrSellPopUpPopUpText;
+    public TextMeshProUGUI addOrSellPopUpText;
+    public TextMeshProUGUI sellButtonText;
     public GameObject returnOrSpinAgainPopUp;
     public TextMeshProUGUI returnOrSpinAgainPopUpText;
+
+    [Header("UI elements that get disabled/enabled during/after lootbox spin")]
+    public GameObject nitroObject;
+    public GameObject backButton;
+    public GameObject goRaceButton;
+    public GameObject shopMenu;
+    public ShopMenu shopMenuScript; // Need to also call the ResetUI() function in the shop menu script
+    public GameObject mainMenuUI;
+    public GameObject topLevelMainMenuButtons;
+    public GameObject garageUI;
 
     [Header("Sound")]
     public MenuSounds menuSounds;
@@ -77,6 +88,7 @@ public class CarDisplay : MonoBehaviour
     private bool _listenForSkip;
     private float _pressStart = -1f;
     private int _skipFingerId = -1;
+    private int _cachedLootboxSellPrice = -1;
 
     private void Update()
     {
@@ -144,7 +156,17 @@ public class CarDisplay : MonoBehaviour
     // Randomize car for lootboxes.
     public void RandomizeCar()
     {
+        // Set all buttons and widges to be inactive
+        lockUiElement.SetActive(false);
         lockImage.SetActive(false);
+        buttonSet1.SetActive(false);
+        buttonSet2.SetActive(false);
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
+        nitroObject.SetActive(false);
+        backButton.SetActive(false);
+        goRaceButton.SetActive(false);
+
         skipRequested = false;     // reset each run
         EndSkipListen();           // just to be safe
         if (_spinCo != null) StopCoroutine(_spinCo);
@@ -259,10 +281,17 @@ public class CarDisplay : MonoBehaviour
 
     private void HandlePostSpin()
     {
+        // Compute & cache the sell price from the currently displayed (randomized) car
+        _cachedLootboxSellPrice = ComputeLootboxSellPrice();
+        string name = currentCar != null ? currentCar.car_name : "car";
+
         // Activate post-spin UI popups
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(true);
-        addOrSellPopUpPopUpText.text = "Congradulations you won a _, you can now choose to add it to your garage or sell it for credits.";
+        addOrSellPopUpText.text =
+            $"Congratulations! You won a <u>{name}</u>. " +
+            $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
+        sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice.ToString("N0") } CR";
 
         // Deactivate car name string
         carName.gameObject.SetActive(false);
@@ -385,6 +414,13 @@ public class CarDisplay : MonoBehaviour
         PutColor((int)Car.ColorType.TAIL_LIGHT, currentCar.tailLight, true);
 
         // Persist and show confirmation UI
+        // NEW: mark the newly added car as the "last owned"
+        saveData.LastOwnedCarType = currentCarType;          // NEW
+        saveData.LastOwnedCarIndex = nextIndex;              // NEW
+                                                             // (Optional) also make it the current selection:
+        saveData.CurrentCarType = currentCarType;            // NEW (optional)
+        saveData.CurrentCarIndex = nextIndex;                // NEW (optional)
+
         SaveManager.Instance.SaveGame();
 
         lootCratePopUps.SetActive(true);
@@ -395,7 +431,101 @@ public class CarDisplay : MonoBehaviour
 
     public void SellLootboxCarForCredits()
     {
+        int amount = (_cachedLootboxSellPrice >= 0) ? _cachedLootboxSellPrice : ComputeLootboxSellPrice();
 
+        // Award credits
+        creditManager.ChangeCredits(amount);
+        SaveManager.Instance.SaveGame();
+
+        // UI feedback
+        if (menuSounds != null) menuSounds.PlayChaChing();
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(true);
+        returnOrSpinAgainPopUpText.text = $"You sold a <u>{currentCar.car_name}</u> for {amount.ToString("N0")} CR.";
+
+        // Reset the cache now that the transaction is done (optional)
+        _cachedLootboxSellPrice = -1;
+    }
+
+
+    /// <summary>
+    /// Compute sell price for the *currently randomized (lootbox)* car on the turntable:
+    /// base = half of car price + 1/4 of each active part price,
+    /// skipping default parts for slots: 0,2,3,4,6 (Exhaust, Front/Rear Wheels, Rear Splitter, Spoiler).
+    /// </summary>
+    private int ComputeLootboxSellPrice()
+    {
+        if (currentCar == null) return 0;
+
+        int total = currentCar.price / 2;
+
+        // Find the live model (preferred) or fall back to prefab to avoid null issues.
+        Transform modelRoot = _spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform;
+        Transform body = modelRoot != null ? modelRoot.Find("BODY") : null;
+        if (body == null) return total;
+
+        PartHolder PH(Transform t) => t ? t.GetComponent<PartHolder>() : null;
+
+        // Wheels live at root in your hierarchy (not under BODY)
+        PartHolder frontWheels = PH((_spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform).Find("FRONT_WHEELS"));
+        PartHolder rearWheels = PH((_spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform).Find("REAR_WHEELS"));
+
+        // Performance root
+        Transform perf = body.Find("PERFORMANCE_PARTS");
+
+        // Map holders by slot index to mirror your save/indexing scheme
+        var holders = new List<(int slot, PartHolder holder)>
+        {
+            (0,  PH(body.Find("EXHAUSTS"))),
+            (1,  PH(body.Find("FRONT_SPLITTERS"))),
+            (2,  frontWheels),
+            (3,  PH(body.Find("REAR_SPLITTERS"))),
+            (4,  rearWheels),
+            (5,  PH(body.Find("SIDESKIRTS"))),
+            (6,  PH(body.Find("SPOILERS"))),
+            (7,  PH(body)),                         // SUSPENSIONS lives on BODY
+            (8,  PH(perf ? perf.Find("ENGINE") : null)),
+            (9,  PH(perf ? perf.Find("TRANSMISSION") : null)),
+            (10, PH(perf ? perf.Find("LIVES") : null)),
+            (11, PH(body.Find("DECALS"))),
+            (12, PH(body.Find("LIVERIES")))
+        };
+
+        // Helper to get active CarPart (falls back to first if none flagged active)
+        CarPart ActivePart(PartHolder h)
+        {
+            if (h == null) return null;
+            var parts = h.GetPartArray();
+            if (parts == null || parts.Length == 0) return null;
+            for (int i = 0; i < parts.Length; i++)
+                if (parts[i] != null && parts[i].gameObject.activeSelf)
+                    return parts[i];
+            return parts[0];
+        }
+
+        foreach (var (slot, holder) in holders)
+        {
+            var part = ActivePart(holder);
+            if (part == null) continue;
+
+            bool isDefault = slot switch
+            {
+                0 => !string.IsNullOrEmpty(currentCar.DefaultExhaust) && part.name == currentCar.DefaultExhaust,
+                2 => !string.IsNullOrEmpty(currentCar.DefaultFrontWheels) && part.name == currentCar.DefaultFrontWheels,
+                3 => !string.IsNullOrEmpty(currentCar.DefaultRearSplitter) && part.name == currentCar.DefaultRearSplitter,
+                4 => !string.IsNullOrEmpty(currentCar.DefaultRearWheels) && part.name == currentCar.DefaultRearWheels,
+                6 => !string.IsNullOrEmpty(currentCar.DefaultSpoiler) && part.name == currentCar.DefaultSpoiler,
+                _ => false
+            };
+
+            if (!isDefault)
+            {
+                total += ((int)part.price) / 4;
+            }
+        }
+
+        return total;
     }
 
     public void ReplaceOwnedCarWithLootboxCar()
@@ -405,17 +535,116 @@ public class CarDisplay : MonoBehaviour
 
     public void OpenLootboxAgain()
     {
+        ResetUIElements();
 
+        // Re-enable shop menu
+        mainMenuUI.SetActive(true);
+        topLevelMainMenuButtons.SetActive(false);
+        shopMenu.SetActive(true);
+
+        // Disable the currently displayed popups
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Disable the garage ui display
+        garageUI.SetActive(false);
     }
 
     public void ExitToShop()
     {
+        ResetUIElements();
 
-    }    
-    
+        // Re-enable shop menu
+        mainMenuUI.SetActive(true);
+        topLevelMainMenuButtons.SetActive(false);
+        shopMenu.SetActive(true);
+
+        // Disable the currently displayed popups
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Disable the garage ui display
+        garageUI.SetActive(false);
+
+        // Reset to default shop menu
+        shopMenuScript.ResetAllUI();
+    }
+
     public void ExitToGarage()
     {
+        // Put the garage UI back
+        ResetUIElements();
 
+        // Close loot crate UI
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Show the garage, hide the shop
+        if (garageUI != null) garageUI.SetActive(true);
+        if (shopMenu != null) shopMenu.SetActive(false);
+
+        var save = SaveManager.Instance.SaveData;
+
+        // Choose the target car based on LastOwnedCarType/Index (set when a lootbox car is added).
+        string type = save.LastOwnedCarType;
+        int index = save.LastOwnedCarIndex;
+
+        // If that pair is invalid (e.g., player sold, or old data), fall back gracefully.
+        Car target = FindCarAssetByType(type);
+        bool pairExists = save.Cars.ContainsKey((type, index));
+
+        if (target == null || !pairExists)
+        {
+            // Try current selection
+            if (!string.IsNullOrEmpty(save.CurrentCarType) &&
+                save.Cars.ContainsKey((save.CurrentCarType, save.CurrentCarIndex)))
+            {
+                type = save.CurrentCarType;
+                index = save.CurrentCarIndex;
+                target = FindCarAssetByType(type);
+            }
+            // Else pick the first owned car
+            else if (save.Cars.Count > 0)
+            {
+                var first = save.Cars.Keys.First();
+                type = first.CarType;
+                index = first.CarIndex;
+                target = FindCarAssetByType(type);
+            }
+        }
+
+        if (target != null)
+        {
+            // Important: pass the *SaveData key string* for carType so ownership lookup works
+            DisplayCar(target, type, index, false);
+        }
+        else
+        {
+            Debug.LogWarning("ExitToGarage: No owned car found to display.");
+        }
+
+        // Reset to default shop menu
+        shopMenuScript.ResetAllUI();
+    }
+
+
+    private void ResetUIElements()
+    {
+        leftButton.SetActive(true);
+        rightButton.SetActive(true);
+
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        nitroObject.SetActive(true);
+        backButton.SetActive(true);
+        goRaceButton.SetActive(true);
+
+        carName.gameObject.SetActive(true);
     }
 
     // Instantiate and display car on turntable in garage.
@@ -434,14 +663,6 @@ public class CarDisplay : MonoBehaviour
         if (lootboxCar)
         {
             carName.text = currentCar.car_name;
-
-            // Set all buttons and widges to be inactive
-            lockUiElement.SetActive(false);
-            lockImage.SetActive(false);
-            buttonSet1.SetActive(false);
-            buttonSet2.SetActive(false);
-            leftButton.SetActive(false);
-            rightButton.SetActive(false);
 
             if (_spawnedModel != null)
             {
@@ -694,6 +915,35 @@ public class CarDisplay : MonoBehaviour
         carHorsepower.text = System.Math.Round(513.57616f * accelMaxValue - 608.44812f).ToString() + " hp";
         carZerotosixty.text = System.Math.Round(Mathf.Max(-12.28856f * accelIncreaseRate + 23.2393f, -5.484f * accelIncreaseRate + 12.068f), 1).ToString() + "s";
         carLives.text = numlives.ToString();
+    }
+
+    /*------------------------------------------------------------------------------------------------*/
+    /*--------------------------------------- HELPER FUNCTIONS ---------------------------------------*/
+    /*------------------------------------------------------------------------------------------------*/
+
+    // Resolve display name consistently
+    private static string CarDisplayName(Car c) =>
+        string.IsNullOrWhiteSpace(c?.car_name) ? c?.name : c.car_name;
+
+    // Search your CarCollection for a Car asset by its type string saved in SaveData
+    private Car FindCarAssetByType(string typeString)
+    {
+        if (string.IsNullOrEmpty(typeString) || carCollection == null) return null;
+
+        foreach (var t in carCollection.carTypes)
+        {
+            foreach (var item in t.items)
+            {
+                var car = item as Car;
+                if (car == null) continue;
+
+                // NOTE: SaveData uses a string key; your code was storing the display name for currentCarType
+                // so we compare with the same logic the code used when setting currentCarType.
+                string name = CarDisplayName(car);
+                if (name == typeString) return car;
+            }
+        }
+        return null;
     }
 
     // Call this wherever you need to spawn a weighted random car once.

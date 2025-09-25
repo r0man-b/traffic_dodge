@@ -123,6 +123,12 @@ public class ShopMenu : MonoBehaviour
     }
     #endregion
 
+    public void ResetAllUI()
+    {
+        menu.SetActive(true);
+        openLootCratePopup.SetActive(false);
+    }
+
     public void ConfirmOpenLootCrate(ShopItem lootCrate)
     {
         menu.SetActive(false);
