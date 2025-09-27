@@ -2,6 +2,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Purchasing;
 using UnityEngine.UI;
 // using UnityEngine.Purchasing;
 
@@ -319,9 +320,9 @@ public class ShopMenu : MonoBehaviour
         {
             case ShopItem.ItemType.Nitro:
                 // Example codeless call:
-                // CodelessIAPStoreListener.instance.InitiatePurchase(nitroProductId);
+                //CodelessIAPStoreListener.instance.InitiatePurchase(nitroProductId);
                 // Or custom manager:
-                // IAPManager.Instance.BuyProductId(nitroProductId, OnNitroPurchaseSucceeded, OnPurchaseFailed);
+                //IAPManager.Instance.BuyProductId(nitroProductId, OnNitroPurchaseSucceeded, OnPurchaseFailed);
 
                 // Simulation:
                 OnNitroPurchaseSucceeded();

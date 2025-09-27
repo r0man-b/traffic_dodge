@@ -528,6 +528,11 @@ public class CarDisplay : MonoBehaviour
         return total;
     }
 
+    public void PickOwnedCarToReplaceWithLootboxCar()
+    {
+
+    }    
+    
     public void ReplaceOwnedCarWithLootboxCar()
     {
 
