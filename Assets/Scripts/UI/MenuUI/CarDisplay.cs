@@ -94,6 +94,11 @@ public class CarDisplay : MonoBehaviour
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
 
+    private void Awake()
+    {
+        BuildCarTypeNameIndex();
+    }
+
     private void Update()
     {
         if (!_listenForSkip || skipRequested) return;
@@ -170,41 +175,45 @@ public class CarDisplay : MonoBehaviour
         // Get the count of cars owned for the current car type (string).
         numOfThisCarTypeOwned = saveData.Cars.Count(car => car.Key.CarType == currentCarType);
 
+        // Resolve prefab index by type name.
+        if (!typeIndexByName.TryGetValue(currentCarType, out int prefabIndex))
+        {
+            Debug.LogWarning($"CarDisplay: No prefab index found for type '{currentCarType}'.");
+            return null;
+        }
+        if (carPrefabs == null || prefabIndex < 0 || prefabIndex >= carPrefabs.Length || carPrefabs[prefabIndex] == null)
+        {
+            Debug.LogWarning($"CarDisplay: carPrefabs[{prefabIndex}] is not assigned.");
+            return null;
+        }
+
+        // Deactivate previously shown instance.
+        if (_spawnedModel != null)
+            _spawnedModel.SetActive(false);
+
+        // Select the pre-placed instance for this car type.
+        _spawnedModel = carPrefabs[prefabIndex];
+
         if (lootboxCar)
         {
             carName.text = currentCar.car_name;
 
-            if (_spawnedModel != null)
-            {
-                Destroy(_spawnedModel);
-                _spawnedModel = null;
-            }
+            _car.RandomizeCar(currentCarType, currentCarIndex, _spawnedModel.transform, false);
 
-            _car.RandomizeCar(currentCarType, currentCarIndex, false);
-            _spawnedModel = Instantiate(currentCar.carModel, carHolder);
-
-            // If turntablePosition is WORLD space, convert it to LOCAL:
-            Vector3 local = carHolder.InverseTransformPoint(
-                new Vector3(currentCar.turntablePositon.x, currentCar.turntablePositon.y, currentCar.turntablePositon.z)
+            // For lootbox path we place using local offsets under holder.
+            // Your previous code overwrote the local position with the turntable values directly.
+            _spawnedModel.transform.localPosition = new Vector3(
+                currentCar.turntablePositon.x,
+                currentCar.turntablePositon.y,
+                currentCar.turntablePositon.z
             );
-
-            // Force local X to zero
-            local.x = currentCar.turntablePositon.x;
-            local.y = currentCar.turntablePositon.y;
-            local.z = currentCar.turntablePositon.z;
-            _spawnedModel.transform.localPosition = local;
+            _spawnedModel.transform.localRotation = Quaternion.identity;
         }
         else
         {
             carName.text = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
             carPrice.text = currentCar.price.ToString("N0") + " cr";
             carPowerplant.text = currentCar.powerplant;
-
-            if (_spawnedModel != null)
-            {
-                Destroy(_spawnedModel);
-                _spawnedModel = null;
-            }
 
             bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
             if (isOwned)
@@ -222,12 +231,19 @@ public class CarDisplay : MonoBehaviour
                 buttonSet2.SetActive(false);
             }
 
-            _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
-            _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
+            _car.InitializeCar(currentCarType, currentCarIndex, _spawnedModel.transform, isOwned);
+
+            // Non-lootbox path previously used world pose; mirror that logic.
+            // Parent is already carHolder; set world position/rotation accordingly.
+            _spawnedModel.transform.SetParent(carHolder, true); // keep world space while changing parent
+            _spawnedModel.transform.SetPositionAndRotation(currentCar.turntablePositon, carHolder.rotation);
         }
 
+
+        _spawnedModel.SetActive(true);
         return _spawnedModel;
     }
+
 
     // Randomize car for lootboxes.
     public void RandomizeCar()
@@ -263,7 +279,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < spinCount - 6; i++)
+        for (int i = 0; i < spinCount; i++)
         {
             if (skipRequested)
             {

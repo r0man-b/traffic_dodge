@@ -620,12 +620,12 @@ public class Car : ScriptableObject
         ApplyMetallicToMaterial(tailLight, NON_METALLIC_DEFAULT);
     }
 
-    public void InitializeCar(string carType, int carIndex, bool isOwned = true)
+    public void InitializeCar(string carType, int carIndex, Transform currentCarModel, bool isOwned = true)
     {
         currentCarType = carType;
         currentCarIndex = carIndex;
 
-        Transform carTransform = carModel.transform.Find("BODY");
+        Transform carTransform = currentCarModel.Find("BODY");
 
         // Access the SaveData instance and retrieve the car's data.
         SaveData saveData = SaveManager.Instance.SaveData;
@@ -682,7 +682,7 @@ public class Car : ScriptableObject
         frontSplitterHolder.ActivatePart(savedFrontSplitterIndex);
 
         // Activate the currently installed front wheels.
-        PartHolder frontWheelHolder = carModel.transform.Find("FRONT_WHEELS").GetComponent<PartHolder>();
+        PartHolder frontWheelHolder = currentCarModel.Find("FRONT_WHEELS").GetComponent<PartHolder>();
         int savedFrontWheelIndex = isOwned ? carData.CarParts[2].CurrentInstalledPart : -1; // 2 = FRONT_WHEELS
         index = 0;
         foreach (CarPart frontWheel in frontWheelHolder.GetPartArray())
@@ -740,7 +740,7 @@ public class Car : ScriptableObject
 
 
         // Activate the currently installed rear wheels.
-        PartHolder rearWheelHolder = carModel.transform.Find("REAR_WHEELS").GetComponent<PartHolder>();
+        PartHolder rearWheelHolder = currentCarModel.Find("REAR_WHEELS").GetComponent<PartHolder>();
         int savedRearWheelIndex = isOwned ? carData.CarParts[4].CurrentInstalledPart : -1; // 4 = REAR_WHEELS
         index = 0;
         foreach (CarPart rearWheel in rearWheelHolder.GetPartArray())
@@ -964,7 +964,7 @@ public class Car : ScriptableObject
     }
 
     // Spawn car with randomized customizations. Will be used for cars spawned from lootboxes.
-    public void RandomizeCar(string carType, int carIndex, bool isOwned = true)
+    public void RandomizeCar(string carType, int carIndex, Transform currentCarModel, bool isOwned = true)
     {
         currentCarType = carType;
         currentCarIndex = carIndex;
@@ -976,7 +976,7 @@ public class Car : ScriptableObject
             // Do nothing.
         }
 
-        Transform carTransform = carModel.transform.Find("BODY");
+        Transform carTransform = currentCarModel.Find("BODY");
 
         // Randomize the exhaust.
         PartHolder exhaustHolder = carTransform.Find("EXHAUSTS").GetComponent<PartHolder>();
@@ -1007,7 +1007,7 @@ public class Car : ScriptableObject
         }
 
         // Randomize the front wheels.
-        PartHolder frontWheelHolder = carModel.transform.Find("FRONT_WHEELS").GetComponent<PartHolder>();
+        PartHolder frontWheelHolder = currentCarModel.Find("FRONT_WHEELS").GetComponent<PartHolder>();
         int randomFrontWheelIndex = UnityEngine.Random.Range(0, frontWheelHolder.GetPartArray().Length);
         foreach (CarPart frontWheel in frontWheelHolder.GetPartArray())
         {
@@ -1035,7 +1035,7 @@ public class Car : ScriptableObject
         }
 
         // Randomize the rear wheels.
-        PartHolder rearWheelHolder = carModel.transform.Find("REAR_WHEELS").GetComponent<PartHolder>();
+        PartHolder rearWheelHolder = currentCarModel.Find("REAR_WHEELS").GetComponent<PartHolder>();
         int randomRearWheelIndex = UnityEngine.Random.Range(0, rearWheelHolder.GetPartArray().Length);
         foreach (CarPart rearWheel in rearWheelHolder.GetPartArray())
         {

@@ -174,7 +174,7 @@ public class PlayerController : MonoBehaviour
         int typeIdx = GetCarTypeIndex(currentCarType);
         currentCar = (Car)carCollection.carTypes[typeIdx].items[currentCarIndex];
 
-        currentCar.InitializeCar(currentCarType, currentCarIndex);
+        currentCar.InitializeCar(currentCarType, currentCarIndex, currentCar.carModel.transform);
         carObject = Instantiate(currentCar.carModel, Vector3.zero, Quaternion.identity, this.transform);
         carObject.transform.localPosition = currentCar.raceSpawnPosition;
 
