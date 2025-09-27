@@ -16,6 +16,10 @@ public class CarDisplay : MonoBehaviour
     [SerializeField] private TextMeshProUGUI carPowerplant;
     [SerializeField] private Transform carHolder;
 
+    [Header("Prefabs (fill in inspector)")]
+    [SerializeField] private GameObject[] carPrefabs; // index aligned with car type index
+    private Dictionary<string, int> typeIndexByName = new Dictionary<string, int>();
+
     [Header("Custom Objects")]
     public CreditManager creditManager;
     public GarageUIManager garageUIManager;
@@ -153,6 +157,78 @@ public class CarDisplay : MonoBehaviour
     }
 
 
+    // Instantiate and display car on turntable in garage.
+    public GameObject DisplayCar(Car _car, string carType, int carIndex, bool lootboxCar)
+    {
+        currentCar = _car;
+        currentCarType = carType;
+        currentCarIndex = carIndex;
+
+        // Access the SaveData instance.
+        SaveData saveData = SaveManager.Instance.SaveData;
+
+        // Get the count of cars owned for the current car type (string).
+        numOfThisCarTypeOwned = saveData.Cars.Count(car => car.Key.CarType == currentCarType);
+
+        if (lootboxCar)
+        {
+            carName.text = currentCar.car_name;
+
+            if (_spawnedModel != null)
+            {
+                Destroy(_spawnedModel);
+                _spawnedModel = null;
+            }
+
+            _car.RandomizeCar(currentCarType, currentCarIndex, false);
+            _spawnedModel = Instantiate(currentCar.carModel, carHolder);
+
+            // If turntablePosition is WORLD space, convert it to LOCAL:
+            Vector3 local = carHolder.InverseTransformPoint(
+                new Vector3(currentCar.turntablePositon.x, currentCar.turntablePositon.y, currentCar.turntablePositon.z)
+            );
+
+            // Force local X to zero
+            local.x = currentCar.turntablePositon.x;
+            local.y = currentCar.turntablePositon.y;
+            local.z = currentCar.turntablePositon.z;
+            _spawnedModel.transform.localPosition = local;
+        }
+        else
+        {
+            carName.text = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
+            carPrice.text = currentCar.price.ToString("N0") + " cr";
+            carPowerplant.text = currentCar.powerplant;
+
+            if (_spawnedModel != null)
+            {
+                Destroy(_spawnedModel);
+                _spawnedModel = null;
+            }
+
+            bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
+            if (isOwned)
+            {
+                lockUiElement.SetActive(false);
+                lockImage.SetActive(false);
+                buttonSet1.SetActive(false);
+                buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
+            }
+            else
+            {
+                lockUiElement.SetActive(true);
+                lockImage.SetActive(true);
+                buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
+                buttonSet2.SetActive(false);
+            }
+
+            _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
+            _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
+        }
+
+        return _spawnedModel;
+    }
+
     // Randomize car for lootboxes.
     public void RandomizeCar()
     {
@@ -187,7 +263,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < spinCount - 3; i++)
+        for (int i = 0; i < spinCount - 6; i++)
         {
             if (skipRequested)
             {
@@ -635,7 +711,6 @@ public class CarDisplay : MonoBehaviour
         shopMenuScript.ResetAllUI();
     }
 
-
     private void ResetUIElements()
     {
         leftButton.SetActive(true);
@@ -650,78 +725,6 @@ public class CarDisplay : MonoBehaviour
         goRaceButton.SetActive(true);
 
         carName.gameObject.SetActive(true);
-    }
-
-    // Instantiate and display car on turntable in garage.
-    public GameObject DisplayCar(Car _car, string carType, int carIndex, bool lootboxCar)
-    {
-        currentCar = _car;
-        currentCarType = carType;
-        currentCarIndex = carIndex;
-
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
-
-        // Get the count of cars owned for the current car type (string).
-        numOfThisCarTypeOwned = saveData.Cars.Count(car => car.Key.CarType == currentCarType);
-
-        if (lootboxCar)
-        {
-            carName.text = currentCar.car_name;
-
-            if (_spawnedModel != null)
-            {
-                Destroy(_spawnedModel);
-                _spawnedModel = null;
-            }
-
-            _car.RandomizeCar(currentCarType, currentCarIndex, false);
-            _spawnedModel = Instantiate(currentCar.carModel, carHolder);
-
-            // If turntablePosition is WORLD space, convert it to LOCAL:
-            Vector3 local = carHolder.InverseTransformPoint(
-                new Vector3(currentCar.turntablePositon.x, currentCar.turntablePositon.y, currentCar.turntablePositon.z)
-            );
-
-            // Force local X to zero
-            local.x = currentCar.turntablePositon.x;
-            local.y = currentCar.turntablePositon.y;
-            local.z = currentCar.turntablePositon.z;
-            _spawnedModel.transform.localPosition = local;
-        }
-        else
-        {
-            carName.text = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
-            carPrice.text = currentCar.price.ToString("N0") + " cr";
-            carPowerplant.text = currentCar.powerplant;
-
-            if (_spawnedModel != null)
-            {
-                Destroy(_spawnedModel);
-                _spawnedModel = null;
-            }
-
-            bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
-            if (isOwned)
-            {
-                lockUiElement.SetActive(false);
-                lockImage.SetActive(false);
-                buttonSet1.SetActive(false);
-                buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
-            }
-            else
-            {
-                lockUiElement.SetActive(true);
-                lockImage.SetActive(true);
-                buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
-                buttonSet2.SetActive(false);
-            }
-
-            _car.InitializeCar(currentCarType, currentCarIndex, isOwned);
-            _spawnedModel = Instantiate(currentCar.carModel, currentCar.turntablePositon, carHolder.rotation, carHolder);
-        }
-
-        return _spawnedModel;
     }
 
     // Display car purchase confirmation dialogue, check if player has enough currency.
@@ -925,6 +928,27 @@ public class CarDisplay : MonoBehaviour
     /*------------------------------------------------------------------------------------------------*/
     /*--------------------------------------- HELPER FUNCTIONS ---------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
+    private void BuildCarTypeNameIndex()
+    {
+        typeIndexByName.Clear();
+
+        for (int i = 0; i < carCollection.carTypes.Count; i++)
+        {
+            var bucket = carCollection.carTypes[i];
+            if (bucket.items == null || bucket.items.Count == 0) continue;
+
+            var first = bucket.items[0] as Car;
+            if (first == null) continue;
+
+            string typeName = !string.IsNullOrWhiteSpace(first.car_name)
+                ? first.car_name
+                : first.name;
+
+            if (!typeIndexByName.ContainsKey(typeName))
+                typeIndexByName[typeName] = i;
+        }
+    }
+
 
     // Resolve display name consistently
     private static string CarDisplayName(Car c) =>
