@@ -18,7 +18,7 @@ public class CarDisplay : MonoBehaviour
 
     [Header("Prefabs (fill in inspector)")]
     [SerializeField] private GameObject[] carPrefabs; // index aligned with car type index
-    private Dictionary<string, int> typeIndexByName = new Dictionary<string, int>();
+    private readonly Dictionary<string, int> typeIndexByName = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
 
     [Header("Custom Objects")]
     public CreditManager creditManager;
@@ -62,6 +62,7 @@ public class CarDisplay : MonoBehaviour
     public GameObject mainMenuUI;
     public GameObject topLevelMainMenuButtons;
     public GameObject garageUI;
+    public GarageUIManager garageUIscript; // Need to also call the ChangeCar() function in the garage menu script
 
     [Header("Sound")]
     public MenuSounds menuSounds;
@@ -279,7 +280,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < spinCount; i++)
+        for (int i = 0; i < spinCount - 3; i++)
         {
             if (skipRequested)
             {
@@ -725,6 +726,7 @@ public class CarDisplay : MonoBehaviour
 
         // Reset to default shop menu
         shopMenuScript.ResetAllUI();
+        garageUIscript.ChangeCar(0);
     }
 
     private void ResetUIElements()
@@ -947,23 +949,28 @@ public class CarDisplay : MonoBehaviour
     private void BuildCarTypeNameIndex()
     {
         typeIndexByName.Clear();
+        if (carCollection == null || carCollection.carTypes == null) return;
 
         for (int i = 0; i < carCollection.carTypes.Count; i++)
         {
             var bucket = carCollection.carTypes[i];
             if (bucket.items == null || bucket.items.Count == 0) continue;
 
-            var first = bucket.items[0] as Car;
-            if (first == null) continue;
+            foreach (var so in bucket.items)
+            {
+                var car = so as Car;
+                if (car == null) continue;
 
-            string typeName = !string.IsNullOrWhiteSpace(first.car_name)
-                ? first.car_name
-                : first.name;
+                string name = !string.IsNullOrWhiteSpace(car.car_name) ? car.car_name : car.name;
+                if (string.IsNullOrWhiteSpace(name)) continue;
 
-            if (!typeIndexByName.ContainsKey(typeName))
-                typeIndexByName[typeName] = i;
+                // Map every variant name to the SAME bucket index.
+                if (!typeIndexByName.ContainsKey(name))
+                    typeIndexByName[name] = i;
+            }
         }
     }
+
 
 
     // Resolve display name consistently
