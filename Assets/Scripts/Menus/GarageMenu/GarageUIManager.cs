@@ -408,6 +408,11 @@ public class GarageUIManager : MonoBehaviour
     /*------------------------------------- GARAGE UI FUNCTIONS -------------------------------------*/
     public void ChangeCar(int change)
     {
+        if (carDisplay.typeNameIndexBuilt == false)
+        {
+            carDisplay.BuildCarTypeNameIndex();
+        }
+
         var saveData = SaveManager.Instance.SaveData;
 
         // Load current selection
@@ -1002,10 +1007,12 @@ public class GarageUIManager : MonoBehaviour
                 {
                     primaryColor.SetTexture("_LiveryMap", null);
                     primaryColor.DisableKeyword("_AKMU_CARPAINT_LIVERY");
-                    return;
                 }
-                primaryColor.SetTexture("_LiveryMap", liveries[startingIndex]);
-                primaryColor.EnableKeyword("_AKMU_CARPAINT_LIVERY");
+                else
+                {
+                    primaryColor.SetTexture("_LiveryMap", liveries[startingIndex]);
+                    primaryColor.EnableKeyword("_AKMU_CARPAINT_LIVERY");
+                }
             }
 
             isPlayerInAllRimsMenu = false;
@@ -1877,7 +1884,7 @@ public class GarageUIManager : MonoBehaviour
         }
         else
         {
-            Debug.Log(engineIndex + " " + carData.CarParts[8].CurrentInstalledPart);
+            //Debug.Log(engineIndex + " " + carData.CarParts[8].CurrentInstalledPart);
             engineIndex = engineIndex == -1 ? 0 : carData.CarParts[8].CurrentInstalledPart;            // ENGINE
             transmissionIndex = transmissionIndex == -1 ? 0 : carData.CarParts[9].CurrentInstalledPart; // TRANSMISSION
             livesIndex = livesIndex == -1 ? 0 : carData.CarParts[10].CurrentInstalledPart;              // LIVES

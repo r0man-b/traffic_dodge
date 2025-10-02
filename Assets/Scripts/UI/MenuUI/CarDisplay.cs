@@ -74,6 +74,7 @@ public class CarDisplay : MonoBehaviour
     private int numOfThisCarTypeOwned;
     private int sellPrice;
     private const string carsOwned = "CARS_OWNED";
+    public bool typeNameIndexBuilt = false;
 
     // -------------------- Loot-box style randomizer --------------------
     private readonly int spinCount = 100;
@@ -94,11 +95,6 @@ public class CarDisplay : MonoBehaviour
     private float _pressStart = -1f;
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
-
-    private void Awake()
-    {
-        BuildCarTypeNameIndex();
-    }
 
     private void Update()
     {
@@ -946,7 +942,7 @@ public class CarDisplay : MonoBehaviour
     /*------------------------------------------------------------------------------------------------*/
     /*--------------------------------------- HELPER FUNCTIONS ---------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
-    private void BuildCarTypeNameIndex()
+    public void BuildCarTypeNameIndex()
     {
         typeIndexByName.Clear();
         if (carCollection == null || carCollection.carTypes == null) return;
@@ -969,9 +965,9 @@ public class CarDisplay : MonoBehaviour
                     typeIndexByName[name] = i;
             }
         }
+
+        typeNameIndexBuilt = true;
     }
-
-
 
     // Resolve display name consistently
     private static string CarDisplayName(Car c) =>
