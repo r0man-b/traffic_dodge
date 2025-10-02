@@ -31,6 +31,7 @@ public class CarDisplay : MonoBehaviour
     [Header("Bottom UI Button Sets")]
     public GameObject buttonSet1;
     public GameObject buttonSet2;
+    public GameObject buttonSet3;
     public GameObject leftButton;
     public GameObject rightButton;
 
@@ -49,6 +50,8 @@ public class CarDisplay : MonoBehaviour
     public GameObject lootCratePopUps;
     public GameObject addOrSellPopUp;
     public TextMeshProUGUI addOrSellPopUpText;
+    public GameObject addButton;
+    public GameObject replaceButton;
     public TextMeshProUGUI sellButtonText;
     public GameObject returnOrSpinAgainPopUp;
     public TextMeshProUGUI returnOrSpinAgainPopUpText;
@@ -67,6 +70,7 @@ public class CarDisplay : MonoBehaviour
     [Header("Sound")]
     public MenuSounds menuSounds;
 
+    [Header("Car Management")]
     private Car currentCar;
     private GameObject _spawnedModel;
     private string currentCarType;
@@ -76,14 +80,13 @@ public class CarDisplay : MonoBehaviour
     private const string carsOwned = "CARS_OWNED";
     public bool typeNameIndexBuilt = false;
 
-    // -------------------- Loot-box style randomizer --------------------
+    [Header("Lootbox Spin Parameters")]
     private readonly int spinCount = 100;
     private readonly float startDelay = 0.2f;   // fast at start
     private readonly float endDelay = 0.8228f;   // slow at end
     private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
     Coroutine _spinCo;
-    [Header("Turntable Spin")]
     [SerializeField] private GameObject carContainer;
     [SerializeField] private float spinMaxSpeed = 360f;  // deg/sec at start of spin
     [SerializeField] private float spinMinSpeed = 60f;  // deg/sec near the end
@@ -96,6 +99,9 @@ public class CarDisplay : MonoBehaviour
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
 
+    /// <summary>
+    /// Update function used solely for skipping a lootbox animation.
+    /// </summary>
     private void Update()
     {
         if (!_listenForSkip || skipRequested) return;
@@ -429,7 +435,7 @@ public class CarDisplay : MonoBehaviour
         cannotSellPopUp.SetActive(false);
     }
 
-    // Update performance stats text
+    // Update performance stats text.
     public void UpdateStats(float accelMaxValue, float accelIncreaseRate, int numlives)
     {
         bool isImperial = SaveManager.Instance.SaveData.ImperialUnits;
@@ -443,9 +449,11 @@ public class CarDisplay : MonoBehaviour
         carLives.text = numlives.ToString();
     }
 
+
     /*------------------------------------------------------------------------------------------------*/
     /*----------------------------------- CAR LOOTBOX FUNCTIONS --------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
+
     // Start randomize car & spin turntable coroutine for lootboxes.
     public void RandomizeCar()
     {
@@ -616,6 +624,8 @@ public class CarDisplay : MonoBehaviour
                     $"You already own the maximum of {maxPerType} for this car type. " +
                     $"You may sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
             }
+            addButton.SetActive(false);
+            replaceButton.SetActive(true);
             return;
         }
 
@@ -744,9 +754,15 @@ public class CarDisplay : MonoBehaviour
         return total;
     }
 
-    public void PickOwnedCarToReplaceWithLootboxCar()
+    public void PrepareToReplaceOwnedCarWithLootboxCar()
     {
+        ExitToGarage();
 
+        buttonSet1.SetActive(false);
+        buttonSet2.SetActive(false);
+        buttonSet3.SetActive(true);
+
+        garageUIscript.inCarReplaceState = true;
     }
 
     // Replace an existing car that the player owns with the randomized lootbox car.
@@ -895,17 +911,23 @@ public class CarDisplay : MonoBehaviour
     // Reset all UI elements to their default states.
     private void ResetUIElements()
     {
+        // Reset car switching buttons
         leftButton.SetActive(true);
         rightButton.SetActive(true);
 
+        // Reset loot crate UI
         lootCratePopUps.SetActive(false);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(false);
+        addButton.SetActive(true);
+        replaceButton.SetActive(false);
 
+        // Re-enable UI elements that were disabled during lootcrate spin
         nitroObject.SetActive(true);
         backButton.SetActive(true);
         goRaceButton.SetActive(true);
 
+        // Re-enable the car name at the bottom of the screen
         carName.gameObject.SetActive(true);
     }
 

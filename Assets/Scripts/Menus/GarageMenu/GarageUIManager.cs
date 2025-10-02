@@ -35,6 +35,7 @@ public class GarageUIManager : MonoBehaviour
     public int previousPaintPrice;
     private Button previousClickedPaintButton;
     private bool useSavedPaintButton = false;
+    public bool inCarReplaceState = false;
 
     [Space(10)]
     [Header("UI Popups for buying items")]
@@ -537,8 +538,6 @@ public class GarageUIManager : MonoBehaviour
         }
 
         UpdatePerformanceStats();
-
-        // Add chrome display function over here.
     }
 
     // Revert the current car index back to the last car the player owns.
