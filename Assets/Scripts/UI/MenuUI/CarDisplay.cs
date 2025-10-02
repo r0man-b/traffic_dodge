@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -16,7 +16,7 @@ public class CarDisplay : MonoBehaviour
     [SerializeField] private TextMeshProUGUI carPowerplant;
     [SerializeField] private Transform carHolder;
 
-    [Header("Prefabs (fill in inspector)")]
+    [Header("Car Prefabs")]
     [SerializeField] private GameObject[] carPrefabs; // index aligned with car type index
     private readonly Dictionary<string, int> typeIndexByName = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
 
@@ -28,13 +28,13 @@ public class CarDisplay : MonoBehaviour
     public GameObject lockUiElement;
     public GameObject lockImage;
 
-    [Header("Bottom button sets")]
+    [Header("Bottom UI Button Sets")]
     public GameObject buttonSet1;
     public GameObject buttonSet2;
     public GameObject leftButton;
     public GameObject rightButton;
 
-    [Header("Buy/sell confirmation popups")]
+    [Header("Buy/sell Confirmation Popups")]
     public GameObject popUps;
     public GameObject buyConfirmationPopUp;
     public TextMeshProUGUI buyConfirmationPopUpText;
@@ -45,7 +45,7 @@ public class CarDisplay : MonoBehaviour
     public GameObject cannotSellPopUp;
     public TextMeshProUGUI cannotSellPopUpText;
 
-    [Header("Loot crate popups")]
+    [Header("Loot Crate Popups")]
     public GameObject lootCratePopUps;
     public GameObject addOrSellPopUp;
     public TextMeshProUGUI addOrSellPopUpText;
@@ -69,7 +69,7 @@ public class CarDisplay : MonoBehaviour
 
     private Car currentCar;
     private GameObject _spawnedModel;
-    private string currentCarType;   // switched to string
+    private string currentCarType;
     private int currentCarIndex;
     private int numOfThisCarTypeOwned;
     private int sellPrice;
@@ -159,7 +159,11 @@ public class CarDisplay : MonoBehaviour
     }
 
 
-    // Instantiate and display car on turntable in garage.
+    /*------------------------------------------------------------------------------------------------*/
+    /*----------------------------- CAR DISPLAY & MANAGEMENT FUNCTIONS -------------------------------*/
+    /*------------------------------------------------------------------------------------------------*/
+
+    // Activate and display car on turntable in garage.
     public GameObject DisplayCar(Car _car, string carType, int carIndex, bool lootboxCar)
     {
         currentCar = _car;
@@ -239,506 +243,6 @@ public class CarDisplay : MonoBehaviour
 
         _spawnedModel.SetActive(true);
         return _spawnedModel;
-    }
-
-
-    // Randomize car for lootboxes.
-    public void RandomizeCar()
-    {
-        // Set all buttons and widges to be inactive
-        lockUiElement.SetActive(false);
-        lockImage.SetActive(false);
-        buttonSet1.SetActive(false);
-        buttonSet2.SetActive(false);
-        leftButton.SetActive(false);
-        rightButton.SetActive(false);
-        nitroObject.SetActive(false);
-        backButton.SetActive(false);
-        goRaceButton.SetActive(false);
-
-        skipRequested = false;     // reset each run
-        EndSkipListen();           // just to be safe
-        if (_spinCo != null) StopCoroutine(_spinCo);
-        _spinCo = StartCoroutine(SpinRoutine());
-    }
-
-    IEnumerator SpinRoutine()
-    {
-        List<float> delays = BuildDelaySchedule();
-        float totalDuration = 0f;
-        for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
-
-        _turntableStartRot = (carHolder != null) ? carHolder.rotation : Quaternion.identity;
-        _turntableCo = StartCoroutine(SpinTurntable(totalDuration));
-
-        BeginSkipListen();  // <-- start listening for a quick tap here
-
-        bool earlySkipTriggered = false;
-        bool finalCarSpawned = false;
-
-        for (int i = 0; i < spinCount - 3; i++)
-        {
-            if (skipRequested)
-            {
-                earlySkipTriggered = true;
-                break;
-            }
-
-            SpawnWeightedRandomCar();
-            yield return new WaitForSecondsRealtime(delays[i]);
-        }
-
-        if (!earlySkipTriggered)
-            finalCarSpawned = true;
-
-        if (skipRequested)
-        {
-            // stop spinning and snap to final pose
-            if (_turntableCo != null)
-            {
-                StopCoroutine(_turntableCo);
-                _turntableCo = null;
-            }
-            if (carHolder != null)
-                carHolder.rotation = _turntableStartRot;
-
-            if (!finalCarSpawned)
-                SpawnWeightedRandomCar();
-
-            EndSkipListen();   // <-- stop listening
-            _spinCo = null;
-            HandlePostSpin();
-            yield break;
-        }
-        else
-        {
-            if (_turntableCo != null)
-                yield return _turntableCo; // wait until turntable finishes/returns
-        }
-
-        EndSkipListen();       // <-- stop listening
-        _spinCo = null;
-        HandlePostSpin();
-    }
-
-    // Couroutine that spins the turntable.
-    IEnumerator SpinTurntable(float totalDuration)
-    {
-        // Spin the container (falls back to carHolder if not set)
-        var target = carHolder;
-        if (target == null || totalDuration <= 0f) yield break;
-
-        // Remember the exact starting WORLD rotation so we can return to it smoothly.
-        Quaternion startWorldRot = target.rotation;
-
-        float elapsed = 0f;
-        while (elapsed < totalDuration)
-        {
-            float dt = Time.unscaledDeltaTime;
-            elapsed += dt;
-
-            // 0..1 time, eased with the same slowDownBias as your car picks
-            float u = Mathf.Clamp01(elapsed / totalDuration);
-            float uBias = Mathf.Pow(u, slowDownBias);
-
-            // Decaying angular speed (deg/sec)
-            float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias);
-
-            // Rotate around WORLD up so it�s always a horizontal spin
-            target.Rotate(Vector3.up, omega * dt, Space.World);
-            yield return null;
-        }
-
-        // --- Smoothly return to the exact starting rotation ---
-        const float returnDuration = 0.35f;  // tweak to taste
-        float t = 0f;
-        Quaternion from = target.rotation;
-
-        while (t < returnDuration)
-        {
-            t += Time.unscaledDeltaTime;
-            float k = t / returnDuration;
-            // Ease-out (cubic): fast -> slow
-            k = 1f - Mathf.Pow(1f - Mathf.Clamp01(k), 3f);
-            target.rotation = Quaternion.Slerp(from, startWorldRot, k);
-            yield return null;
-        }
-
-        // Ensure perfect final alignment
-        target.rotation = startWorldRot;
-    }
-
-    private void HandlePostSpin()
-    {
-        // Compute & cache the sell price from the currently displayed (randomized) car
-        _cachedLootboxSellPrice = ComputeLootboxSellPrice();
-        string name = currentCar != null ? currentCar.car_name : "car";
-
-        // Activate post-spin UI popups
-        lootCratePopUps.SetActive(true);
-        addOrSellPopUp.SetActive(true);
-        addOrSellPopUpText.text =
-            $"Congratulations! You won a <u>{name}</u>. " +
-            $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
-        sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice.ToString("N0") } CR";
-
-        // Deactivate car name string
-        carName.gameObject.SetActive(false);
-    }
-
-    public void AddLootboxCarToGarage()
-    {
-        var saveData = SaveManager.Instance.SaveData;
-
-        // Determine the next index for this car type and create the save record.
-        int nextIndex = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
-        var newCarKey = (CarType: currentCarType, CarIndex: nextIndex);
-
-        if (!saveData.Cars.TryGetValue(newCarKey, out SaveData.CarData carData))
-        {
-            carData = new SaveData.CarData();
-            saveData.Cars[newCarKey] = carData;
-        }
-
-        // ---- Read currently active parts from the displayed (spawned) model ----
-        // Fallback to prefab if needed (shouldn't usually be necessary).
-        Transform body = _spawnedModel != null
-            ? _spawnedModel.transform.Find("BODY")
-            : currentCar.carModel.transform.Find("BODY");
-
-        if (body == null)
-        {
-            Debug.LogWarning("AddLootboxCarToGarage: BODY transform not found.");
-            return;
-        }
-
-        // Minimal local helpers
-        int ActiveIndex(PartHolder h)
-        {
-            if (h == null) return 0;
-            var parts = h.GetPartArray();
-            for (int i = 0; i < parts.Length; i++)
-                if (parts[i].gameObject.activeSelf) return i;
-            return 0;
-        }
-
-        void SaveSlot(int slot, PartHolder holder)
-        {
-            if (holder == null) return;
-
-            int idx = ActiveIndex(holder);
-            carData.CarParts[slot].CurrentInstalledPart = idx;
-
-            // Ensure the dictionary exists
-            var own = carData.CarParts[slot].Ownership;
-            if (own == null)
-                carData.CarParts[slot].Ownership = own = new Dictionary<int, bool>();
-
-            // Mark this part as owned (Add or overwrite)
-            own[idx] = true;
-            // If you prefer the explicit form:
-            // if (!own.ContainsKey(idx)) own.Add(idx, true); else own[idx] = true;
-        }
-
-        // Cosmetic & aero
-        SaveSlot(0, body.Find("EXHAUSTS")?.GetComponent<PartHolder>());
-        SaveSlot(1, body.Find("FRONT_SPLITTERS")?.GetComponent<PartHolder>());
-        SaveSlot(2, _spawnedModel.transform.Find("FRONT_WHEELS")?.GetComponent<PartHolder>());
-        SaveSlot(3, body.Find("REAR_SPLITTERS")?.GetComponent<PartHolder>());
-        SaveSlot(4, _spawnedModel.transform.Find("REAR_WHEELS")?.GetComponent<PartHolder>());
-        SaveSlot(5, body.Find("SIDESKIRTS")?.GetComponent<PartHolder>());
-        SaveSlot(6, body.Find("SPOILERS")?.GetComponent<PartHolder>());
-        SaveSlot(7, body.GetComponent<PartHolder>()); // SUSPENSIONS lives on BODY
-
-        // Performance parts
-        var perf = body.Find("PERFORMANCE_PARTS");
-        SaveSlot(8, perf?.Find("ENGINE")?.GetComponent<PartHolder>());
-        SaveSlot(9, perf?.Find("TRANSMISSION")?.GetComponent<PartHolder>());
-        SaveSlot(10, perf?.Find("LIVES")?.GetComponent<PartHolder>());
-
-        // Decals & livery
-        SaveSlot(11, body.Find("DECALS")?.GetComponent<PartHolder>());
-        SaveSlot(12, body.Find("LIVERIES")?.GetComponent<PartHolder>());
-
-        // ---- Copy paint state from the randomized materials on the Car asset ----
-        // colorType indices: 0=PRIMARY,1=SECONDARY,2=RIM,3=PRIMARY_LIGHT,4=SECONDARY_LIGHT,5=TAIL_LIGHT
-
-        void PutColor(int idx, Material m, bool isLight)
-        {
-            if (m == null) return;
-            var cd = carData.Colors[idx];
-
-            // Read common channels safely
-            Color BaseOrBlack = m.HasProperty("_Color") ? m.color : Color.black;
-            Color F1 = m.HasProperty("_FresnelColor") ? m.GetColor("_FresnelColor") : BaseOrBlack;
-            Color F2 = m.HasProperty("_FresnelColor2") ? m.GetColor("_FresnelColor2") : BaseOrBlack;
-            Color Em = m.HasProperty("_EmissionColor") ? m.GetColor("_EmissionColor") : Color.black;
-            float met = m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0f;
-
-            if (isLight)
-            {
-                // Lights store their color in EmissionColor; Base is black.
-                cd.BaseColor[0] = 0; cd.BaseColor[1] = 0; cd.BaseColor[2] = 0; cd.BaseColor[3] = 1;
-                cd.EmissionColor[0] = Em.r; cd.EmissionColor[1] = Em.g; cd.EmissionColor[2] = Em.b; cd.EmissionColor[3] = Em.a;
-                cd.FresnelColor[0] = cd.FresnelColor[1] = cd.FresnelColor[2] = cd.FresnelColor[3] = 0;
-                cd.FresnelColor2[0] = cd.FresnelColor2[1] = cd.FresnelColor2[2] = cd.FresnelColor2[3] = 0;
-                cd.MetallicMap = met;
-            }
-            else
-            {
-                // Body/rims store color in Base; Em used only if you later set emissive rims/secondary.
-                cd.BaseColor[0] = BaseOrBlack.r; cd.BaseColor[1] = BaseOrBlack.g; cd.BaseColor[2] = BaseOrBlack.b; cd.BaseColor[3] = BaseOrBlack.a;
-                cd.FresnelColor[0] = F1.r; cd.FresnelColor[1] = F1.g; cd.FresnelColor[2] = F1.b; cd.FresnelColor[3] = F1.a;
-                cd.FresnelColor2[0] = F2.r; cd.FresnelColor2[1] = F2.g; cd.FresnelColor2[2] = F2.b; cd.FresnelColor2[3] = F2.a;
-                cd.EmissionColor[0] = Em.r; cd.EmissionColor[1] = Em.g; cd.EmissionColor[2] = Em.b; cd.EmissionColor[3] = Em.a;
-                cd.MetallicMap = met;
-            }
-        }
-
-        PutColor((int)Car.ColorType.PRIMARY_COLOR, currentCar.primColor, false);
-        PutColor((int)Car.ColorType.SECONDARY_COLOR, currentCar.secondColor, false);
-        PutColor((int)Car.ColorType.RIM_COLOR, currentCar.rimColor, false);
-        PutColor((int)Car.ColorType.PRIMARY_LIGHT, currentCar.primLight, true);
-        PutColor((int)Car.ColorType.SECONDARY_LIGHT, currentCar.secondLight, true);
-        PutColor((int)Car.ColorType.TAIL_LIGHT, currentCar.tailLight, true);
-
-        // Persist and show confirmation UI
-        // NEW: mark the newly added car as the "last owned"
-        saveData.LastOwnedCarType = currentCarType;          // NEW
-        saveData.LastOwnedCarIndex = nextIndex;              // NEW
-                                                             // (Optional) also make it the current selection:
-        saveData.CurrentCarType = currentCarType;            // NEW (optional)
-        saveData.CurrentCarIndex = nextIndex;                // NEW (optional)
-
-        SaveManager.Instance.SaveGame();
-
-        lootCratePopUps.SetActive(true);
-        addOrSellPopUp.SetActive(false);
-        returnOrSpinAgainPopUp.SetActive(true);
-        returnOrSpinAgainPopUpText.text = $"You have added a <u>{currentCar.car_name}</u> to your garage.";
-    }
-
-    public void SellLootboxCarForCredits()
-    {
-        int amount = (_cachedLootboxSellPrice >= 0) ? _cachedLootboxSellPrice : ComputeLootboxSellPrice();
-
-        // Award credits
-        creditManager.ChangeCredits(amount);
-        SaveManager.Instance.SaveGame();
-
-        // UI feedback
-        if (menuSounds != null) menuSounds.PlayChaChing();
-        lootCratePopUps.SetActive(true);
-        addOrSellPopUp.SetActive(false);
-        returnOrSpinAgainPopUp.SetActive(true);
-        returnOrSpinAgainPopUpText.text = $"You sold a <u>{currentCar.car_name}</u> for {amount.ToString("N0")} CR.";
-
-        // Reset the cache now that the transaction is done (optional)
-        _cachedLootboxSellPrice = -1;
-    }
-
-
-    /// <summary>
-    /// Compute sell price for the *currently randomized (lootbox)* car on the turntable:
-    /// base = half of car price + 1/4 of each active part price,
-    /// skipping default parts for slots: 0,2,3,4,6 (Exhaust, Front/Rear Wheels, Rear Splitter, Spoiler).
-    /// </summary>
-    private int ComputeLootboxSellPrice()
-    {
-        if (currentCar == null) return 0;
-
-        int total = currentCar.price / 2;
-
-        // Find the live model (preferred) or fall back to prefab to avoid null issues.
-        Transform modelRoot = _spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform;
-        Transform body = modelRoot != null ? modelRoot.Find("BODY") : null;
-        if (body == null) return total;
-
-        PartHolder PH(Transform t) => t ? t.GetComponent<PartHolder>() : null;
-
-        // Wheels live at root in your hierarchy (not under BODY)
-        PartHolder frontWheels = PH((_spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform).Find("FRONT_WHEELS"));
-        PartHolder rearWheels = PH((_spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform).Find("REAR_WHEELS"));
-
-        // Performance root
-        Transform perf = body.Find("PERFORMANCE_PARTS");
-
-        // Map holders by slot index to mirror your save/indexing scheme
-        var holders = new List<(int slot, PartHolder holder)>
-        {
-            (0,  PH(body.Find("EXHAUSTS"))),
-            (1,  PH(body.Find("FRONT_SPLITTERS"))),
-            (2,  frontWheels),
-            (3,  PH(body.Find("REAR_SPLITTERS"))),
-            (4,  rearWheels),
-            (5,  PH(body.Find("SIDESKIRTS"))),
-            (6,  PH(body.Find("SPOILERS"))),
-            (7,  PH(body)),                         // SUSPENSIONS lives on BODY
-            (8,  PH(perf ? perf.Find("ENGINE") : null)),
-            (9,  PH(perf ? perf.Find("TRANSMISSION") : null)),
-            (10, PH(perf ? perf.Find("LIVES") : null)),
-            (11, PH(body.Find("DECALS"))),
-            (12, PH(body.Find("LIVERIES")))
-        };
-
-        // Helper to get active CarPart (falls back to first if none flagged active)
-        CarPart ActivePart(PartHolder h)
-        {
-            if (h == null) return null;
-            var parts = h.GetPartArray();
-            if (parts == null || parts.Length == 0) return null;
-            for (int i = 0; i < parts.Length; i++)
-                if (parts[i] != null && parts[i].gameObject.activeSelf)
-                    return parts[i];
-            return parts[0];
-        }
-
-        foreach (var (slot, holder) in holders)
-        {
-            var part = ActivePart(holder);
-            if (part == null) continue;
-
-            bool isDefault = slot switch
-            {
-                0 => !string.IsNullOrEmpty(currentCar.DefaultExhaust) && part.name == currentCar.DefaultExhaust,
-                2 => !string.IsNullOrEmpty(currentCar.DefaultFrontWheels) && part.name == currentCar.DefaultFrontWheels,
-                3 => !string.IsNullOrEmpty(currentCar.DefaultRearSplitter) && part.name == currentCar.DefaultRearSplitter,
-                4 => !string.IsNullOrEmpty(currentCar.DefaultRearWheels) && part.name == currentCar.DefaultRearWheels,
-                6 => !string.IsNullOrEmpty(currentCar.DefaultSpoiler) && part.name == currentCar.DefaultSpoiler,
-                _ => false
-            };
-
-            if (!isDefault)
-            {
-                total += ((int)part.price) / 4;
-            }
-        }
-
-        return total;
-    }
-
-    public void PickOwnedCarToReplaceWithLootboxCar()
-    {
-
-    }    
-    
-    public void ReplaceOwnedCarWithLootboxCar()
-    {
-
-    }
-
-    public void OpenLootboxAgain()
-    {
-        ResetUIElements();
-
-        // Re-enable shop menu
-        mainMenuUI.SetActive(true);
-        topLevelMainMenuButtons.SetActive(false);
-        shopMenu.SetActive(true);
-
-        // Disable the currently displayed popups
-        lootCratePopUps.SetActive(false);
-        addOrSellPopUp.SetActive(false);
-        returnOrSpinAgainPopUp.SetActive(false);
-
-        // Disable the garage ui display
-        garageUI.SetActive(false);
-    }
-
-    public void ExitToShop()
-    {
-        ResetUIElements();
-
-        // Re-enable shop menu
-        mainMenuUI.SetActive(true);
-        topLevelMainMenuButtons.SetActive(false);
-        shopMenu.SetActive(true);
-
-        // Disable the currently displayed popups
-        lootCratePopUps.SetActive(false);
-        addOrSellPopUp.SetActive(false);
-        returnOrSpinAgainPopUp.SetActive(false);
-
-        // Disable the garage ui display
-        garageUI.SetActive(false);
-
-        // Reset to default shop menu
-        shopMenuScript.ResetAllUI();
-    }
-
-    public void ExitToGarage()
-    {
-        // Put the garage UI back
-        ResetUIElements();
-
-        // Close loot crate UI
-        lootCratePopUps.SetActive(false);
-        addOrSellPopUp.SetActive(false);
-        returnOrSpinAgainPopUp.SetActive(false);
-
-        // Show the garage, hide the shop
-        if (garageUI != null) garageUI.SetActive(true);
-        if (shopMenu != null) shopMenu.SetActive(false);
-
-        var save = SaveManager.Instance.SaveData;
-
-        // Choose the target car based on LastOwnedCarType/Index (set when a lootbox car is added).
-        string type = save.LastOwnedCarType;
-        int index = save.LastOwnedCarIndex;
-
-        // If that pair is invalid (e.g., player sold, or old data), fall back gracefully.
-        Car target = FindCarAssetByType(type);
-        bool pairExists = save.Cars.ContainsKey((type, index));
-
-        if (target == null || !pairExists)
-        {
-            // Try current selection
-            if (!string.IsNullOrEmpty(save.CurrentCarType) &&
-                save.Cars.ContainsKey((save.CurrentCarType, save.CurrentCarIndex)))
-            {
-                type = save.CurrentCarType;
-                index = save.CurrentCarIndex;
-                target = FindCarAssetByType(type);
-            }
-            // Else pick the first owned car
-            else if (save.Cars.Count > 0)
-            {
-                var first = save.Cars.Keys.First();
-                type = first.CarType;
-                index = first.CarIndex;
-                target = FindCarAssetByType(type);
-            }
-        }
-
-        if (target != null)
-        {
-            // Important: pass the *SaveData key string* for carType so ownership lookup works
-            DisplayCar(target, type, index, false);
-        }
-        else
-        {
-            Debug.LogWarning("ExitToGarage: No owned car found to display.");
-        }
-
-        // Reset to default shop menu
-        shopMenuScript.ResetAllUI();
-        garageUIscript.ChangeCar(0);
-    }
-
-    private void ResetUIElements()
-    {
-        leftButton.SetActive(true);
-        rightButton.SetActive(true);
-
-        lootCratePopUps.SetActive(false);
-        addOrSellPopUp.SetActive(false);
-        returnOrSpinAgainPopUp.SetActive(false);
-
-        nitroObject.SetActive(true);
-        backButton.SetActive(true);
-        goRaceButton.SetActive(true);
-
-        carName.gameObject.SetActive(true);
     }
 
     // Display car purchase confirmation dialogue, check if player has enough currency.
@@ -940,44 +444,689 @@ public class CarDisplay : MonoBehaviour
     }
 
     /*------------------------------------------------------------------------------------------------*/
+    /*----------------------------------- CAR LOOTBOX FUNCTIONS --------------------------------------*/
+    /*------------------------------------------------------------------------------------------------*/
+    // Start randomize car & spin turntable coroutine for lootboxes.
+    public void RandomizeCar()
+    {
+        // Set all buttons and widges to be inactive.
+        lockUiElement.SetActive(false);
+        lockImage.SetActive(false);
+        buttonSet1.SetActive(false);
+        buttonSet2.SetActive(false);
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
+        nitroObject.SetActive(false);
+        backButton.SetActive(false);
+        goRaceButton.SetActive(false);
+
+        skipRequested = false;     // reset each run
+        EndSkipListen();           // just to be safe
+        if (_spinCo != null) StopCoroutine(_spinCo);
+        _spinCo = StartCoroutine(RandomizeRoutine());
+    }
+
+    // Car randomization coroutine.
+    IEnumerator RandomizeRoutine()
+    {
+        List<float> delays = BuildDelaySchedule();
+        float totalDuration = 0f;
+        for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
+
+        _turntableStartRot = (carHolder != null) ? carHolder.rotation : Quaternion.identity;
+        _turntableCo = StartCoroutine(SpinTurntable(totalDuration));
+
+        BeginSkipListen();  // <-- start listening for a quick tap here
+
+        bool earlySkipTriggered = false;
+        bool finalCarSpawned = false;
+
+        for (int i = 0; i < spinCount - 3; i++)
+        {
+            if (skipRequested)
+            {
+                earlySkipTriggered = true;
+                break;
+            }
+
+            SpawnWeightedRandomCar();
+            yield return new WaitForSecondsRealtime(delays[i]);
+        }
+
+        if (!earlySkipTriggered)
+            finalCarSpawned = true;
+
+        if (skipRequested)
+        {
+            // stop spinning and snap to final pose
+            if (_turntableCo != null)
+            {
+                StopCoroutine(_turntableCo);
+                _turntableCo = null;
+            }
+            if (carHolder != null)
+                carHolder.rotation = _turntableStartRot;
+
+            if (!finalCarSpawned)
+                SpawnWeightedRandomCar();
+
+            EndSkipListen();   // <-- stop listening
+            _spinCo = null;
+            HandlePostSpin();
+            yield break;
+        }
+        else
+        {
+            if (_turntableCo != null)
+                yield return _turntableCo; // wait until turntable finishes/returns
+        }
+
+        EndSkipListen();       // <-- stop listening
+        _spinCo = null;
+        HandlePostSpin();
+    }
+
+    // Turntable spin coroutine.
+    IEnumerator SpinTurntable(float totalDuration)
+    {
+        // Spin the container (falls back to carHolder if not set)
+        var target = carHolder;
+        if (target == null || totalDuration <= 0f) yield break;
+
+        // Remember the exact starting WORLD rotation so we can return to it smoothly.
+        Quaternion startWorldRot = target.rotation;
+
+        float elapsed = 0f;
+        while (elapsed < totalDuration)
+        {
+            float dt = Time.unscaledDeltaTime;
+            elapsed += dt;
+
+            // 0..1 time, eased with the same slowDownBias as your car picks
+            float u = Mathf.Clamp01(elapsed / totalDuration);
+            float uBias = Mathf.Pow(u, slowDownBias);
+
+            // Decaying angular speed (deg/sec)
+            float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias);
+
+            // Rotate around WORLD up so it’s always a horizontal spin
+            target.Rotate(Vector3.up, omega * dt, Space.World);
+            yield return null;
+        }
+
+        // --- Smoothly return to the exact starting rotation ---
+        const float returnDuration = 0.35f;  // tweak to taste
+        float t = 0f;
+        Quaternion from = target.rotation;
+
+        while (t < returnDuration)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = t / returnDuration;
+            // Ease-out (cubic): fast -> slow
+            k = 1f - Mathf.Pow(1f - Mathf.Clamp01(k), 3f);
+            target.rotation = Quaternion.Slerp(from, startWorldRot, k);
+            yield return null;
+        }
+
+        // Ensure perfect final alignment
+        target.rotation = startWorldRot;
+    }
+
+    // Post spin UI.
+    private void HandlePostSpin()
+    {
+        // Compute & cache the sell price from the currently displayed (randomized) car
+        _cachedLootboxSellPrice = ComputeLootboxSellPrice();
+        string name = currentCar != null ? currentCar.car_name : "car";
+
+        // Activate post-spin UI popups
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(true);
+        addOrSellPopUpText.text =
+            $"Congratulations! You won a <u>{name}</u>. " +
+            $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
+        sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice.ToString("N0") } CR";
+
+        // Deactivate car name string
+        carName.gameObject.SetActive(false);
+    }
+
+    // Add randomized lootbox car to garage.
+    public void AddLootboxCarToGarage()
+    {
+        var saveData = SaveManager.Instance.SaveData;
+
+        // Enforce the same per-type cap used in ConfirmBuy()
+        const int maxPerType = 100;
+        int ownedOfThisType = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
+
+        if (ownedOfThisType >= maxPerType)
+        {
+            if (lootCratePopUps != null) lootCratePopUps.SetActive(true);
+            if (addOrSellPopUp != null) addOrSellPopUp.SetActive(true);
+
+            EnsureLootboxSellPriceCached();
+
+            string displayName = string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name;
+            if (addOrSellPopUpText != null)
+            {
+                addOrSellPopUpText.text =
+                    $"You cannot add another <u>{displayName}</u> to your garage. " +
+                    $"You already own the maximum of {maxPerType} for this car type. " +
+                    $"You may sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
+            }
+            return;
+        }
+
+        // Determine next index for this type and create/overwrite record
+        int nextIndex = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
+        var newCarKey = (CarType: currentCarType, CarIndex: nextIndex);
+
+        if (!saveData.Cars.TryGetValue(newCarKey, out SaveData.CarData carData))
+        {
+            carData = new SaveData.CarData();
+            saveData.Cars[newCarKey] = carData;
+        }
+
+        // Snapshot from the displayed, randomized model
+        var snapshot = BuildCarDataFromDisplayedModel();
+        saveData.Cars[newCarKey] = snapshot;
+
+        // Persist selection pointers
+        saveData.LastOwnedCarType = currentCarType;
+        saveData.LastOwnedCarIndex = nextIndex;
+        saveData.CurrentCarType = currentCarType;   // optional
+        saveData.CurrentCarIndex = nextIndex;       // optional
+
+        SaveManager.Instance.SaveGame();
+
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(true);
+        returnOrSpinAgainPopUpText.text = $"You have added a <u>{currentCar.car_name}</u> to your garage.";
+    }
+
+    // Sell randomized lootbox car for credits.
+    public void SellLootboxCarForCredits()
+    {
+        int amount = (_cachedLootboxSellPrice >= 0) ? _cachedLootboxSellPrice : ComputeLootboxSellPrice();
+
+        // Award credits
+        creditManager.ChangeCredits(amount);
+        SaveManager.Instance.SaveGame();
+
+        // UI feedback
+        if (menuSounds != null) menuSounds.PlayChaChing();
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(true);
+        returnOrSpinAgainPopUpText.text = $"You sold a <u>{currentCar.car_name}</u> for {amount.ToString("N0")} CR.";
+
+        // Reset the cache now that the transaction is done (optional)
+        _cachedLootboxSellPrice = -1;
+    }
+
+    // Compute sell price for the *currently randomized (lootbox)* car on the turntable:
+    // base = half of car price + 1/4 of each active part price,
+    // skipping default parts for slots: 0,2,3,4,6 (Exhaust, Front/Rear Wheels, Rear Splitter, Spoiler).
+    private int ComputeLootboxSellPrice()
+    {
+        if (currentCar == null) return 0;
+
+        int total = currentCar.price / 2;
+
+        // Find the live model (preferred) or fall back to prefab to avoid null issues.
+        Transform modelRoot = _spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform;
+        Transform body = modelRoot != null ? modelRoot.Find("BODY") : null;
+        if (body == null) return total;
+
+        PartHolder PH(Transform t) => t ? t.GetComponent<PartHolder>() : null;
+
+        // Wheels live at root in your hierarchy (not under BODY)
+        PartHolder frontWheels = PH((_spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform).Find("FRONT_WHEELS"));
+        PartHolder rearWheels = PH((_spawnedModel != null ? _spawnedModel.transform : currentCar.carModel.transform).Find("REAR_WHEELS"));
+
+        // Performance root
+        Transform perf = body.Find("PERFORMANCE_PARTS");
+
+        // Map holders by slot index to mirror your save/indexing scheme
+        var holders = new List<(int slot, PartHolder holder)>
+        {
+            (0,  PH(body.Find("EXHAUSTS"))),
+            (1,  PH(body.Find("FRONT_SPLITTERS"))),
+            (2,  frontWheels),
+            (3,  PH(body.Find("REAR_SPLITTERS"))),
+            (4,  rearWheels),
+            (5,  PH(body.Find("SIDESKIRTS"))),
+            (6,  PH(body.Find("SPOILERS"))),
+            (7,  PH(body)),                         // SUSPENSIONS lives on BODY
+            (8,  PH(perf ? perf.Find("ENGINE") : null)),
+            (9,  PH(perf ? perf.Find("TRANSMISSION") : null)),
+            (10, PH(perf ? perf.Find("LIVES") : null)),
+            (11, PH(body.Find("DECALS"))),
+            (12, PH(body.Find("LIVERIES")))
+        };
+
+        // Helper to get active CarPart (falls back to first if none flagged active)
+        CarPart ActivePart(PartHolder h)
+        {
+            if (h == null) return null;
+            var parts = h.GetPartArray();
+            if (parts == null || parts.Length == 0) return null;
+            for (int i = 0; i < parts.Length; i++)
+                if (parts[i] != null && parts[i].gameObject.activeSelf)
+                    return parts[i];
+            return parts[0];
+        }
+
+        foreach (var (slot, holder) in holders)
+        {
+            var part = ActivePart(holder);
+            if (part == null) continue;
+
+            bool isDefault = slot switch
+            {
+                0 => !string.IsNullOrEmpty(currentCar.DefaultExhaust) && part.name == currentCar.DefaultExhaust,
+                2 => !string.IsNullOrEmpty(currentCar.DefaultFrontWheels) && part.name == currentCar.DefaultFrontWheels,
+                3 => !string.IsNullOrEmpty(currentCar.DefaultRearSplitter) && part.name == currentCar.DefaultRearSplitter,
+                4 => !string.IsNullOrEmpty(currentCar.DefaultRearWheels) && part.name == currentCar.DefaultRearWheels,
+                6 => !string.IsNullOrEmpty(currentCar.DefaultSpoiler) && part.name == currentCar.DefaultSpoiler,
+                _ => false
+            };
+
+            if (!isDefault)
+            {
+                total += ((int)part.price) / 4;
+            }
+        }
+
+        return total;
+    }
+
+    public void PickOwnedCarToReplaceWithLootboxCar()
+    {
+
+    }
+
+    // Replace an existing car that the player owns with the randomized lootbox car.
+    // Only called if player already has max copies of a certain car type owned.
+    public void ReplaceOwnedCarWithLootboxCar()
+    {
+        var save = SaveManager.Instance.SaveData;
+
+        if (save == null || currentCar == null || _spawnedModel == null)
+        {
+            Debug.LogWarning("ReplaceOwnedCarWithLootboxCar: Missing SaveData or no lootbox car displayed.");
+            return;
+        }
+
+        string type = currentCarType;
+        int index = currentCarIndex;
+        var key = (CarType: type, CarIndex: index);
+
+        if (!save.Cars.ContainsKey(key))
+        {
+            Debug.LogWarning($"ReplaceOwnedCarWithLootboxCar: No owned car found at ({type}, {index}) to replace.");
+            return;
+        }
+
+        // Snapshot from the displayed, randomized model
+        SaveData.CarData replacement = BuildCarDataFromDisplayedModel();
+        save.Cars[key] = replacement;
+
+        // Update pointers
+        save.CurrentCarType = type;
+        save.CurrentCarIndex = index;
+        save.LastOwnedCarType = type;
+        save.LastOwnedCarIndex = index;
+
+        SaveManager.Instance.SaveGame();
+
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(true);
+
+        string awardedName = string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name;
+        returnOrSpinAgainPopUpText.text = $"Replaced your car with a <u>{awardedName}</u>.";
+    }
+
+    // UI flow for re-opening a car lootbox after spin.
+    public void OpenLootboxAgain()
+    {
+        ResetUIElements();
+
+        // Re-enable shop menu
+        mainMenuUI.SetActive(true);
+        topLevelMainMenuButtons.SetActive(false);
+        shopMenu.SetActive(true);
+
+        // Disable the currently displayed popups
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Disable the garage ui display
+        garageUI.SetActive(false);
+    }
+
+    // UI flow for returning to shop after spin.
+    public void ExitToShop()
+    {
+        ResetUIElements();
+
+        // Re-enable shop menu
+        mainMenuUI.SetActive(true);
+        topLevelMainMenuButtons.SetActive(false);
+        shopMenu.SetActive(true);
+
+        // Disable the currently displayed popups
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Disable the garage ui display
+        garageUI.SetActive(false);
+
+        // Reset to default shop menu
+        shopMenuScript.ResetAllUI();
+    }
+
+    // UI flow for exiting to garage after spin.
+    public void ExitToGarage()
+    {
+        // Put the garage UI back
+        ResetUIElements();
+
+        // Close loot crate UI
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Show the garage, hide the shop
+        if (garageUI != null) garageUI.SetActive(true);
+        if (shopMenu != null) shopMenu.SetActive(false);
+
+        var save = SaveManager.Instance.SaveData;
+
+        // Choose the target car based on LastOwnedCarType/Index (set when a lootbox car is added).
+        string type = save.LastOwnedCarType;
+        int index = save.LastOwnedCarIndex;
+
+        // If that pair is invalid (e.g., player sold, or old data), fall back gracefully.
+        Car target = FindCarAssetByType(type);
+        bool pairExists = save.Cars.ContainsKey((type, index));
+
+        if (target == null || !pairExists)
+        {
+            // Try current selection
+            if (!string.IsNullOrEmpty(save.CurrentCarType) &&
+                save.Cars.ContainsKey((save.CurrentCarType, save.CurrentCarIndex)))
+            {
+                type = save.CurrentCarType;
+                index = save.CurrentCarIndex;
+                target = FindCarAssetByType(type);
+            }
+            // Else pick the first owned car
+            else if (save.Cars.Count > 0)
+            {
+                var first = save.Cars.Keys.First();
+                type = first.CarType;
+                index = first.CarIndex;
+                target = FindCarAssetByType(type);
+            }
+        }
+
+        if (target != null)
+        {
+            // Important: pass the *SaveData key string* for carType so ownership lookup works
+            DisplayCar(target, type, index, false);
+        }
+        else
+        {
+            Debug.LogWarning("ExitToGarage: No owned car found to display.");
+        }
+
+        // Reset to default shop menu
+        shopMenuScript.ResetAllUI();
+        garageUIscript.ChangeCar(0);
+    }
+
+    // Reset all UI elements to their default states.
+    private void ResetUIElements()
+    {
+        leftButton.SetActive(true);
+        rightButton.SetActive(true);
+
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        nitroObject.SetActive(true);
+        backButton.SetActive(true);
+        goRaceButton.SetActive(true);
+
+        carName.gameObject.SetActive(true);
+    }
+
+
+    /*------------------------------------------------------------------------------------------------*/
     /*--------------------------------------- HELPER FUNCTIONS ---------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
+
+    /// <summary>
+    /// Tries to locate the active model root and key sub-nodes on the currently displayed car.
+    /// Uses the spawned (lootbox) instance if available; otherwise falls back to the Car asset's prefab.
+    /// </summary>
+    private bool TryGetModelRoots(out Transform modelRoot, out Transform body, out Transform perfRoot)
+    {
+        // Prefer the spawned lootbox model if it exists, otherwise use the prefab attached to the Car asset.
+        modelRoot = (_spawnedModel != null) ? _spawnedModel.transform : currentCar?.carModel?.transform;
+
+        body = null;     // Initialize out parameter
+        perfRoot = null; // Initialize out parameter
+
+        if (modelRoot == null) return false; // No model root found → cannot proceed.
+
+        // Look for the "BODY" node (required part of hierarchy).
+        body = modelRoot.Find("BODY");
+        if (body == null) return false;
+
+        // Attempt to locate optional PERFORMANCE_PARTS under BODY.
+        var perf = body.Find("PERFORMANCE_PARTS");
+        perfRoot = perf != null ? perf : null;
+
+        return true; // Both root and BODY are valid
+    }
+
+    /// <summary>
+    /// Returns the index of the currently active (enabled) part in a PartHolder.
+    /// Falls back to index 0 if none are active or if the holder is invalid.
+    /// </summary>
+    private static int ActiveIndex(PartHolder holder)
+    {
+        if (holder == null) return 0; // Null holder → safe fallback index.
+
+        var parts = holder.GetPartArray(); // Retrieve all parts managed by this holder.
+        if (parts == null || parts.Length == 0) return 0; // Nothing in the array → default to 0.
+
+        // Iterate through parts and return index of the first active GameObject.
+        for (int i = 0; i < parts.Length; i++)
+            if (parts[i] != null && parts[i].gameObject.activeSelf) return i;
+
+        return 0; // None active → fallback to 0.
+    }
+
+    /// <summary>
+    /// Records the active part index into SaveData.CarData for a given slot,
+    /// and marks that index as "owned" by the player.
+    /// </summary>
+    private static void SaveSlot(SaveData.CarData data, int slot, PartHolder holder)
+    {
+        if (holder == null) return; // Skip invalid holder.
+
+        int idx = ActiveIndex(holder); // Determine which part is active.
+        data.CarParts[slot].CurrentInstalledPart = idx; // Record as the installed part.
+
+        // Ensure Ownership dictionary exists for this slot.
+        if (data.CarParts[slot].Ownership == null)
+            data.CarParts[slot].Ownership = new Dictionary<int, bool>();
+
+        // Mark this part index as owned.
+        data.CarParts[slot].Ownership[idx] = true;
+    }
+
+    /// <summary>
+    /// Copies all paint and light colors from a Car's materials into CarData.
+    /// Light slots are treated specially (only emission is stored).
+    /// </summary>
+    private static void CopyColorsFromCar(SaveData.CarData data, Car src)
+    {
+        if (src == null) return;
+
+        // Local helper: copy a single Material's values into a given CarData color slot.
+        void PutColor(int idx, Material m, bool isLight)
+        {
+            if (m == null) return; // Skip if no material applied.
+
+            var cd = data.Colors[idx]; // Target slot in SaveData.
+
+            // Pull values from material if property exists, otherwise fall back.
+            Color baseOrBlack = m.HasProperty("_Color") ? m.color : Color.black;
+            Color f1 = m.HasProperty("_FresnelColor") ? m.GetColor("_FresnelColor") : baseOrBlack;
+            Color f2 = m.HasProperty("_FresnelColor2") ? m.GetColor("_FresnelColor2") : baseOrBlack;
+            Color em = m.HasProperty("_EmissionColor") ? m.GetColor("_EmissionColor") : Color.black;
+            float met = m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0f;
+
+            if (isLight)
+            {
+                // For lights: ignore base/fresnel and store only emission + metallic.
+                cd.BaseColor[0] = 0; cd.BaseColor[1] = 0; cd.BaseColor[2] = 0; cd.BaseColor[3] = 1;
+                cd.EmissionColor[0] = em.r; cd.EmissionColor[1] = em.g; cd.EmissionColor[2] = em.b; cd.EmissionColor[3] = em.a;
+                cd.FresnelColor[0] = cd.FresnelColor[1] = cd.FresnelColor[2] = cd.FresnelColor[3] = 0;
+                cd.FresnelColor2[0] = cd.FresnelColor2[1] = cd.FresnelColor2[2] = cd.FresnelColor2[3] = 0;
+                cd.MetallicMap = met;
+            }
+            else
+            {
+                // For opaque body/rim materials: capture all main properties.
+                cd.BaseColor[0] = baseOrBlack.r; cd.BaseColor[1] = baseOrBlack.g; cd.BaseColor[2] = baseOrBlack.b; cd.BaseColor[3] = baseOrBlack.a;
+                cd.FresnelColor[0] = f1.r; cd.FresnelColor[1] = f1.g; cd.FresnelColor[2] = f1.b; cd.FresnelColor[3] = f1.a;
+                cd.FresnelColor2[0] = f2.r; cd.FresnelColor2[1] = f2.g; cd.FresnelColor2[2] = f2.b; cd.FresnelColor2[3] = f2.a;
+                cd.EmissionColor[0] = em.r; cd.EmissionColor[1] = em.g; cd.EmissionColor[2] = em.b; cd.EmissionColor[3] = em.a;
+                cd.MetallicMap = met;
+            }
+        }
+
+        // Apply helper to all car color slots.
+        PutColor((int)Car.ColorType.PRIMARY_COLOR, src.primColor, false);
+        PutColor((int)Car.ColorType.SECONDARY_COLOR, src.secondColor, false);
+        PutColor((int)Car.ColorType.RIM_COLOR, src.rimColor, false);
+        PutColor((int)Car.ColorType.PRIMARY_LIGHT, src.primLight, true);
+        PutColor((int)Car.ColorType.SECONDARY_LIGHT, src.secondLight, true);
+        PutColor((int)Car.ColorType.TAIL_LIGHT, src.tailLight, true);
+    }
+
+    /// <summary>
+    /// Creates a CarData snapshot from the currently displayed lootbox model.
+    /// Walks hierarchy and saves parts + colors.
+    /// </summary>
+    private SaveData.CarData BuildCarDataFromDisplayedModel()
+    {
+        var data = new SaveData.CarData(); // Start with a fresh CarData container.
+
+        // Ensure model hierarchy is available (root + BODY).
+        if (!TryGetModelRoots(out var modelRoot, out var body, out var perf))
+        {
+            Debug.LogWarning("BuildCarDataFromDisplayedModel: Model roots not found.");
+            return data;
+        }
+
+        // Record all cosmetic parts (slots 0–7).
+        SaveSlot(data, 0, body.Find("EXHAUSTS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 1, body.Find("FRONT_SPLITTERS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 2, modelRoot.Find("FRONT_WHEELS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 3, body.Find("REAR_SPLITTERS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 4, modelRoot.Find("REAR_WHEELS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 5, body.Find("SIDESKIRTS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 6, body.Find("SPOILERS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 7, body.GetComponent<PartHolder>()); // Suspensions holder is directly on BODY.
+
+        // Record performance parts if PERFORMANCE_PARTS node exists (slots 8–10).
+        SaveSlot(data, 8, perf ? perf.Find("ENGINE")?.GetComponent<PartHolder>() : null);
+        SaveSlot(data, 9, perf ? perf.Find("TRANSMISSION")?.GetComponent<PartHolder>() : null);
+        SaveSlot(data, 10, perf ? perf.Find("LIVES")?.GetComponent<PartHolder>() : null);
+
+        // Record decals and livery (slots 11–12).
+        SaveSlot(data, 11, body.Find("DECALS")?.GetComponent<PartHolder>());
+        SaveSlot(data, 12, body.Find("LIVERIES")?.GetComponent<PartHolder>());
+
+        // Copy paint/light colors from Car’s current materials.
+        CopyColorsFromCar(data, currentCar);
+
+        return data;
+    }
+
+    /// <summary>
+    /// Caches the computed lootbox sell price if not already cached.
+    /// Prevents recalculating repeatedly.
+    /// </summary>
+    private void EnsureLootboxSellPriceCached()
+    {
+        if (_cachedLootboxSellPrice < 0) // Only compute once
+            _cachedLootboxSellPrice = ComputeLootboxSellPrice();
+    }
+
+    /// <summary>
+    /// Builds a dictionary mapping car display names to their bucket index within CarCollection.
+    /// Skips null or empty names. Duplicate names keep their first index.
+    /// </summary>
     public void BuildCarTypeNameIndex()
     {
-        typeIndexByName.Clear();
+        typeIndexByName.Clear(); // Reset any existing index.
+
         if (carCollection == null || carCollection.carTypes == null) return;
 
+        // Iterate all car type buckets.
         for (int i = 0; i < carCollection.carTypes.Count; i++)
         {
             var bucket = carCollection.carTypes[i];
             if (bucket.items == null || bucket.items.Count == 0) continue;
 
+            // Iterate all assets in bucket.
             foreach (var so in bucket.items)
             {
                 var car = so as Car;
                 if (car == null) continue;
 
+                // Use car_name if set, otherwise fallback to Unity object name.
                 string name = !string.IsNullOrWhiteSpace(car.car_name) ? car.car_name : car.name;
                 if (string.IsNullOrWhiteSpace(name)) continue;
 
-                // Map every variant name to the SAME bucket index.
+                // Only add if not already mapped (first occurrence wins).
                 if (!typeIndexByName.ContainsKey(name))
                     typeIndexByName[name] = i;
             }
         }
 
-        typeNameIndexBuilt = true;
+        typeNameIndexBuilt = true; // Mark index as built so it won’t rebuild unnecessarily.
     }
 
-    // Resolve display name consistently
+    /// <summary>
+    /// Returns the consistent display name for a Car (prefers car_name over object name).
+    /// </summary>
     private static string CarDisplayName(Car c) =>
         string.IsNullOrWhiteSpace(c?.car_name) ? c?.name : c.car_name;
 
-    // Search your CarCollection for a Car asset by its type string saved in SaveData
+    /// <summary>
+    /// Finds a Car asset in CarCollection that matches the given type string (display name).
+    /// Used to resolve SaveData entries back to prefab assets.
+    /// </summary>
     private Car FindCarAssetByType(string typeString)
     {
         if (string.IsNullOrEmpty(typeString) || carCollection == null) return null;
 
+        // Iterate through all buckets and items to find a matching display name.
         foreach (var t in carCollection.carTypes)
         {
             foreach (var item in t.items)
@@ -985,76 +1134,130 @@ public class CarDisplay : MonoBehaviour
                 var car = item as Car;
                 if (car == null) continue;
 
-                // NOTE: SaveData uses a string key; your code was storing the display name for currentCarType
-                // so we compare with the same logic the code used when setting currentCarType.
                 string name = CarDisplayName(car);
-                if (name == typeString) return car;
+                if (name == typeString) return car; // Match found
             }
         }
-        return null;
+        return null; // Not found
     }
 
-    // Call this wherever you need to spawn a weighted random car once.
+
+    /*------------------------------------------------------------------------------------------------*/
+    /*--------------------------------------- LOOTBOX HELPERS ----------------------------------------*/
+    /*------------------------------------------------------------------------------------------------*/
+
+    /// <summary>
+    /// Spawns a random car (by type bucket) using a fixed, skewed weight distribution,
+    /// then displays it in "lootbox" mode (randomized parts/colors).
+    /// Assumptions:
+    ///  - carCollection and its carTypes/items are populated.
+    ///  - Index 99 exists within the chosen bucket (per your fixed pick).
+    ///  - DisplayCar will handle lootbox placement and randomization.
+    /// </summary>
     private void SpawnWeightedRandomCar()
     {
+        // Heavier weights make early indices more likely. Order matters.
         float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
-        float total = 0f;
-        float[] cum = new float[weights.Length];
-        for (int w = 0; w < weights.Length; w++) { total += weights[w]; cum[w] = total; }
 
+        float total = 0f;                              // Running sum for normalization.
+        float[] cum = new float[weights.Length];       // Cumulative array used for inverse CDF sampling.
+
+        // Build cumulative weights: cum[i] = sum(weights[0..i]).
+        for (int w = 0; w < weights.Length; w++)
+        {
+            total += weights[w];                       // Accumulate total weight.
+            cum[w] = total;                            // Store cumulative sum at this index.
+        }
+
+        // Sample a bucket index according to weights.
         int typeIdx = WeightedPick(cum, total);
+
+        // Guard the index against collection bounds (robust to short carTypes lists).
         typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
 
+        // Resolve the chosen bucket from the collection.
         var bucket = carCollection.carTypes[typeIdx];
-        int carIdx = 99; // your fixed pick
 
+        // Fixed car index within the bucket, per your current design.
+        // NOTE: Ensure that '99' exists in all target buckets, or add bounds checks as needed.
+        int carIdx = 99;
+
+        // Resolve the Car ScriptableObject at (typeIdx, carIdx).
         var carAsset = bucket.items[carIdx] as Car;
         if (carAsset != null)
         {
-            DisplayCar(
-                carAsset,
-                string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name,
-                carIdx,
-                true
-            );
+            // Use car_name if set, otherwise fallback to the underlying object name.
+            string displayType = string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name;
+
+            // Display in lootbox mode (true), which randomizes and places using local offsets.
+            DisplayCar(carAsset, displayType, carIdx, true);
         }
+        // else: if null, the bucket did not contain a Car at index 99; consider adding a guard if needed.
     }
 
-    // Build the exact delay schedule used by the randomizer so spin timing matches 1:1.
-    List<float> BuildDelaySchedule()
+    /// <summary>
+    /// Builds a sequence of delays (in seconds) for the lootbox randomizer loop,
+    /// starting faster and slowing toward the end using a power (slowDownBias) easing.
+    /// The length equals 'spinCount'.
+    /// </summary>
+    private List<float> BuildDelaySchedule()
     {
-        var delays = new List<float>(spinCount);
+        var delays = new List<float>(spinCount);       // Pre-size list to avoid reallocations.
+
         for (int i = 0; i < spinCount; i++)
         {
+            // Linear progress in [0,1]. When spinCount == 1, clamp to 1 to avoid divide-by-zero.
             float tLin = (spinCount <= 1) ? 1f : (float)i / (spinCount - 1);
+
+            // Apply a power curve to bias toward the end (larger exponent => more end-weighted).
             float tBias = Mathf.Pow(tLin, slowDownBias);
+
+            // Interpolate between startDelay and endDelay by the biased t.
             float delay = Mathf.Lerp(startDelay, endDelay, tBias);
-            delays.Add(delay);
+
+            delays.Add(delay);                         // Append this step’s delay.
         }
-        return delays;
+
+        return delays;                                 // Returned list used by the randomize coroutine.
     }
 
-    // Map a random number onto the cumulative weights.
-    int WeightedPick(float[] cumulative, float total)
+    /// <summary>
+    /// Samples an index from a cumulative weight array (inverse transform sampling).
+    /// 'cumulative' must be strictly non-decreasing; 'total' is cumulative[^last].
+    /// Returns the first index i where r < cumulative[i].
+    /// </summary>
+    private int WeightedPick(float[] cumulative, float total)
     {
-        float r = Random.value * total; // [0,total)
+        // Random r in [0, total). Using UnityEngine.Random for deterministic seeding if configured externally.
+        float r = Random.value * total;
+
+        // Find the first cumulative bucket that exceeds r.
         for (int i = 0; i < cumulative.Length; i++)
             if (r < cumulative[i]) return i;
+
+        // Fallback: due to floating-point edge cases, return the last index.
         return cumulative.Length - 1;
     }
 
+    /// <summary>
+    /// Enables input listening for "quick tap to skip" behavior during the spin.
+    /// Resets internal state to ensure a clean capture of the next tap/gesture.
+    /// </summary>
     private void BeginSkipListen()
     {
-        _listenForSkip = true;
-        _pressStart = -1f;
-        _skipFingerId = -1;
+        _listenForSkip = true;     // Enable Update() path that checks for skip input.
+        _pressStart = -1f;         // Reset press/tap timer sentinel.
+        _skipFingerId = -1;        // Ensure no stale finger is tracked on mobile.
     }
 
+    /// <summary>
+    /// Disables input listening for the skip feature and clears any partial state.
+    /// Should be called when the spin completes or a skip is handled.
+    /// </summary>
     private void EndSkipListen()
     {
-        _listenForSkip = false;
-        _pressStart = -1f;
-        _skipFingerId = -1;
+        _listenForSkip = false;    // Disable skip input processing in Update().
+        _pressStart = -1f;         // Clear timing capture.
+        _skipFingerId = -1;        // Clear finger association.
     }
-
 }
