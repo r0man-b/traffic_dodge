@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -409,6 +409,7 @@ public class GarageUIManager : MonoBehaviour
     /*------------------------------------- GARAGE UI FUNCTIONS -------------------------------------*/
     public void ChangeCar(int change)
     {
+        // Ensure CarDisplay's name→index map exists (needed by DisplayCar() path).
         if (carDisplay.typeNameIndexBuilt == false)
         {
             carDisplay.BuildCarTypeNameIndex();
@@ -416,7 +417,7 @@ public class GarageUIManager : MonoBehaviour
 
         var saveData = SaveManager.Instance.SaveData;
 
-        // Load current selection
+        // Load current selection from save.
         currentCarType = saveData.CurrentCarType;
         currentCarIndex = saveData.CurrentCarIndex;
 
@@ -427,45 +428,75 @@ public class GarageUIManager : MonoBehaviour
             currentCarIndex = 0;
         }
 
-        // Apply index change within the same type
+        // Apply index delta first; how we handle edges depends on replace mode.
         currentCarIndex += change;
 
-        // Owned copies of current type
+        // Counts/limits for the *current type*.
         numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
-
-        // Variations count available in collection
         var typeBucket = GetCarTypeBucket(currentCarType);
         int maxVariations = typeBucket.items.Count;
 
-        if (currentCarIndex < 0)
+        if (inCarReplaceState)
         {
-            // Move to previous type
-            currentCarType = GetPrevType(currentCarType);
-            typeBucket = GetCarTypeBucket(currentCarType);
-            numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
-            maxVariations = typeBucket.items.Count;
+            // --- REPLACE MODE ---
+            // Constrain the user to THIS car type only; do not roll to prev/next types.
+            // Clamp index to the range of *owned* copies and available variations.
+            int maxOwnedIndex = Mathf.Min(Mathf.Max(numOfThisCarTypeOwned - 1, 0), Mathf.Max(maxVariations - 1, 0));
+            currentCarIndex = Mathf.Clamp(currentCarIndex, 0, maxOwnedIndex);
 
-            currentCarIndex = Mathf.Min(Mathf.Max(numOfThisCarTypeOwned - 1, 0), Mathf.Max(maxVariations - 1, 0));
+            // Disable left/right buttons at the edges within this type.
+            if (carDisplay != null)
+            {
+                bool canGoLeft = currentCarIndex > 0;
+                bool canGoRight = currentCarIndex < maxOwnedIndex;
+
+                if (carDisplay.leftButton != null) carDisplay.leftButton.SetActive(canGoLeft);
+                if (carDisplay.rightButton != null) carDisplay.rightButton.SetActive(canGoRight);
+            }
         }
-        else if (currentCarIndex > Mathf.Min(numOfThisCarTypeOwned - 1, maxVariations - 1))
+        else
         {
-            // Move to next type
-            currentCarType = GetNextType(currentCarType);
-            typeBucket = GetCarTypeBucket(currentCarType);
-            numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
-            maxVariations = typeBucket.items.Count;
+            // --- NORMAL BROWSE MODE (original cross-type behavior) ---
+            if (currentCarIndex < 0)
+            {
+                // Move to previous type and land on the last valid owned/available index.
+                currentCarType = GetPrevType(currentCarType);
+                typeBucket = GetCarTypeBucket(currentCarType);
+                numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+                maxVariations = typeBucket.items.Count;
 
-            currentCarIndex = 0;
+                currentCarIndex = Mathf.Min(
+                    Mathf.Max(numOfThisCarTypeOwned - 1, 0),
+                    Mathf.Max(maxVariations - 1, 0)
+                );
+            }
+            else if (currentCarIndex > Mathf.Min(numOfThisCarTypeOwned - 1, maxVariations - 1))
+            {
+                // Move to next type and land on the first index.
+                currentCarType = GetNextType(currentCarType);
+                typeBucket = GetCarTypeBucket(currentCarType);
+                numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+                maxVariations = typeBucket.items.Count;
+
+                currentCarIndex = 0;
+            }
+
+            // In normal mode, keep nav buttons enabled.
+            if (carDisplay != null)
+            {
+                if (carDisplay.leftButton != null) carDisplay.leftButton.SetActive(true);
+                if (carDisplay.rightButton != null) carDisplay.rightButton.SetActive(true);
+            }
         }
 
-        // Persist current selection
+        // Persist current selection.
         saveData.CurrentCarType = currentCarType;
         saveData.CurrentCarIndex = currentCarIndex;
 
-        // Grab the car object
+        // Grab the car object from the resolved bucket.
         car = (Car)typeBucket.items[currentCarIndex];
 
-        // Save the last owned car index if this car is owned.
+        // If owned, remember as last owned selection.
         bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
         if (isOwned)
         {
@@ -474,9 +505,9 @@ public class GarageUIManager : MonoBehaviour
         }
         SaveManager.Instance.SaveGame();
 
+        // Display in CarDisplay.
         if (carDisplay != null)
         {
-            // Ensure CarDisplay supports string carType. If not, map to index via GetCarTypeIndex(currentCarType).
             currentCar = carDisplay.DisplayCar(car, currentCarType, currentCarIndex, false);
             if (currentCar == null)
             {
@@ -486,6 +517,7 @@ public class GarageUIManager : MonoBehaviour
             }
         }
 
+        // Rebind holders/parts for the new car.
         Transform carTransform = currentCar.transform.Find("BODY").transform;
 
         carParts[0] = carTransform.Find("EXHAUSTS").GetComponent<PartHolder>().GetPartArray();

@@ -756,13 +756,49 @@ public class CarDisplay : MonoBehaviour
 
     public void PrepareToReplaceOwnedCarWithLootboxCar()
     {
+        var save = SaveManager.Instance.SaveData;
+
+        // Target the lootbox car's type
+        string targetType = currentCarType;
+
+        // Safety: make sure the player actually owns this type (should be true if we're "maxed")
+        int ownedOfType = save.Cars.Count(kv => kv.Key.CarType == targetType);
+        if (ownedOfType <= 0)
+        {
+            Debug.LogWarning($"PrepareToReplaceOwnedCarWithLootboxCar: Player doesn't own any '{targetType}' yet.");
+            return;
+        }
+
+        // Find the first owned index for this type (normally 0, but this is robust if indices were ever shifted)
+        int firstOwnedIndex = save.Cars
+            .Where(kv => kv.Key.CarType == targetType)
+            .Select(kv => kv.Key.CarIndex)
+            .DefaultIfEmpty(0)
+            .Min();
+
+        // Pin current selection to the (first) 0th index of the lootbox/maxed type
+        save.CurrentCarType = targetType;
+        save.CurrentCarIndex = firstOwnedIndex;
+
+        // Also set "last owned" so ExitToGarage()’s selection logic prefers this pair
+        save.LastOwnedCarType = targetType;
+        save.LastOwnedCarIndex = firstOwnedIndex;
+
+        SaveManager.Instance.SaveGame();
+
+        // Bring up the garage focused on that car and enter replace mode
         ExitToGarage();
 
+        // Swap to the replace button set and constrain nav to this type
         buttonSet1.SetActive(false);
         buttonSet2.SetActive(false);
         buttonSet3.SetActive(true);
 
         garageUIscript.inCarReplaceState = true;
+
+        // Optional immediate feedback: disable left (we're at the first index) and set right based on ownership count
+        if (leftButton != null) leftButton.SetActive(false);
+        if (rightButton != null) rightButton.SetActive(ownedOfType > 1);
     }
 
     // Replace an existing car that the player owns with the randomized lootbox car.
