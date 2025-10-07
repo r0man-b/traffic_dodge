@@ -681,6 +681,8 @@ public class CarDisplay : MonoBehaviour
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
         returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(currentCar.car_name)}</u> for {amount.ToString("N0")} CR.";
+        lockUiElement.SetActive(true);
+        lockImage.SetActive(true);
 
         // Reset the cache now that the transaction is done (optional)
         _cachedLootboxSellPrice = -1;
