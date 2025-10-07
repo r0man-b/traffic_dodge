@@ -601,7 +601,7 @@ public class CarDisplay : MonoBehaviour
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(true);
         addOrSellPopUpText.text =
-            $"Congratulations! You won a <u>{name}</u>. " +
+            $"Congratulations! You won a <u>{TrimLeadingThe(name)}</u>. " +
             $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
         sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice.ToString("N0") } CR";
 
@@ -625,13 +625,13 @@ public class CarDisplay : MonoBehaviour
 
             EnsureLootboxSellPriceCached();
 
-            string displayName = string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name;
+            string displayName = TrimLeadingThe(string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name);
             if (addOrSellPopUpText != null)
             {
                 addOrSellPopUpText.text =
-                    $"You cannot add another <u>{displayName}</u> to your garage. " +
-                    $"You already own the maximum of {maxPerType} for this car type. " +
-                    $"You may sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
+                    $"You already own the maximum number of <u>{displayName}s</u>. " +
+                    $"You can choose to either replace an existing {displayName} with the one you just unlocked, " +
+                    $"or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
             }
             addButton.SetActive(false);
             replaceButton.SetActive(true);
@@ -663,7 +663,7 @@ public class CarDisplay : MonoBehaviour
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
-        returnOrSpinAgainPopUpText.text = $"You have added a <u>{currentCar.car_name}</u> to your garage.";
+        returnOrSpinAgainPopUpText.text = $"You have added a <u>{TrimLeadingThe(currentCar.car_name)}</u> to your garage.";
     }
 
     // Sell randomized lootbox car for credits.
@@ -680,7 +680,7 @@ public class CarDisplay : MonoBehaviour
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
-        returnOrSpinAgainPopUpText.text = $"You sold a <u>{currentCar.car_name}</u> for {amount.ToString("N0")} CR.";
+        returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(currentCar.car_name)}</u> for {amount.ToString("N0")} CR.";
 
         // Reset the cache now that the transaction is done (optional)
         _cachedLootboxSellPrice = -1;
@@ -887,8 +887,11 @@ public class CarDisplay : MonoBehaviour
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
 
-        string awardedName = string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name;
-        returnOrSpinAgainPopUpText.text = $"Replaced your car with a <u>{awardedName}</u>.";
+        string replacedCar = currentCar.car_name + (currentCarIndex > 0 ? " (" + currentCarIndex + ")" : "");
+        returnOrSpinAgainPopUpText.text = $"You have replaced your <u>{TrimLeadingThe(replacedCar)}</u> with your awarded lootbox car!";
+
+        // Display the new replacement car
+        garageUIManager.ChangeCar(0);
 
         // Exit replace state
         garageUIManager.inCarReplaceState = false;
@@ -1253,7 +1256,14 @@ public class CarDisplay : MonoBehaviour
         return null; // Not found
     }
 
-
+    /// <summary>
+    /// Gets rid of a leading "The ". Used for trimming "The " off of The Valen's string display name.
+    /// </summary>
+    private static string TrimLeadingThe(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return s;
+        return s.StartsWith("The ", System.StringComparison.OrdinalIgnoreCase) ? s.Substring(4) : s;
+    }
     /*------------------------------------------------------------------------------------------------*/
     /*--------------------------------------- LOOTBOX HELPERS ----------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
