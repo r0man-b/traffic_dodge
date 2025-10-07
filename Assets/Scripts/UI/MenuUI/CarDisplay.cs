@@ -223,19 +223,26 @@ public class CarDisplay : MonoBehaviour
             carPowerplant.text = currentCar.powerplant;
 
             bool isOwned = saveData.Cars.ContainsKey((currentCarType, currentCarIndex));
-            if (isOwned)
+
+            // Don't display any of the typical car management UI elements (buy,sell,customize)
+            // if the player is currently replacing one of their cars with a lootbox car, as these
+            // UI elements will overlap onto the 'replace' button.
+            if (!garageUIManager.inCarReplaceState)
             {
-                lockUiElement.SetActive(false);
-                lockImage.SetActive(false);
-                buttonSet1.SetActive(false);
-                buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
-            }
-            else
-            {
-                lockUiElement.SetActive(true);
-                lockImage.SetActive(true);
-                buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
-                buttonSet2.SetActive(false);
+                if (isOwned)
+                {
+                    lockUiElement.SetActive(false);
+                    lockImage.SetActive(false);
+                    buttonSet1.SetActive(false);
+                    buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
+                }
+                else
+                {
+                    lockUiElement.SetActive(true);
+                    lockImage.SetActive(true);
+                    buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
+                    buttonSet2.SetActive(false);
+                }
             }
 
             _car.InitializeCar(currentCarType, currentCarIndex, _spawnedModel.transform, isOwned);
@@ -786,15 +793,26 @@ public class CarDisplay : MonoBehaviour
 
         SaveManager.Instance.SaveGame();
 
-        // Bring up the garage focused on that car and enter replace mode
-        ExitToGarage();
+        // Change the car to the index we saved above
+        garageUIscript.ChangeCar(0);
+
+        // Close loot crate UI
+        lootCratePopUps.SetActive(false);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(false);
+
+        // Show the garage, hide the shop
+        if (garageUI != null) garageUI.SetActive(true);
+        if (shopMenu != null) shopMenu.SetActive(false);
 
         // Swap to the replace button set and constrain nav to this type
         buttonSet1.SetActive(false);
         buttonSet2.SetActive(false);
         buttonSet3.SetActive(true);
-
         garageUIscript.inCarReplaceState = true;
+
+        // Re-enable the car name string
+        carName.gameObject.SetActive(true);
 
         // Optional immediate feedback: disable left (we're at the first index) and set right based on ownership count
         if (leftButton != null) leftButton.SetActive(false);
@@ -802,7 +820,7 @@ public class CarDisplay : MonoBehaviour
     }
 
     // Replace an existing car that the player owns with the randomized lootbox car.
-    // Only called if player already has max copies of a certain car type owned.
+    // Called once player hits 'replace' button on car of their choice that they want replaced.
     public void ReplaceOwnedCarWithLootboxCar()
     {
         var save = SaveManager.Instance.SaveData;
@@ -835,12 +853,22 @@ public class CarDisplay : MonoBehaviour
 
         SaveManager.Instance.SaveGame();
 
+        // Disable UI elements that we enabled for replacing cars
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
+        buttonSet3.SetActive(false);
+        carName.gameObject.SetActive(false);
+
+        // Re-enable loot crate popups
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
 
         string awardedName = string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name;
         returnOrSpinAgainPopUpText.text = $"Replaced your car with a <u>{awardedName}</u>.";
+
+        // Get out of the car replace state
+        garageUIManager.inCarReplaceState = false;
     }
 
     // UI flow for re-opening a car lootbox after spin.
@@ -965,6 +993,9 @@ public class CarDisplay : MonoBehaviour
 
         // Re-enable the car name at the bottom of the screen
         carName.gameObject.SetActive(true);
+
+        // Disable 'replace' button
+        buttonSet3.SetActive(false);
     }
 
 
