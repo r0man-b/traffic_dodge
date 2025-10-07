@@ -79,6 +79,8 @@ public class CarDisplay : MonoBehaviour
     private int sellPrice;
     private const string carsOwned = "CARS_OWNED";
     public bool typeNameIndexBuilt = false;
+    private SaveData.CarData _pendingLootboxSnapshot; // parts/colors captured from the lootbox car
+    private string _pendingLootboxType;               // type of the lootbox car (for safety checks)
 
     [Header("Lootbox Spin Parameters")]
     private readonly int spinCount = 100;
@@ -765,6 +767,10 @@ public class CarDisplay : MonoBehaviour
     {
         var save = SaveManager.Instance.SaveData;
 
+        // Snapshot the lootbox car BEFORE leaving this screen ---
+        _pendingLootboxSnapshot = BuildCarDataFromDisplayedModel(); // uses the lootbox _spawnedModel
+        _pendingLootboxType = currentCarType;
+
         // Target the lootbox car's type
         string targetType = currentCarType;
 
@@ -776,24 +782,24 @@ public class CarDisplay : MonoBehaviour
             return;
         }
 
-        // Find the first owned index for this type (normally 0, but this is robust if indices were ever shifted)
+        // Find the first owned index for this type (normally 0, but robust if indices shifted)
         int firstOwnedIndex = save.Cars
             .Where(kv => kv.Key.CarType == targetType)
             .Select(kv => kv.Key.CarIndex)
             .DefaultIfEmpty(0)
             .Min();
 
-        // Pin current selection to the (first) 0th index of the lootbox/maxed type
+        // Pin current selection to index 0 (or first) of this type
         save.CurrentCarType = targetType;
         save.CurrentCarIndex = firstOwnedIndex;
 
-        // Also set "last owned" so ExitToGarage()’s selection logic prefers this pair
+        // Also set "last owned" so ExitToGarage() logic prefers this pair
         save.LastOwnedCarType = targetType;
         save.LastOwnedCarIndex = firstOwnedIndex;
 
         SaveManager.Instance.SaveGame();
 
-        // Change the car to the index we saved above
+        // Jump straight to that car in the garage
         garageUIscript.ChangeCar(0);
 
         // Close loot crate UI
@@ -814,7 +820,7 @@ public class CarDisplay : MonoBehaviour
         // Re-enable the car name string
         carName.gameObject.SetActive(true);
 
-        // Optional immediate feedback: disable left (we're at the first index) and set right based on ownership count
+        // Edge buttons: disable left (we're at first), right only if >1 owned
         if (leftButton != null) leftButton.SetActive(false);
         if (rightButton != null) rightButton.SetActive(ownedOfType > 1);
     }
@@ -825,25 +831,38 @@ public class CarDisplay : MonoBehaviour
     {
         var save = SaveManager.Instance.SaveData;
 
-        if (save == null || currentCar == null || _spawnedModel == null)
+        if (save == null)
         {
-            Debug.LogWarning("ReplaceOwnedCarWithLootboxCar: Missing SaveData or no lootbox car displayed.");
+            Debug.LogWarning("ReplaceOwnedCarWithLootboxCar: SaveData missing.");
+            return;
+        }
+
+        // Must have a captured lootbox snapshot
+        if (_pendingLootboxSnapshot == null)
+        {
+            Debug.LogWarning("ReplaceOwnedCarWithLootboxCar: No lootbox snapshot captured. Aborting replace.");
             return;
         }
 
         string type = currentCarType;
         int index = currentCarIndex;
-        var key = (CarType: type, CarIndex: index);
 
+        // Optional safety: ensure we’re replacing within the same type as the lootbox snapshot
+        if (!string.IsNullOrEmpty(_pendingLootboxType) && !string.Equals(_pendingLootboxType, type))
+        {
+            Debug.LogWarning($"ReplaceOwnedCarWithLootboxCar: Type mismatch. Lootbox='{_pendingLootboxType}', Target='{type}'. Aborting replace.");
+            return;
+        }
+
+        var key = (CarType: type, CarIndex: index);
         if (!save.Cars.ContainsKey(key))
         {
             Debug.LogWarning($"ReplaceOwnedCarWithLootboxCar: No owned car found at ({type}, {index}) to replace.");
             return;
         }
 
-        // Snapshot from the displayed, randomized model
-        SaveData.CarData replacement = BuildCarDataFromDisplayedModel();
-        save.Cars[key] = replacement;
+        // --- IMPORTANT: write the LOOTBOX snapshot, not the currently displayed garage car ---
+        save.Cars[key] = _pendingLootboxSnapshot;
 
         // Update pointers
         save.CurrentCarType = type;
@@ -853,7 +872,11 @@ public class CarDisplay : MonoBehaviour
 
         SaveManager.Instance.SaveGame();
 
-        // Disable UI elements that we enabled for replacing cars
+        // Clear the snapshot now that we've used it
+        _pendingLootboxSnapshot = null;
+        _pendingLootboxType = null;
+
+        // Disable UI elements we enabled for replacing cars
         leftButton.SetActive(false);
         rightButton.SetActive(false);
         buttonSet3.SetActive(false);
@@ -867,7 +890,7 @@ public class CarDisplay : MonoBehaviour
         string awardedName = string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name;
         returnOrSpinAgainPopUpText.text = $"Replaced your car with a <u>{awardedName}</u>.";
 
-        // Get out of the car replace state
+        // Exit replace state
         garageUIManager.inCarReplaceState = false;
     }
 
