@@ -181,7 +181,8 @@ public class ShopMenu : MonoBehaviour
         gameObject.SetActive(false);
         garageUI.SetActive(true);
         carDisplay.gameObject.SetActive(true);
-        carDisplay.RandomizeCar(_currentItem.carTier);
+        if (_currentItem.partsLootCrate) carDisplay.RandomizeParts();
+        else carDisplay.RandomizeCar(_currentItem.carTier);
     }
 
     #region UI Configuration

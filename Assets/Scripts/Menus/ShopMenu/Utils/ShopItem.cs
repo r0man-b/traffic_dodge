@@ -18,6 +18,7 @@ public class ShopItem : MonoBehaviour
     public float priceOfItem;
 
     [Header("Loot Crate Characteristics ONLY")]
+    public bool partsLootCrate;
     public string itemDescription = "";
     [TextArea(1, 21)]
     public string leftDescription = "";

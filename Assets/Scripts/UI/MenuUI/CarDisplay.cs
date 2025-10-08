@@ -489,7 +489,19 @@ public class CarDisplay : MonoBehaviour
 
     public void RandomizeParts()
     {
+        // Set all buttons and widges to be inactive.
+        lockUiElement.SetActive(false);
+        lockImage.SetActive(false);
+        buttonSet1.SetActive(false);
+        buttonSet2.SetActive(false);
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
+        nitroObject.SetActive(false);
+        backButton.SetActive(false);
+        goRaceButton.SetActive(false);
 
+        skipRequested = false;     // reset each run
+        EndSkipListen();           // just to be safe
     }
 
     // Car randomization coroutine.
@@ -507,7 +519,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < spinCount - 3; i++)
+        for (int i = 0; i < spinCount - 4; i++)
         {
             if (skipRequested)
             {
