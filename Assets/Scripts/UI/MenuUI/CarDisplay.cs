@@ -484,7 +484,7 @@ public class CarDisplay : MonoBehaviour
         skipRequested = false;     // reset each run
         EndSkipListen();           // just to be safe
         if (_spinCo != null) StopCoroutine(_spinCo);
-        _spinCo = StartCoroutine(RandomizeRoutine());
+        _spinCo = StartCoroutine(RandomizeCarRoutine());
     }
 
     public void RandomizeParts()
@@ -505,7 +505,7 @@ public class CarDisplay : MonoBehaviour
     }
 
     // Car randomization coroutine.
-    IEnumerator RandomizeRoutine()
+    IEnumerator RandomizeCarRoutine()
     {
         List<float> delays = BuildDelaySchedule();
         float totalDuration = 0f;
