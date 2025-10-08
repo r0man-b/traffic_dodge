@@ -100,6 +100,7 @@ public class CarDisplay : MonoBehaviour
     private float _pressStart = -1f;
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
+    private int _savedCarTier = -1;
 
     /// <summary>
     /// Update function used solely for skipping a lootbox animation.
@@ -464,8 +465,11 @@ public class CarDisplay : MonoBehaviour
     /*------------------------------------------------------------------------------------------------*/
 
     // Start randomize car & spin turntable coroutine for lootboxes.
-    public void RandomizeCar()
+    public void RandomizeCar(int carTier)
     {
+        // Save the car tier we are randomizing, used for determining the weights to use
+        _savedCarTier = carTier;
+
         // Set all buttons and widges to be inactive.
         lockUiElement.SetActive(false);
         lockImage.SetActive(false);
@@ -481,6 +485,11 @@ public class CarDisplay : MonoBehaviour
         EndSkipListen();           // just to be safe
         if (_spinCo != null) StopCoroutine(_spinCo);
         _spinCo = StartCoroutine(RandomizeRoutine());
+    }
+
+    public void RandomizeParts()
+    {
+
     }
 
     // Car randomization coroutine.
@@ -1270,6 +1279,36 @@ public class CarDisplay : MonoBehaviour
     /*--------------------------------------- LOOTBOX HELPERS ----------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
 
+    // Returns a 14-length weight array per tier.
+    // Order MUST match carCollection.carTypes order.
+    private float[] GetTierWeights(int tier)
+    {
+        switch (tier)
+        {
+            case 3: // Tier 3 (all 14 have chances)
+                return new float[]
+                {
+                40f, 20f, 10f,  8f,  6f,  5f,  4f,  3f,  2f,  1f, 0.5f, 0.25f, 0.2f, 0.05f
+                };
+
+            case 2: // Tier 2 (first 4 disabled, then the 10 weights listed)
+                return new float[]
+                {
+                 0f,  0f,  0f,  0f, 30f, 20f, 15f, 12f,  8f,  5f,  4f,   3f,  2f,   1f
+                };
+
+            case 1: // Tier 1 (only last 5 enabled)
+                return new float[]
+                {
+                 0f,  0f,  0f,  0f,  0f,  0f,  0f,  0f,  0f, 32f, 25f,  20f, 15f,   8f
+                };
+
+            default:
+                // All zero => no spawn (caller handles this)
+                return new float[14];
+        }
+    }
+
     /// <summary>
     /// Spawns a random car (by type bucket) using a fixed, skewed weight distribution,
     /// then displays it in "lootbox" mode (randomized parts/colors).
@@ -1280,43 +1319,65 @@ public class CarDisplay : MonoBehaviour
     /// </summary>
     private void SpawnWeightedRandomCar()
     {
-        // Heavier weights make early indices more likely. Order matters.
-        float[] weights = { 40f, 20f, 10f, 8f, 6f, 5f, 4f, 3f, 2f, 1f, 0.5f, 0.25f, 0.2f, 0.05f };
+        // 1) Get weights for the current tier (14 floats; some may be 0f)
+        float[] weights = GetTierWeights(_savedCarTier);
 
-        float total = 0f;                              // Running sum for normalization.
-        float[] cum = new float[weights.Length];       // Cumulative array used for inverse CDF sampling.
-
-        // Build cumulative weights: cum[i] = sum(weights[0..i]).
-        for (int w = 0; w < weights.Length; w++)
+        // 2) Clamp to the actual number of type buckets available
+        int count = Mathf.Min(weights.Length, carCollection?.carTypes?.Count ?? 0);
+        if (count <= 0)
         {
-            total += weights[w];                       // Accumulate total weight.
-            cum[w] = total;                            // Store cumulative sum at this index.
+            Debug.LogWarning("SpawnWeightedRandomCar: No car types available.");
+            return;
         }
 
-        // Sample a bucket index according to weights.
+        // 3) Build cumulative weights (with zero allowed) and compute total
+        float total = 0f;
+        float[] cum = new float[count];
+        for (int i = 0; i < count; i++)
+        {
+            // sanitize: negatives -> 0
+            float w = Mathf.Max(0f, weights[i]);
+            total += w;
+            cum[i] = total;
+        }
+
+        // 4) Guard the “all zero weights” case
+        if (total <= 0f)
+        {
+            Debug.LogWarning("SpawnWeightedRandomCar: All weights are zero for this tier.");
+            return;
+        }
+
+        // 5) Weighted pick of the type index
         int typeIdx = WeightedPick(cum, total);
+        typeIdx = Mathf.Clamp(typeIdx, 0, count - 1);
 
-        // Guard the index against collection bounds (robust to short carTypes lists).
-        typeIdx = Mathf.Clamp(typeIdx, 0, Mathf.Max(0, carCollection.carTypes.Count - 1));
-
-        // Resolve the chosen bucket from the collection.
+        // 6) Resolve bucket and pick a variant (prefer index 99; fallback to first valid)
         var bucket = carCollection.carTypes[typeIdx];
-
-        // Fixed car index within the bucket, per your current design.
-        // NOTE: Ensure that '99' exists in all target buckets, or add bounds checks as needed.
         int carIdx = 99;
+        Car carAsset =
+            (bucket.items != null && carIdx >= 0 && carIdx < bucket.items.Count)
+                ? bucket.items[carIdx] as Car
+                : null;
 
-        // Resolve the Car ScriptableObject at (typeIdx, carIdx).
-        var carAsset = bucket.items[carIdx] as Car;
-        if (carAsset != null)
+        if (carAsset == null)
         {
-            // Use car_name if set, otherwise fallback to the underlying object name.
-            string displayType = string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name;
-
-            // Display in lootbox mode (true), which randomizes and places using local offsets.
-            DisplayCar(carAsset, displayType, carIdx, true);
+            // Fallback: first Car in bucket
+            for (int i = 0; i < bucket.items.Count; i++)
+            {
+                carAsset = bucket.items[i] as Car;
+                if (carAsset != null) { carIdx = i; break; }
+            }
         }
-        // else: if null, the bucket did not contain a Car at index 99; consider adding a guard if needed.
+
+        if (carAsset == null)
+        {
+            Debug.LogWarning($"SpawnWeightedRandomCar: No Car asset found in bucket index {typeIdx}.");
+            return;
+        }
+
+        string displayType = string.IsNullOrWhiteSpace(carAsset.car_name) ? carAsset.name : carAsset.car_name;
+        DisplayCar(carAsset, displayType, carIdx, true);
     }
 
     /// <summary>

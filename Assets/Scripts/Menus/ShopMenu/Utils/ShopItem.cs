@@ -19,9 +19,13 @@ public class ShopItem : MonoBehaviour
 
     [Header("Loot Crate Characteristics ONLY")]
     public string itemDescription = "";
+    [TextArea(1, 21)]
     public string leftDescription = "";
+    [TextArea(1, 21)]
     public string rightDescription = "";
     public Texture2D crateTexture;
+    [Header("CAR Loot Crate Characteristics ONLY")]
+    public int carTier;
 
     [Header("UI References")]
     public TextMeshProUGUI quantityText;
