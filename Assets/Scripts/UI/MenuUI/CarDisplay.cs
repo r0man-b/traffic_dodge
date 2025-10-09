@@ -86,9 +86,12 @@ public class CarDisplay : MonoBehaviour
     private string _pendingLootboxType;               // type of the lootbox car (for safety checks)
 
     [Header("Lootbox Spin Parameters")]
-    private readonly int spinCount = 100;
-    private readonly float startDelay = 0.2f;   // fast at start
-    private readonly float endDelay = 0.8228f;   // slow at end
+    private readonly int carSpinCount = 100;
+    private readonly int partSpinCount = 50;
+    private readonly float carStartDelay = 0.2f;   // fast at start
+    private readonly float carEndDelay = 0.8228f;   // slow at end
+    private readonly float partStartDelay = 0.4f;   // fast at start
+    private readonly float partEndDelay = 0.8228f;   // slow at end
     private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
     Coroutine _spinCo;
@@ -98,6 +101,8 @@ public class CarDisplay : MonoBehaviour
     private float tapMaxDuration = 0.175f; // How long user has to hold tap until lootbox spin is skipped
     private Coroutine _turntableCo;
     private Quaternion _turntableStartRot;
+    private Coroutine _partsTurntableCo;
+    private Quaternion _partsTurntableStartRot;
     private bool skipRequested;
     private Coroutine _partsSpinCo;
     private bool _listenForSkip;
@@ -527,7 +532,7 @@ public class CarDisplay : MonoBehaviour
     // Car randomization coroutine.
     IEnumerator RandomizeCarRoutine()
     {
-        List<float> delays = BuildDelaySchedule();
+        List<float> delays = BuildDelaySchedule(carSpinCount, carStartDelay, carEndDelay);
         float totalDuration = 0f;
         for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
 
@@ -539,7 +544,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < spinCount - 4; i++)
+        for (int i = 0; i < carSpinCount - 4; i++)
         {
             if (skipRequested)
             {
@@ -589,7 +594,7 @@ public class CarDisplay : MonoBehaviour
     {
         // Build a progressive delay schedule using your existing parameters.
         // You can shorten if desired; here we reuse the full spinCount for consistency.
-        List<float> delays = BuildDelaySchedule();
+        List<float> delays = BuildDelaySchedule(partSpinCount, partStartDelay, partEndDelay);
 
         // Use the explicitly assigned EMPTY_PART_HOLDER (separate scene object)
         if (emptyPartHolder == null)
@@ -617,6 +622,13 @@ public class CarDisplay : MonoBehaviour
             yield break;
         }
 
+        float totalDuration = 0f;
+        for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
+
+        _partsTurntableStartRot = emptyPartHolder.rotation;
+        if (_partsTurntableCo != null) StopCoroutine(_partsTurntableCo);
+        _partsTurntableCo = StartCoroutine(SpinEmptyPartsHolder(totalDuration));
+
         // Begin listening for a quick tap to skip
         BeginSkipListen();
 
@@ -639,7 +651,7 @@ public class CarDisplay : MonoBehaviour
                 // Update UI text with the current part's name
                 var parts = holder.GetPartArray();
                 if (parts != null && partIdx >= 0 && partIdx < parts.Length && parts[partIdx] != null)
-                    carName.text = parts[partIdx].name;
+                    carName.text = parts[partIdx].name; // Set the car display string to the name of the displayed part
             }
 
             yield return new WaitForSecondsRealtime(delays[i]);
@@ -649,7 +661,7 @@ public class CarDisplay : MonoBehaviour
         var finalHolder = candidates[Random.Range(0, candidates.Count)];
         if (TryRandomIndex(finalHolder, out int finalPartIdx))
             ActivateSwitch(finalHolder, finalPartIdx, ref prevHolder, ref prevIndex);
-
+        carName.text = finalHolder.GetPartArray()[finalPartIdx].name; // Set the car display string to the name of the displayed part
 
         // Stop listening for skip taps
         EndSkipListen();
@@ -705,6 +717,42 @@ public class CarDisplay : MonoBehaviour
 
         // Ensure perfect final alignment
         target.rotation = startWorldRot;
+    }
+
+    // Parts spin coroutine.
+    private IEnumerator SpinEmptyPartsHolder(float totalDuration)
+    {
+        if (emptyPartHolder == null || totalDuration <= 0f) yield break;
+
+        Quaternion startWorldRot = emptyPartHolder.rotation;
+        float elapsed = 0f;
+
+        while (elapsed < totalDuration)
+        {
+            float dt = Time.unscaledDeltaTime;
+            elapsed += dt;
+
+            float u = Mathf.Clamp01(elapsed / totalDuration);
+            float uBias = Mathf.Pow(u, slowDownBias);
+            float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias);
+
+            emptyPartHolder.Rotate(Vector3.up, omega * dt, Space.World);
+            yield return null;
+        }
+
+        // Ease back to exact start
+        const float returnDuration = 0.35f;
+        float t = 0f;
+        Quaternion from = emptyPartHolder.rotation;
+        while (t < returnDuration)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 3f);
+            emptyPartHolder.rotation = Quaternion.Slerp(from, startWorldRot, k);
+            yield return null;
+        }
+
+        emptyPartHolder.rotation = startWorldRot;
     }
 
     // Post spin UI.
@@ -1528,7 +1576,7 @@ public class CarDisplay : MonoBehaviour
     /// starting faster and slowing toward the end using a power (slowDownBias) easing.
     /// The length equals 'spinCount'.
     /// </summary>
-    private List<float> BuildDelaySchedule()
+    private List<float> BuildDelaySchedule(int spinCount, float startDelay, float endDelay)
     {
         var delays = new List<float>(spinCount);       // Pre-size list to avoid reallocations.
 
