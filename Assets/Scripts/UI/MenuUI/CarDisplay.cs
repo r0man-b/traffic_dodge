@@ -61,11 +61,14 @@ public class CarDisplay : MonoBehaviour
     public GameObject backButton;
     public GameObject goRaceButton;
     public GameObject shopMenu;
-    public ShopMenu shopMenuScript; // Need to also call the ResetUI() function in the shop menu script
     public GameObject mainMenuUI;
     public GameObject topLevelMainMenuButtons;
     public GameObject garageUI;
+
+    [Header("External Scripts")]
+    public ShopMenu shopMenuScript; // Need to also call the ResetUI() function in the shop menu script
     public GarageUIManager garageUIscript; // Need to also call the ChangeCar() function in the garage menu script
+    public GarageCamera garageCamera;
 
     [Header("Sound")]
     public MenuSounds menuSounds;
@@ -96,11 +99,15 @@ public class CarDisplay : MonoBehaviour
     private Coroutine _turntableCo;
     private Quaternion _turntableStartRot;
     private bool skipRequested;
+    private Coroutine _partsSpinCo;
     private bool _listenForSkip;
     private float _pressStart = -1f;
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
     private int _savedCarTier = -1;
+
+    [Header("Randomize Parts")]
+    [SerializeField] private Transform emptyPartHolder; // assign the EMPTY_PART_HOLDER in Inspector
 
     /// <summary>
     /// Update function used solely for skipping a lootbox animation.
@@ -461,7 +468,7 @@ public class CarDisplay : MonoBehaviour
 
 
     /*------------------------------------------------------------------------------------------------*/
-    /*----------------------------------- CAR LOOTBOX FUNCTIONS --------------------------------------*/
+    /*------------------------------------- LOOTBOX FUNCTIONS ----------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/
 
     // Start randomize car & spin turntable coroutine for lootboxes.
@@ -487,9 +494,10 @@ public class CarDisplay : MonoBehaviour
         _spinCo = StartCoroutine(RandomizeCarRoutine());
     }
 
+    // Start to randomize parts & begin parts randomization coroutine
     public void RandomizeParts()
     {
-        // Set all buttons and widges to be inactive.
+        // Disable/clear UI like your existing version
         lockUiElement.SetActive(false);
         lockImage.SetActive(false);
         buttonSet1.SetActive(false);
@@ -500,8 +508,20 @@ public class CarDisplay : MonoBehaviour
         backButton.SetActive(false);
         goRaceButton.SetActive(false);
 
-        skipRequested = false;     // reset each run
-        EndSkipListen();           // just to be safe
+        // Deactivate currently displayed car while parts randomization occurs.
+        if (_spawnedModel != null)
+            _spawnedModel.SetActive(false);
+
+        // Prepare skip state shared with Update()
+        skipRequested = false;
+        EndSkipListen();
+
+        // Zoom garage camera in on the randomized parts
+        garageCamera.SetCameraForPartsRandomization();
+
+        // Start the randomization loop for parts
+        if (_partsSpinCo != null) StopCoroutine(_partsSpinCo);
+        _partsSpinCo = StartCoroutine(RandomizePartsRoutine());
     }
 
     // Car randomization coroutine.
@@ -562,6 +582,82 @@ public class CarDisplay : MonoBehaviour
         EndSkipListen();       // <-- stop listening
         _spinCo = null;
         HandlePostSpin();
+    }
+
+    // --- The parts randomization loop (progressively slows; supports quick-tap skip) ---
+    private IEnumerator RandomizePartsRoutine()
+    {
+        // Build a progressive delay schedule using your existing parameters.
+        // You can shorten if desired; here we reuse the full spinCount for consistency.
+        List<float> delays = BuildDelaySchedule();
+
+        // Use the explicitly assigned EMPTY_PART_HOLDER (separate scene object)
+        if (emptyPartHolder == null)
+        {
+            Debug.LogWarning("RandomizePartsRoutine: 'emptyPartHolder' is not assigned in the inspector.");
+            yield break;
+        }
+
+        var candidates = new List<PartHolder>(6);
+
+        // Expected children on EMPTY_PART_HOLDER: EXHAUSTS, FRONT_SPLITTERS, REAR_SPLITTERS, SIDESKIRTS, SPOILERS, WHEELS
+        PartHolder H(string child) => emptyPartHolder.Find(child)?.GetComponent<PartHolder>();
+        var names = new[] { "EXHAUSTS", "FRONT_SPLITTERS", "REAR_SPLITTERS", "SIDESKIRTS", "SPOILERS", "WHEELS" };
+
+        foreach (var n in names)
+        {
+            var h = H(n);
+            if (h != null && h.GetPartArray() != null && h.GetPartArray().Length > 0)
+                candidates.Add(h);
+        }
+
+        if (candidates.Count == 0)
+        {
+            Debug.LogWarning("RandomizePartsRoutine: No valid PartHolders found under the assigned EMPTY_PART_HOLDER.");
+            yield break;
+        }
+
+        // Begin listening for a quick tap to skip
+        BeginSkipListen();
+
+        // Single global "last activated" across all holders
+        PartHolder prevHolder = null;
+        int prevIndex = -1;
+
+        int limit = Mathf.Max(0, delays.Count - 3);
+        for (int i = 0; i < limit; i++)
+        {
+            if (skipRequested)
+                break;
+
+            // Pick a random holder and part
+            var holder = candidates[Random.Range(0, candidates.Count)];
+            if (TryRandomIndex(holder, out int partIdx))
+            {
+                ActivateSwitch(holder, partIdx, ref prevHolder, ref prevIndex);
+
+                // Update UI text with the current part's name
+                var parts = holder.GetPartArray();
+                if (parts != null && partIdx >= 0 && partIdx < parts.Length && parts[partIdx] != null)
+                    carName.text = parts[partIdx].name;
+            }
+
+            yield return new WaitForSecondsRealtime(delays[i]);
+        }
+
+        // Final pick (whether skipped or not)
+        var finalHolder = candidates[Random.Range(0, candidates.Count)];
+        if (TryRandomIndex(finalHolder, out int finalPartIdx))
+            ActivateSwitch(finalHolder, finalPartIdx, ref prevHolder, ref prevIndex);
+
+
+        // Stop listening for skip taps
+        EndSkipListen();
+        _partsSpinCo = null;
+
+        // Finalization: per requirement, do nothing else here.
+        // (No physical spin or extra UI. Hook future effects here if needed.)
+        yield break;
     }
 
     // Turntable spin coroutine.
@@ -1287,6 +1383,41 @@ public class CarDisplay : MonoBehaviour
         if (string.IsNullOrWhiteSpace(s)) return s;
         return s.StartsWith("The ", System.StringComparison.OrdinalIgnoreCase) ? s.Substring(4) : s;
     }
+
+    private static void ActivateSwitch(PartHolder newHolder, int newIndex, ref PartHolder prevHolder, ref int prevIndex)
+    {
+        if (newHolder == null) return;
+
+        var newParts = newHolder.GetPartArray();
+        if (newParts == null || newParts.Length == 0) return;
+
+        // Deactivate the previously activated part (even if from a different holder)
+        if (prevHolder != null && prevIndex >= 0)
+        {
+            var prevParts = prevHolder.GetPartArray();
+            if (prevParts != null && prevIndex < prevParts.Length && prevParts[prevIndex] != null)
+                prevParts[prevIndex].gameObject.SetActive(false);
+        }
+
+        // Activate the new one
+        if (newIndex >= 0 && newIndex < newParts.Length && newParts[newIndex] != null)
+            newParts[newIndex].gameObject.SetActive(true);
+
+        // Update the global previous pointer
+        prevHolder = newHolder;
+        prevIndex = newIndex;
+    }
+
+    private static bool TryRandomIndex(PartHolder holder, out int idx)
+    {
+        idx = -1;
+        if (holder == null) return false;
+        var parts = holder.GetPartArray();
+        if (parts == null || parts.Length == 0) return false;
+        idx = Random.Range(0, parts.Length);
+        return true;
+    }
+
     /*------------------------------------------------------------------------------------------------*/
     /*--------------------------------------- LOOTBOX HELPERS ----------------------------------------*/
     /*------------------------------------------------------------------------------------------------*/

@@ -11,120 +11,137 @@ public class GarageCamera : MonoBehaviour
     private bool ignoreTouch = false;
     public float screenRatioToIgnore;
 
+    // Lock camera to a fixed distance until released
+    [SerializeField] private bool lockToDistance = false;
+    private float lockedDistance = 0f;
+
     // Start is called before the first frame update
 
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetAxis("Mouse ScrollWheel") > 0f) // forward
+        // ----- Zoom (mouse wheel) -----
+        if (!lockToDistance)
         {
-            distanceToTarget -= 100 * Time.deltaTime;
+            if (Input.GetAxis("Mouse ScrollWheel") > 0f) distanceToTarget -= 100f * Time.deltaTime;
+            if (Input.GetAxis("Mouse ScrollWheel") < 0f) distanceToTarget += 100f * Time.deltaTime;
+            distanceToTarget = Mathf.Clamp(distanceToTarget, 2.7f, 7f);
         }
-        if (Input.GetAxis("Mouse ScrollWheel") < 0f) // backwards
+        else
         {
-            distanceToTarget += 100 * Time.deltaTime;
+            // Force distance to the locked value when locked
+            distanceToTarget = lockedDistance;
         }
-        distanceToTarget = Mathf.Clamp(distanceToTarget, 2.7f, 7f); //i limited the zoom and zoomout distance inside (12,25).
 
-        // Pinch to Zoom
-        if (Input.touchCount == 2)
+        // ----- Pinch to zoom -----
+        if (!lockToDistance && Input.touchCount == 2)
         {
             Touch touch0 = Input.GetTouch(0);
             Touch touch1 = Input.GetTouch(1);
 
-            // Calculate the distance between the two touches in the current and previous frames
             float pinchDistance = Vector2.Distance(touch0.position, touch1.position);
-            float previousPinchDistance = Vector2.Distance(touch0.position - touch0.deltaPosition, touch1.position - touch1.deltaPosition);
-
-            // Find out how much distance they moved compared to the last frame
+            float previousPinchDistance = Vector2.Distance(touch0.position - touch0.deltaPosition,
+                                                          touch1.position - touch1.deltaPosition);
             float deltaDistance = pinchDistance - previousPinchDistance;
 
-            // Modify the camera's distance based on the change in the distance between touches
-            distanceToTarget -= deltaDistance * Time.deltaTime / 5;
-
-            // Ensure the distance stays within the desired limits
+            distanceToTarget -= deltaDistance * Time.deltaTime / 5f;
             distanceToTarget = Mathf.Clamp(distanceToTarget, 2.7f, 7f);
+
             cam.transform.position = target.position;
-            cam.transform.Translate(new Vector3(0, 0, -distanceToTarget));
+            cam.transform.Translate(new Vector3(0f, 0f, -distanceToTarget));
+            return; // Two-finger pinch consumes the frame
         }
 
-        else
+        // ----- Pointer down: capture start for orbit; still allowed when locked -----
+        if (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began))
         {
-            if (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began))
+            if (Input.touchCount > 0)
             {
-                if (Input.touchCount > 0)
-                {
-                    if (Input.GetTouch(0).position.y <= Screen.height / screenRatioToIgnore)
-                    {
-                        // Ignore the touch if it originated in the bottom 1/8th of the screen
-                        ignoreTouch = true;
-                    }
-                    else
-                    {
-                        // Proceed with camera movement logic
-                        ignoreTouch = false;
-                        previousPosition = cam.ScreenToViewportPoint(Input.GetTouch(0).position);
-                    }
-                }
+                if (Input.GetTouch(0).position.y <= Screen.height / screenRatioToIgnore)
+                    ignoreTouch = true;
                 else
                 {
-                    if (Input.mousePosition.y <= Screen.height / screenRatioToIgnore)
-                    {
-                        // Ignore the touch if it originated in the bottom 1/8th of the screen
-                        ignoreTouch = true;
-                    }
-                    else
-                    {
-                        // Proceed with camera movement logic
-                        // Your existing code to handle the start of a touch or mouse click
-                        ignoreTouch = false;
-                        previousPosition = cam.ScreenToViewportPoint(Input.mousePosition);
-                    }
+                    ignoreTouch = false;
+                    previousPosition = cam.ScreenToViewportPoint(Input.GetTouch(0).position);
                 }
-            }
-
-            else if ((Input.GetMouseButton(0) && !ignoreTouch) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Moved && !ignoreTouch))
-            {
-                Vector3 direction;
-                Vector3 newPosition;
-                if (Input.touchCount > 0)
-                {
-                    direction = previousPosition - cam.ScreenToViewportPoint(Input.GetTouch(0).position);
-                    newPosition = cam.ScreenToViewportPoint(Input.GetTouch(0).position);
-                }
-                else
-                {
-                    direction = previousPosition - cam.ScreenToViewportPoint(Input.mousePosition);
-                    newPosition = cam.ScreenToViewportPoint(Input.mousePosition);
-                }
-                if (Input.touchCount == 1 || Input.GetMouseButton(0))
-                    direction.Scale(new Vector3(-360, 90, 0)); // x is half, y is double of the original scale
-                else
-                    direction.Scale(new Vector3(0, 0, 0)); // x is half, y is double of the original scale
-                                                           //i limited the angles between  10<angle<90 degree in the x direction that means vertical movement
-                var desiredQ = Quaternion.Euler(Mathf.Clamp(cam.transform.eulerAngles.x + direction.y, 0, 35),
-                                                cam.transform.eulerAngles.y + direction.x, 0);
-                //let assume movementspeed= 30.0f;
-                cam.transform.rotation = Quaternion.Lerp(cam.transform.rotation, desiredQ, Time.deltaTime * 1200.0f);
-                cam.transform.position = target.position;
-                cam.transform.Translate(new Vector3(0, 0, -distanceToTarget));
-
-                float clampedY = Mathf.Clamp(cam.transform.position.y, 0, 4f);
-                cam.transform.position = new Vector3(cam.transform.position.x, clampedY, cam.transform.position.z);
-
-                previousPosition = newPosition;
-            }
-            else if (Input.GetMouseButtonUp(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Ended))
-            {
-                // Reset the ignore flag when the touch or click ends
-                ignoreTouch = false;
             }
             else
             {
-                cam.transform.position = target.position;
-                cam.transform.Translate(new Vector3(0, 0, -distanceToTarget));
+                if (Input.mousePosition.y <= Screen.height / screenRatioToIgnore)
+                    ignoreTouch = true;
+                else
+                {
+                    ignoreTouch = false;
+                    previousPosition = cam.ScreenToViewportPoint(Input.mousePosition);
+                }
             }
         }
+        // ----- Orbit drag (enabled regardless of lock) -----
+        else if ((Input.GetMouseButton(0) && !ignoreTouch) ||
+                 (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Moved && !ignoreTouch))
+        {
+            Vector3 direction;
+            Vector3 newPosition;
+            if (Input.touchCount > 0)
+            {
+                direction = previousPosition - cam.ScreenToViewportPoint(Input.GetTouch(0).position);
+                newPosition = cam.ScreenToViewportPoint(Input.GetTouch(0).position);
+            }
+            else
+            {
+                direction = previousPosition - cam.ScreenToViewportPoint(Input.mousePosition);
+                newPosition = cam.ScreenToViewportPoint(Input.mousePosition);
+            }
+
+            if (Input.touchCount == 1 || Input.GetMouseButton(0))
+                direction.Scale(new Vector3(-360f, 90f, 0f));
+            else
+                direction.Scale(new Vector3(0f, 0f, 0f));
+
+            var desiredQ = Quaternion.Euler(
+                Mathf.Clamp(cam.transform.eulerAngles.x + direction.y, 0f, 35f),
+                cam.transform.eulerAngles.y + direction.x,
+                0f);
+
+            cam.transform.rotation = Quaternion.Lerp(cam.transform.rotation, desiredQ, Time.deltaTime * 1200f);
+            cam.transform.position = target.position;
+            cam.transform.Translate(new Vector3(0f, 0f, -distanceToTarget));
+
+            if (!lockToDistance)
+            {
+                float clampedY = Mathf.Clamp(cam.transform.position.y, 0f, 4f);
+                cam.transform.position = new Vector3(cam.transform.position.x, clampedY, cam.transform.position.z);
+            }
+
+            previousPosition = newPosition;
+            return; // Consumed this frame
+        }
+        else if (Input.GetMouseButtonUp(0) ||
+                 (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Ended))
+        {
+            ignoreTouch = false;
+        }
+
+        // ----- Final placement (also preserves exact distance when locked) -----
+        cam.transform.position = target.position;
+        cam.transform.Translate(new Vector3(0f, 0f, -distanceToTarget));
+
+        if (!lockToDistance)
+        {
+            float y = Mathf.Clamp(cam.transform.position.y, 0f, 4f);
+            cam.transform.position = new Vector3(cam.transform.position.x, y, cam.transform.position.z);
+        }
+    }
+
+    public void LockDistanceToCurrent()
+    {
+        lockToDistance = true;
+        lockedDistance = distanceToTarget; // lock whatever was set by SetCameraForPartsRandomization()
+    }
+
+    public void UnlockDistance()
+    {
+        lockToDistance = false;
     }
 
     public void SetCameraPosition(int preset)
@@ -183,5 +200,17 @@ public class GarageCamera : MonoBehaviour
 
         cam.transform.SetPositionAndRotation(newPos, newRot);
         distanceToTarget = Vector3.Distance(target.position, newPos);
+    }
+
+    public void SetCameraForPartsRandomization()
+    {
+        Vector3 newPos = new Vector3(-1.15999997f, 0.699999988f, 1.5f);
+        Quaternion newRot = new Quaternion(0.0460329987f, 0.931142509f, -0.126474619f, 0.338908195f);
+
+        cam.transform.SetPositionAndRotation(newPos, newRot);
+
+        // Capture the distance from target for locking
+        distanceToTarget = Vector3.Distance(target.position, newPos);
+        LockDistanceToCurrent();
     }
 }
