@@ -51,6 +51,7 @@ public class CarDisplay : MonoBehaviour
     public GameObject addOrSellPopUp;
     public TextMeshProUGUI addOrSellPopUpText;
     public GameObject addButton;
+    public GameObject partAddButton;
     public GameObject replaceButton;
     public TextMeshProUGUI sellButtonText;
     public GameObject returnOrSpinAgainPopUp;
@@ -110,6 +111,11 @@ public class CarDisplay : MonoBehaviour
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
     private int _savedCarTier = -1;
+    // Parts lootbox selection cache
+    private CarPart _lastSelectedPart;
+    private string _lastSelectedPartType;
+    private string _partName;
+    private bool _partsRandomized = false; // State flag to determine if we have opened a car or parts lootbox
 
     [Header("Randomize Parts")]
     [SerializeField] private Transform emptyPartHolder; // assign the EMPTY_PART_HOLDER in Inspector
@@ -517,6 +523,10 @@ public class CarDisplay : MonoBehaviour
         if (_spawnedModel != null)
             _spawnedModel.SetActive(false);
 
+        // Reset the cached parts
+        _lastSelectedPart = null;
+        _lastSelectedPartType = null;
+
         // Prepare skip state shared with Update()
         skipRequested = false;
         EndSkipListen();
@@ -527,6 +537,9 @@ public class CarDisplay : MonoBehaviour
         // Start the randomization loop for parts
         if (_partsSpinCo != null) StopCoroutine(_partsSpinCo);
         _partsSpinCo = StartCoroutine(RandomizePartsRoutine());
+
+        // Set the parts randomized flag to true, will be used for UI flow later
+        _partsRandomized = true;
     }
 
     // Car randomization coroutine.
@@ -660,12 +673,28 @@ public class CarDisplay : MonoBehaviour
         // Final pick (whether skipped or not)
         var finalHolder = candidates[Random.Range(0, candidates.Count)];
         if (TryRandomIndex(finalHolder, out int finalPartIdx))
+        {
             ActivateSwitch(finalHolder, finalPartIdx, ref prevHolder, ref prevIndex);
-        carName.text = finalHolder.GetPartArray()[finalPartIdx].name; // Set the car display string to the name of the displayed part
+
+            // --- cache for popup ---
+            var finalPartsArray = finalHolder.GetPartArray();
+            if (finalPartsArray != null && finalPartIdx >= 0 && finalPartIdx < finalPartsArray.Length)
+            {
+                _lastSelectedPart = finalPartsArray[finalPartIdx];
+                _lastSelectedPartType = finalHolder != null ? finalHolder.name : null;
+            }
+            // update name text
+            carName.text = finalPartsArray != null && finalPartsArray[finalPartIdx] != null
+                ? finalPartsArray[finalPartIdx].name
+                : carName.text;
+        }
 
         // Stop listening for skip taps
         EndSkipListen();
         _partsSpinCo = null;
+
+        // Post spin UI
+        HandlePostSpin();
 
         // Finalization: per requirement, do nothing else here.
         // (No physical spin or extra UI. Hook future effects here if needed.)
@@ -758,17 +787,40 @@ public class CarDisplay : MonoBehaviour
     // Post spin UI.
     private void HandlePostSpin()
     {
-        // Compute & cache the sell price from the currently displayed (randomized) car
-        _cachedLootboxSellPrice = ComputeLootboxSellPrice();
-        string name = currentCar != null ? currentCar.car_name : "car";
+        if (_partsRandomized) // UI flow for parts lootbox
+        {
+            // Disable default add button for cars & enable add button for parts
+            addButton.SetActive(false);
+            partAddButton.SetActive(true);
 
-        // Activate post-spin UI popups
-        lootCratePopUps.SetActive(true);
-        addOrSellPopUp.SetActive(true);
-        addOrSellPopUpText.text =
-            $"Congratulations! You won a <u>{TrimLeadingThe(name)}</u>. " +
-            $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
-        sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice.ToString("N0") } CR";
+            // Defensive defaults
+            _partName = _lastSelectedPart != null ? _lastSelectedPart.name : "Part";
+            string partType = PrettyPartType(_lastSelectedPartType);
+            _cachedLootboxSellPrice = _lastSelectedPart != null ? ((int)_lastSelectedPart.price) / 4 : 0;
+
+            lootCratePopUps.SetActive(true);
+            addOrSellPopUp.SetActive(true);
+
+            addOrSellPopUpText.text =
+                $"Congratulations! You won a <u>{TrimLeadingThe(_partName)}</u> {partType}. " +
+                $"You can now choose to add it to one of your owned cars or sell it for {_cachedLootboxSellPrice:N0} CR.";
+        
+            sellButtonText.text = $"SELL FOR {_cachedLootboxSellPrice:N0} CR";
+        }
+        else // UI flow for cars lootbox
+        {
+            // Compute & cache the sell price from the currently displayed (randomized) car
+            _cachedLootboxSellPrice = ComputeLootboxSellPrice();
+            string name = currentCar != null ? currentCar.car_name : "car";
+
+            // Activate post-spin UI popups
+            lootCratePopUps.SetActive(true);
+            addOrSellPopUp.SetActive(true);
+            addOrSellPopUpText.text =
+                $"Congratulations! You won a <u>{TrimLeadingThe(name)}</u>. " +
+                $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice:N0} CR.";
+            sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice:N0} CR";
+        }
 
         // Deactivate car name string
         carName.gameObject.SetActive(false);
@@ -831,8 +883,8 @@ public class CarDisplay : MonoBehaviour
         returnOrSpinAgainPopUpText.text = $"You have added a <u>{TrimLeadingThe(currentCar.car_name)}</u> to your garage.";
     }
 
-    // Sell randomized lootbox car for credits.
-    public void SellLootboxCarForCredits()
+    // Sell randomized lootbox car or part for credits.
+    public void SellLootboxItemForCredits()
     {
         int amount = (_cachedLootboxSellPrice >= 0) ? _cachedLootboxSellPrice : ComputeLootboxSellPrice();
 
@@ -845,7 +897,8 @@ public class CarDisplay : MonoBehaviour
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
-        returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(currentCar.car_name)}</u> for {amount.ToString("N0")} CR.";
+        if (_partsRandomized) returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(_partName)}</u> for {amount:N0} CR.";
+        else returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(currentCar.car_name)}</u> for {amount:N0} CR.";
         lockUiElement.SetActive(true);
         lockImage.SetActive(true);
 
@@ -990,6 +1043,11 @@ public class CarDisplay : MonoBehaviour
         // Edge buttons: disable left (we're at first), right only if >1 owned
         if (leftButton != null) leftButton.SetActive(false);
         if (rightButton != null) rightButton.SetActive(ownedOfType > 1);
+    }
+
+    public void PrepareToAddPartToOwnedCar()
+    {
+
     }
 
     // Replace an existing car that the player owns with the randomized lootbox car.
@@ -1177,6 +1235,7 @@ public class CarDisplay : MonoBehaviour
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(false);
         addButton.SetActive(true);
+        partAddButton.SetActive(false);
         replaceButton.SetActive(false);
 
         // Re-enable UI elements that were disabled during lootcrate spin
@@ -1189,6 +1248,12 @@ public class CarDisplay : MonoBehaviour
 
         // Disable 'replace' button
         buttonSet3.SetActive(false);
+
+        // Unlock garage camera in case we opened a part lootbox
+        garageCamera.UnlockDistance();
+
+        // Reset state variables
+        _partsRandomized = false;
     }
 
 
@@ -1613,6 +1678,24 @@ public class CarDisplay : MonoBehaviour
 
         // Fallback: due to floating-point edge cases, return the last index.
         return cumulative.Length - 1;
+    }
+
+    /// <summary>
+    /// Translates internal customization part type names to readable strings
+    /// </summary>
+    private static string PrettyPartType(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "Part";
+        switch (raw.ToUpperInvariant())
+        {
+            case "EXHAUSTS": return "Exhaust";
+            case "FRONT_SPLITTERS": return "Front Splitter";
+            case "REAR_SPLITTERS": return "Rear Splitter";
+            case "SIDESKIRTS": return "Side Skirt";
+            case "SPOILERS": return "Spoiler";
+            case "WHEELS": return "Wheels";
+            default: return raw; // fallback to transform name
+        }
     }
 
     /// <summary>
