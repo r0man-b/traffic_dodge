@@ -1249,11 +1249,46 @@ public class CarDisplay : MonoBehaviour
         // Disable 'replace' button
         buttonSet3.SetActive(false);
 
-        // Unlock garage camera in case we opened a part lootbox
+        // Reset garage camera
         garageCamera.UnlockDistance();
+        garageCamera.SetCameraPosition(0); // Default garage camera position
 
         // Reset state variables
         _partsRandomized = false;
+
+        // Turn off the last spawned customization part (from parts lootbox), if present
+        if (_lastSelectedPart != null && emptyPartHolder != null && !string.IsNullOrEmpty(_lastSelectedPartType))
+        {
+            // Try to find the exact PartHolder by its transform name under EMPTY_PART_HOLDER
+            var holderTf = emptyPartHolder.Find(_lastSelectedPartType);
+            var holder = holderTf ? holderTf.GetComponent<PartHolder>() : null;
+
+            if (holder != null)
+            {
+                var parts = holder.GetPartArray();
+                if (parts != null)
+                {
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        if (parts[i] == _lastSelectedPart && parts[i] != null)
+                        {
+                            parts[i].gameObject.SetActive(false); // disable the last shown part
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Fallback: if we couldn't resolve the holder, just deactivate the cached instance
+                _lastSelectedPart.gameObject.SetActive(false);
+            }
+        }
+
+        // Clear part selection cache
+        _lastSelectedPart = null;
+        _lastSelectedPartType = null;
+        _partName = null;
     }
 
 
