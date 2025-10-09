@@ -92,7 +92,7 @@ public class CarDisplay : MonoBehaviour
     private readonly float carStartDelay = 0.2f;   // fast at start
     private readonly float carEndDelay = 0.8228f;   // slow at end
     private readonly float partStartDelay = 0.4f;   // fast at start
-    private readonly float partEndDelay = 0.8228f;   // slow at end
+    private readonly float partEndDelay = 1f;   // slow at end
     private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
     Coroutine _spinCo;
