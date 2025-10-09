@@ -204,8 +204,8 @@ public class GarageCamera : MonoBehaviour
 
     public void SetCameraForPartsRandomization()
     {
-        Vector3 newPos = new Vector3(-1.15999997f, 0.699999988f, 1.5f);
-        Quaternion newRot = new Quaternion(0.0460329987f, 0.931142509f, -0.126474619f, 0.338908195f);
+        Vector3 newPos = new Vector3(-1.03999996f, 0.730000019f, 0.850000024f);
+        Quaternion newRot = new Quaternion(0.0803543329f, 0.893745065f, -0.177798718f, 0.403919041f);
 
         cam.transform.SetPositionAndRotation(newPos, newRot);
 
