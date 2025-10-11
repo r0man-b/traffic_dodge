@@ -742,54 +742,61 @@ public class CarDisplay : MonoBehaviour
         HandlePostSpin();
     }
 
-    // Turntable spin coroutine.
+    // Turntable spin coroutine for cars
     IEnumerator SpinTurntable(float totalDuration)
     {
-        // Spin the container (falls back to carHolder if not set)
         var target = carHolder;
         if (target == null || totalDuration <= 0f) yield break;
 
-        // Remember the exact starting WORLD rotation so we can return to it smoothly.
+        // Capture the exact starting WORLD rotation so we can return to it
         Quaternion startWorldRot = target.rotation;
 
         float elapsed = 0f;
         while (elapsed < totalDuration)
         {
+            // If the player skips during the coast, snap to final and finish
+            if (skipRequested)
+            {
+                target.rotation = startWorldRot;
+                yield break;
+            }
+
             float dt = Time.unscaledDeltaTime;
             elapsed += dt;
 
-            // 0..1 time, eased with the same slowDownBias as your car picks
             float u = Mathf.Clamp01(elapsed / totalDuration);
             float uBias = Mathf.Pow(u, slowDownBias);
-
-            // Decaying angular speed (deg/sec)
             float omega = Mathf.Lerp(spinMaxSpeed, spinMinSpeed, uBias);
 
-            // Rotate around WORLD up so it’s always a horizontal spin
+            // Rotate around world up so it always feels like a horizontal spin
             target.Rotate(Vector3.up, omega * dt, Space.World);
             yield return null;
         }
 
-        // --- Smoothly return to the exact starting rotation ---
-        const float returnDuration = 0.35f;  // tweak to taste
+        // Smooth ease back to the exact start rotation
+        const float returnDuration = 0.35f;
         float t = 0f;
         Quaternion from = target.rotation;
 
         while (t < returnDuration)
         {
+            // Honor a late skip here too
+            if (skipRequested)
+            {
+                target.rotation = startWorldRot;
+                yield break;
+            }
+
             t += Time.unscaledDeltaTime;
-            float k = t / returnDuration;
-            // Ease-out (cubic): fast -> slow
-            k = 1f - Mathf.Pow(1f - Mathf.Clamp01(k), 3f);
+            float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 3f); // ease-out cubic
             target.rotation = Quaternion.Slerp(from, startWorldRot, k);
             yield return null;
         }
 
-        // Ensure perfect final alignment
         target.rotation = startWorldRot;
     }
 
-    // Parts spin coroutine.
+    // Parts spin coroutine
     private IEnumerator SpinEmptyPartsHolder(float totalDuration)
     {
         if (emptyPartHolder == null || totalDuration <= 0f) yield break;
@@ -799,6 +806,13 @@ public class CarDisplay : MonoBehaviour
 
         while (elapsed < totalDuration)
         {
+            // If the player skips during the coast, snap to final and finish
+            if (skipRequested)
+            {
+                emptyPartHolder.rotation = startWorldRot;
+                yield break;
+            }
+
             float dt = Time.unscaledDeltaTime;
             elapsed += dt;
 
@@ -810,14 +824,22 @@ public class CarDisplay : MonoBehaviour
             yield return null;
         }
 
-        // Ease back to exact start
+        // Smooth ease back to the exact start rotation
         const float returnDuration = 0.35f;
         float t = 0f;
         Quaternion from = emptyPartHolder.rotation;
+
         while (t < returnDuration)
         {
+            // Honor a late skip here too
+            if (skipRequested)
+            {
+                emptyPartHolder.rotation = startWorldRot;
+                yield break;
+            }
+
             t += Time.unscaledDeltaTime;
-            float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 3f);
+            float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 3f); // ease-out cubic
             emptyPartHolder.rotation = Quaternion.Slerp(from, startWorldRot, k);
             yield return null;
         }
