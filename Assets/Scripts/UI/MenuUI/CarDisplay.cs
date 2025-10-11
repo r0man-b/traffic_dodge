@@ -241,6 +241,11 @@ public class CarDisplay : MonoBehaviour
                 currentCar.turntablePositon.z
             );
             _spawnedModel.transform.localRotation = Quaternion.identity;
+
+            // Update performance stats
+            UpdateStats(_car.accelMaxValue, _car.accelIncreaseRate, _car.numlives);
+            carPrice.text = currentCar.price.ToString("N0") + " cr";
+            carPowerplant.text = currentCar.powerplant;
         }
         else
         {

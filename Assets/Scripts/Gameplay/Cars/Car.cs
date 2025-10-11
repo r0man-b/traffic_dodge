@@ -1107,6 +1107,9 @@ public class Car : ScriptableObject
             carData.CarParts[8].CurrentInstalledPart = randomEngineIndex;
             carData.CarParts[8].Ownership[randomEngineIndex] = true;
         }
+        var engineParts = engineHolder.GetPartArray();
+        if (engineParts != null && randomEngineIndex >= 0 && randomEngineIndex < engineParts.Length && engineParts[randomEngineIndex] != null)
+            accelMaxValue = defaultAccelMaxValue * engineParts[randomEngineIndex].accelMaxValueUpgrade;
 
         // Randomize the transmission.
         PartHolder transmissionHolder = carTransform.Find("PERFORMANCE_PARTS/TRANSMISSION").GetComponent<PartHolder>();
@@ -1121,6 +1124,9 @@ public class Car : ScriptableObject
             carData.CarParts[9].CurrentInstalledPart = randomTransmissionIndex;
             carData.CarParts[9].Ownership[randomTransmissionIndex] = true;
         }
+        var transParts = transmissionHolder.GetPartArray();
+        if (transParts != null && randomTransmissionIndex >= 0 && randomTransmissionIndex < transParts.Length && transParts[randomTransmissionIndex] != null)
+            accelIncreaseRate = defaultAccelIncreaseRate * transParts[randomTransmissionIndex].accelIncreaseRateUpgrade;
 
         // Randomize the lives.
         PartHolder livesHolder = carTransform.Find("PERFORMANCE_PARTS/LIVES").GetComponent<PartHolder>();
@@ -1135,6 +1141,9 @@ public class Car : ScriptableObject
             carData.CarParts[10].CurrentInstalledPart = randomLivesIndex;
             carData.CarParts[10].Ownership[randomLivesIndex] = true;
         }
+        var livesParts = livesHolder.GetPartArray();
+        if (livesParts != null && randomLivesIndex >= 0 && randomLivesIndex < livesParts.Length && livesParts[randomLivesIndex] != null)
+            numlives = livesParts[randomLivesIndex].maxLives;
 
         // Randomize the decals.
         PartHolder decalsHolder = carTransform.Find("DECALS").GetComponent<PartHolder>();
