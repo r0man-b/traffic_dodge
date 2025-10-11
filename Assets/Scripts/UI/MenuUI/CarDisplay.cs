@@ -94,7 +94,7 @@ public class CarDisplay : MonoBehaviour
     private readonly float carStartDelay = 0.2f;   // fast at start
     private readonly float carEndDelay = 0.8228f;   // slow at end
     private readonly float partStartDelay = 0.4f;   // fast at start
-    private readonly float partEndDelay = 1f;   // slow at end
+    private readonly float partEndDelay = 0.945f;   // slow at end
     private readonly float slowDownBias = 2f;
     public CarCollection carCollection;
     Coroutine _spinCo;
@@ -612,11 +612,8 @@ public class CarDisplay : MonoBehaviour
     // --- The parts randomization loop (progressively slows; supports quick-tap skip) ---
     private IEnumerator RandomizePartsRoutine()
     {
-        // Build a progressive delay schedule using your existing parameters.
-        // You can shorten if desired; here we reuse the full spinCount for consistency.
         List<float> delays = BuildDelaySchedule(partSpinCount, partStartDelay, partEndDelay);
 
-        // Use the explicitly assigned EMPTY_PART_HOLDER (separate scene object)
         if (emptyPartHolder == null)
         {
             Debug.LogWarning("RandomizePartsRoutine: 'emptyPartHolder' is not assigned in the inspector.");
@@ -624,8 +621,6 @@ public class CarDisplay : MonoBehaviour
         }
 
         var candidates = new List<PartHolder>(6);
-
-        // Expected children on EMPTY_PART_HOLDER: EXHAUSTS, FRONT_SPLITTERS, REAR_SPLITTERS, SIDESKIRTS, SPOILERS, WHEELS
         PartHolder H(string child) => emptyPartHolder.Find(child)?.GetComponent<PartHolder>();
         var names = new[] { "EXHAUSTS", "FRONT_SPLITTERS", "REAR_SPLITTERS", "SIDESKIRTS", "SPOILERS", "WHEELS" };
 
@@ -635,10 +630,9 @@ public class CarDisplay : MonoBehaviour
             if (h != null && h.GetPartArray() != null && h.GetPartArray().Length > 0)
                 candidates.Add(h);
         }
-
         if (candidates.Count == 0)
         {
-            Debug.LogWarning("RandomizePartsRoutine: No valid PartHolders found under the assigned EMPTY_PART_HOLDER.");
+            Debug.LogWarning("RandomizePartsRoutine: No valid PartHolders found under EMPTY_PART_HOLDER.");
             yield break;
         }
 
@@ -649,63 +643,103 @@ public class CarDisplay : MonoBehaviour
         if (_partsTurntableCo != null) StopCoroutine(_partsTurntableCo);
         _partsTurntableCo = StartCoroutine(SpinEmptyPartsHolder(totalDuration));
 
-        // Begin listening for a quick tap to skip
         BeginSkipListen();
 
-        // Single global "last activated" across all holders
+        // Track last pick to prevent consecutive duplicates
         PartHolder prevHolder = null;
         int prevIndex = -1;
 
+        // Helper: pick a (holder, idx) not equal to the previous (when possible)
+        bool PickNonRepeating(out PartHolder holder, out int idx)
+        {
+            holder = null; idx = -1;
+            // Try up to N times to avoid repeating the exact same (holder,idx)
+            const int attempts = 10;
+            for (int a = 0; a < attempts; a++)
+            {
+                var h = candidates[Random.Range(0, candidates.Count)];
+                if (!TryRandomIndex(h, out int pi)) continue;
+
+                if (!(h == prevHolder && pi == prevIndex) || (h.GetPartArray()?.Length ?? 0) <= 1)
+                {
+                    holder = h;
+                    idx = pi;
+                    return true;
+                }
+            }
+            // Fallback (accept whatever)
+            var hFallback = candidates[Random.Range(0, candidates.Count)];
+            if (TryRandomIndex(hFallback, out int piFallback))
+            {
+                holder = hFallback;
+                idx = piFallback;
+                return true;
+            }
+            return false;
+        }
+
+        bool earlySkip = false;
         int limit = Mathf.Max(0, delays.Count - 3);
+
         for (int i = 0; i < limit; i++)
         {
             if (skipRequested)
+            {
+                earlySkip = true;
                 break;
+            }
 
-            // Pick a random holder and part
-            var holder = candidates[Random.Range(0, candidates.Count)];
-            if (TryRandomIndex(holder, out int partIdx))
+            if (PickNonRepeating(out var holder, out int partIdx))
             {
                 ActivateSwitch(holder, partIdx, ref prevHolder, ref prevIndex);
 
-                // Update UI text with the current part's name
                 var parts = holder.GetPartArray();
                 if (parts != null && partIdx >= 0 && partIdx < parts.Length && parts[partIdx] != null)
-                    carName.text = parts[partIdx].name; // Set the car display string to the name of the displayed part
+                    carName.text = parts[partIdx].name;
             }
 
             yield return new WaitForSecondsRealtime(delays[i]);
         }
 
-        // Final pick (whether skipped or not)
-        var finalHolder = candidates[Random.Range(0, candidates.Count)];
-        if (TryRandomIndex(finalHolder, out int finalPartIdx))
+        // Final pick (also non-repeating)
+        if (PickNonRepeating(out var finalHolder, out int finalPartIdx))
         {
             ActivateSwitch(finalHolder, finalPartIdx, ref prevHolder, ref prevIndex);
 
-            // --- cache for popup ---
             var finalPartsArray = finalHolder.GetPartArray();
             if (finalPartsArray != null && finalPartIdx >= 0 && finalPartIdx < finalPartsArray.Length)
             {
                 _lastSelectedPart = finalPartsArray[finalPartIdx];
                 _lastSelectedPartType = finalHolder != null ? finalHolder.name : null;
             }
-            // update name text
             carName.text = finalPartsArray != null && finalPartsArray[finalPartIdx] != null
                 ? finalPartsArray[finalPartIdx].name
                 : carName.text;
         }
 
-        // Stop listening for skip taps
+        // === Skip handling & "only show popup after spin stops" ===
+        if (earlySkip)
+        {
+            // Stop rotation and snap back immediately
+            if (_partsTurntableCo != null)
+            {
+                StopCoroutine(_partsTurntableCo);
+                _partsTurntableCo = null;
+            }
+            emptyPartHolder.rotation = _partsTurntableStartRot;
+        }
+        else
+        {
+            // Wait until the spin coroutine finishes before showing UI
+            if (_partsTurntableCo != null)
+                yield return _partsTurntableCo;
+        }
+
         EndSkipListen();
         _partsSpinCo = null;
 
-        // Post spin UI
+        // Now that the spin has definitively stopped, show the popup
         HandlePostSpin();
-
-        // Finalization: per requirement, do nothing else here.
-        // (No physical spin or extra UI. Hook future effects here if needed.)
-        yield break;
     }
 
     // Turntable spin coroutine.
@@ -1109,6 +1143,8 @@ public class CarDisplay : MonoBehaviour
         }
 
         // --- Close lootbox UI, open the garage UI ---
+        // Hide the floating displayed lootbox part so it doesn't clip with the car in garage
+        HideDisplayedAwardedPart();
 
         // Hide loot crate popups
         if (lootCratePopUps != null) lootCratePopUps.SetActive(false);
@@ -1835,6 +1871,36 @@ public class CarDisplay : MonoBehaviour
         return null; // Not found
     }
 
+    private void HideDisplayedAwardedPart()
+    {
+        if (_lastSelectedPart == null || emptyPartHolder == null || string.IsNullOrEmpty(_lastSelectedPartType))
+            return;
+
+        var holderTf = emptyPartHolder.Find(_lastSelectedPartType);
+        var holder = holderTf ? holderTf.GetComponent<PartHolder>() : null;
+
+        if (holder != null)
+        {
+            var parts = holder.GetPartArray();
+            if (parts != null)
+            {
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    if (parts[i] == _lastSelectedPart && parts[i] != null)
+                    {
+                        parts[i].gameObject.SetActive(false);
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Fallback if holder couldn’t be resolved
+            _lastSelectedPart.gameObject.SetActive(false);
+        }
+    }
+
     /// <summary>
     /// Gets rid of a leading "The ". Used for trimming "The " off of The Valen's string display name.
     /// </summary>
@@ -2052,7 +2118,7 @@ public class CarDisplay : MonoBehaviour
             case "EXHAUSTS": return "Exhaust";
             case "FRONT_SPLITTERS": return "Front Splitter";
             case "REAR_SPLITTERS": return "Rear Splitter";
-            case "SIDESKIRTS": return "Side Skirt";
+            case "SIDESKIRTS": return "Side Skirts";
             case "SPOILERS": return "Spoiler";
             case "WHEELS": return "Wheels";
             default: return raw; // fallback to transform name
