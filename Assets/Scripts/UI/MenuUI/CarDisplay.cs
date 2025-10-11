@@ -1102,6 +1102,16 @@ public class CarDisplay : MonoBehaviour
         if (buttonSet2 != null) buttonSet2.SetActive(false);
         if (buttonSet3 != null) buttonSet3.SetActive(false);
 
+        // >>> SHOW ONLY the Add Part button set <<<
+        if (buttonSet4 != null)
+        {
+            buttonSet4.SetActive(true);
+
+            // Disable the button if part is not applicable to the currently displayed car
+            var addBtn = buttonSet4.GetComponentInChildren<Button>(true);
+            if (addBtn != null) addBtn.interactable = IsAwardedPartApplicableToCurrentCar();
+        }
+
         // Lock image/text start hidden; we’ll show them if current car can’t use the part.
         if (lockImage != null) lockImage.SetActive(false);
         if (unapplicableTextObject != null) unapplicableTextObject.SetActive(false);
@@ -1209,7 +1219,149 @@ public class CarDisplay : MonoBehaviour
 
     public void AddPartToOwnedCar()
     {
+        // Must have a selected part and type, and be applicable
+        if (_lastSelectedPart == null || string.IsNullOrEmpty(_lastSelectedPartType))
+        {
+            Debug.LogWarning("AddPartToOwnedCar: No awarded part cached.");
+            return;
+        }
+        if (!IsAwardedPartApplicableToCurrentCar())
+        {
+            Debug.LogWarning("AddPartToOwnedCar: Current car is incompatible with the awarded part.");
+            return;
+        }
 
+        var save = SaveManager.Instance.SaveData;
+        var key = (CarType: currentCarType, CarIndex: currentCarIndex);
+
+        if (!save.Cars.TryGetValue(key, out var carData))
+        {
+            Debug.LogWarning($"AddPartToOwnedCar: No owned SaveData at ({currentCarType},{currentCarIndex}).");
+            return;
+        }
+
+        // Resolve model/holders
+        if (_spawnedModel == null)
+        {
+            Debug.LogWarning("AddPartToOwnedCar: No spawned model to resolve holders.");
+            return;
+        }
+        var root = _spawnedModel.transform;
+        var body = root.Find("BODY");
+        if (body == null)
+        {
+            Debug.LogWarning("AddPartToOwnedCar: BODY transform not found.");
+            return;
+        }
+
+        // Helper: find index of a part by name within a holder
+        int FindIndexByName(PartHolder holder, string partName)
+        {
+            if (holder == null || string.IsNullOrEmpty(partName)) return -1;
+            var arr = holder.GetPartArray();
+            if (arr == null) return -1;
+            for (int i = 0; i < arr.Length; i++)
+                if (arr[i] != null && arr[i].name == partName) return i;
+            return -1;
+        }
+
+        // Helper: activate exactly one index in a holder (preview already did this, but ensure consistency)
+        void ActivateOnly(PartHolder holder, int idx)
+        {
+            if (holder == null) return;
+            var arr = holder.GetPartArray();
+            if (arr == null) return;
+            for (int i = 0; i < arr.Length; i++)
+                if (arr[i] != null) arr[i].gameObject.SetActive(i == idx);
+        }
+
+        // Map type → holder(s) + save slot(s)
+        string type = _lastSelectedPartType.ToUpperInvariant();
+        string partName = _lastSelectedPart.name;
+
+        bool success = false;
+
+        switch (type)
+        {
+            case "WHEELS":
+                {
+                    var frontH = root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>();
+                    var rearH = root.Find("REAR_WHEELS")?.GetComponent<PartHolder>();
+
+                    int fIdx = FindIndexByName(frontH, partName);
+                    int rIdx = FindIndexByName(rearH, partName);
+
+                    if (fIdx >= 0)
+                    {
+                        ActivateOnly(frontH, fIdx);
+                        carData.CarParts[2].CurrentInstalledPart = fIdx; // FRONT_WHEELS slot
+                        carData.CarParts[2].Ownership[fIdx] = true;
+                        success = true;
+                    }
+                    if (rIdx >= 0)
+                    {
+                        ActivateOnly(rearH, rIdx);
+                        carData.CarParts[4].CurrentInstalledPart = rIdx; // REAR_WHEELS slot
+                        carData.CarParts[4].Ownership[rIdx] = true;
+                        success = true;
+                    }
+                    break;
+                }
+
+            case "EXHAUSTS":
+            case "FRONT_SPLITTERS":
+            case "REAR_SPLITTERS":
+            case "SIDESKIRTS":
+            case "SPOILERS":
+                {
+                    // Holder lives under BODY with the same name
+                    var holder = body.Find(type)?.GetComponent<PartHolder>();
+                    int idx = FindIndexByName(holder, partName);
+                    if (idx < 0) break;
+
+                    ActivateOnly(holder, idx);
+
+                    int slot = type switch
+                    {
+                        "EXHAUSTS" => 0,
+                        "FRONT_SPLITTERS" => 1,
+                        "REAR_SPLITTERS" => 3,
+                        "SIDESKIRTS" => 5,
+                        "SPOILERS" => 6,
+                        _ => -1
+                    };
+                    if (slot >= 0)
+                    {
+                        carData.CarParts[slot].CurrentInstalledPart = idx;
+                        carData.CarParts[slot].Ownership[idx] = true;
+                        success = true;
+                    }
+                    break;
+                }
+
+            default:
+                Debug.LogWarning($"AddPartToOwnedCar: Unsupported part type '{_lastSelectedPartType}'.");
+                break;
+        }
+
+        if (!success)
+        {
+            Debug.LogWarning("AddPartToOwnedCar: Failed to install awarded part (index not found in holder?).");
+            return;
+        }
+
+        // Persist
+        SaveManager.Instance.SaveGame();
+
+        // Feedback & UI polish
+        if (menuSounds != null) menuSounds.PlayAirWrenchSound();
+
+        // Disable the Add Part button now that it's installed
+        if (buttonSet4 != null)
+        {
+            var addBtn = buttonSet4.GetComponentInChildren<Button>(true);
+            if (addBtn != null) addBtn.interactable = false;
+        }
     }
 
     // UI flow for re-opening a car lootbox after spin.
@@ -1846,10 +1998,17 @@ public class CarDisplay : MonoBehaviour
     {
         bool applicable = IsAwardedPartApplicableToCurrentCar();
 
-        // If the part CANNOT be applied to the current car, show lock + text.
+        // lock+text
         lockImage.SetActive(!applicable);
         if (unapplicableTextObject != null)
             unapplicableTextObject.SetActive(!applicable);
+
+        // >>> While in the apply flow, enable/disable the Add Part button
+        if (garageUIscript != null && garageUIscript.inPartApplyState && buttonSet4 != null)
+        {
+            var addBtn = buttonSet4.GetComponentInChildren<Button>(true);
+            if (addBtn != null) addBtn.interactable = applicable;
+        }
     }
 
     // True if the currently-awarded part exists in the shown car's relevant PartHolder(s).
