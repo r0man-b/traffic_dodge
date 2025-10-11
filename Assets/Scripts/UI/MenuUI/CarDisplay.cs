@@ -29,9 +29,10 @@ public class CarDisplay : MonoBehaviour
     public GameObject lockImage;
 
     [Header("Bottom UI Button Sets")]
-    public GameObject buttonSet1;
-    public GameObject buttonSet2;
-    public GameObject buttonSet3;
+    public GameObject buttonSet1; // Buy button only
+    public GameObject buttonSet2; // Buy/customize/sell
+    public GameObject buttonSet3; // Button replace (for lootbox cars only)
+    public GameObject buttonSet4; // Button add part (for lootbox parts only)
     public GameObject leftButton;
     public GameObject rightButton;
 
@@ -1204,6 +1205,11 @@ public class CarDisplay : MonoBehaviour
 
         // Exit replace state
         garageUIManager.inCarReplaceState = false;
+    }
+
+    public void AddPartToOwnedCar()
+    {
+
     }
 
     // UI flow for re-opening a car lootbox after spin.
