@@ -252,7 +252,7 @@ public class CarDisplay : MonoBehaviour
             // Don't display any of the typical car management UI elements (buy,sell,customize)
             // if the player is currently replacing one of their cars with a lootbox car, as these
             // UI elements will overlap onto the 'replace' button.
-            if (!garageUIManager.inCarReplaceState)
+            if (!garageUIManager.inCarReplaceState && !garageUIManager.inPartApplyState)
             {
                 if (isOwned)
                 {
