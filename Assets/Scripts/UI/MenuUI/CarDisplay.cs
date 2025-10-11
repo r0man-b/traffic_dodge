@@ -120,6 +120,9 @@ public class CarDisplay : MonoBehaviour
     [Header("Randomize Parts")]
     [SerializeField] private Transform emptyPartHolder; // assign the EMPTY_PART_HOLDER in Inspector
 
+    [Header("Part Apply UI")]
+    [SerializeField] private GameObject unapplicableTextObject; // shown when the awarded part can't be used on the shown car
+
     /// <summary>
     /// Update function used solely for skipping a lootbox animation.
     /// </summary>
@@ -1047,7 +1050,84 @@ public class CarDisplay : MonoBehaviour
 
     public void PrepareToAddPartToOwnedCar()
     {
+        // Must have a selected part from the parts lootbox flow.
+        if (_lastSelectedPart == null || string.IsNullOrEmpty(_lastSelectedPartType))
+        {
+            Debug.LogWarning("PrepareToAddPartToOwnedCar: No awarded part cached. Did you open a parts lootbox?");
+            return;
+        }
 
+        var save = SaveManager.Instance.SaveData;
+        if (save == null || save.Cars == null || save.Cars.Count == 0)
+        {
+            Debug.LogWarning("PrepareToAddPartToOwnedCar: Player has no owned cars to apply to.");
+            return;
+        }
+
+        // --- Close lootbox UI, open the garage UI ---
+
+        // Hide loot crate popups
+        if (lootCratePopUps != null) lootCratePopUps.SetActive(false);
+        if (addOrSellPopUp != null) addOrSellPopUp.SetActive(false);
+        if (returnOrSpinAgainPopUp != null) returnOrSpinAgainPopUp.SetActive(false);
+
+        // Show garage, hide shop
+        if (garageUI != null) garageUI.SetActive(true);
+        if (shopMenu != null) shopMenu.SetActive(false);
+
+        // Enable browse buttons
+        if (leftButton != null) leftButton.SetActive(true);
+        if (rightButton != null) rightButton.SetActive(true);
+
+        // Turn on the name label at the bottom
+        if (carName != null) carName.gameObject.SetActive(true);
+
+        // We are NOT replacing a car.
+        if (garageUIscript != null)
+        {
+            garageUIscript.inCarReplaceState = false;   // ensure replace mode is off
+                                                        // Flag a special “apply part” browse mode (skip unowned cars across ALL types).
+            garageUIscript.inPartApplyState = true;     // <-- add this bool to GarageUIManager
+            garageUIscript.ownedOnlyBrowse = true;      // <-- add this bool to GarageUIManager
+        }
+
+        // Default UI: hide buy/sell/customize sets (we’re in a selection flow)
+        if (buttonSet1 != null) buttonSet1.SetActive(false);
+        if (buttonSet2 != null) buttonSet2.SetActive(false);
+        if (buttonSet3 != null) buttonSet3.SetActive(false);
+
+        // Lock image/text start hidden; we’ll show them if current car can’t use the part.
+        if (lockImage != null) lockImage.SetActive(false);
+        if (unapplicableTextObject != null) unapplicableTextObject.SetActive(false);
+
+        // Pick a sane starting car: use last owned if valid, else first owned entry.
+        string startType = save.LastOwnedCarType;
+        int startIdx = save.LastOwnedCarIndex;
+        if (!save.Cars.ContainsKey((startType, startIdx)))
+        {
+            var first = save.Cars.Keys.First();
+            startType = first.CarType;
+            startIdx = first.CarIndex;
+        }
+
+        save.CurrentCarType = startType;
+        save.CurrentCarIndex = startIdx;
+        SaveManager.Instance.SaveGame();
+
+        // Move camera to a good preset for the awarded part type.
+        if (garageCamera != null)
+        {
+            // Lock distance while targeting parts view
+            garageCamera.UnlockDistance(); // if you want free orbit, keep; else add a LockDistance() if you have one
+            garageCamera.SetCameraPosition(PartTypeToCameraPreset(_lastSelectedPartType));
+        }
+
+        // Show current selection in the garage, then check applicability for this car.
+        if (garageUIscript != null)
+        {
+            garageUIscript.ChangeCar(0); // refresh current car display
+        }
+        RefreshPartApplicabilityUI();
     }
 
     // Replace an existing car that the player owns with the randomized lootbox car.
@@ -1731,6 +1811,77 @@ public class CarDisplay : MonoBehaviour
             case "WHEELS": return "Wheels";
             default: return raw; // fallback to transform name
         }
+    }
+
+    // Maps the awarded part type (holder name) to a GarageCamera preset.
+    private int PartTypeToCameraPreset(string partType)
+    {
+        if (string.IsNullOrEmpty(partType)) return 0; // DEFAULT
+
+        switch (partType.ToUpperInvariant())
+        {
+            case "EXHAUSTS": return 1;
+            case "FRONT_SPLITTERS": return 2;
+            case "WHEELS": return 3; // Use FRONT WHEELS preset for wheels viewing
+            case "REAR_SPLITTERS": return 4;
+            case "SIDESKIRTS": return 6;
+            case "SPOILERS": return 7;
+            case "SUSPENSIONS": return 8;
+            default: return 0;
+        }
+    }
+
+    // Re-check whether the awarded part can be applied to the currently displayed car and update the lock/unapplicable UI.
+    private void RefreshPartApplicabilityUI()
+    {
+        bool applicable = IsAwardedPartApplicableToCurrentCar();
+
+        // If the part CANNOT be applied to the current car, show lock + text.
+        lockImage.SetActive(!applicable);
+        if (unapplicableTextObject != null)
+            unapplicableTextObject.SetActive(!applicable);
+    }
+
+    // True if the currently-awarded part exists in the shown car's relevant PartHolder(s).
+    private bool IsAwardedPartApplicableToCurrentCar()
+    {
+        if (_lastSelectedPart == null || string.IsNullOrEmpty(_lastSelectedPartType) || currentCar == null)
+            return false;
+
+        string awardedName = _lastSelectedPart.name;
+        var root = _spawnedModel.transform;
+        if (root == null) return false;
+
+        // BODY node for most holders
+        var body = root.Find("BODY");
+        if (body == null) return false;
+
+        // Wheels are special: they’re at root as FRONT_WHEELS / REAR_WHEELS, not under BODY.
+        if (string.Equals(_lastSelectedPartType, "WHEELS", System.StringComparison.OrdinalIgnoreCase))
+        {
+            bool inFront = HolderHasPartByName(root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>(), awardedName);
+            bool inRear = HolderHasPartByName(root.Find("REAR_WHEELS")?.GetComponent<PartHolder>(), awardedName);
+            return inFront || inRear;
+        }
+        else
+        {
+            // Most cosmetic holders are under BODY with the same name as the type.
+            var holder = body.Find(_lastSelectedPartType)?.GetComponent<PartHolder>();
+            return HolderHasPartByName(holder, awardedName);
+        }
+    }
+
+    private static bool HolderHasPartByName(PartHolder holder, string partName)
+    {
+        if (holder == null || string.IsNullOrEmpty(partName)) return false;
+        var arr = holder.GetPartArray();
+        if (arr == null || arr.Length == 0) return false;
+        for (int i = 0; i < arr.Length; i++)
+        {
+            if (arr[i] != null && string.Equals(arr[i].name, partName, System.StringComparison.Ordinal))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
