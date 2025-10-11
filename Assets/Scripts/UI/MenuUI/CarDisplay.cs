@@ -808,10 +808,14 @@ public class CarDisplay : MonoBehaviour
             lootCratePopUps.SetActive(true);
             addOrSellPopUp.SetActive(true);
 
+            string prettyPartType = PrettyPartType(_lastSelectedPartType);
+            string article = ArticleForPart(_lastSelectedPartType);
+            string themLower = PronounForPart_Lower(_lastSelectedPartType);
+
             addOrSellPopUpText.text =
-                $"Congratulations! You won a <u>{TrimLeadingThe(_partName)}</u> {partType}. " +
-                $"You can now choose to add it to one of your owned cars or sell it for {_cachedLootboxSellPrice:N0} CR.";
-        
+                $"Congratulations! You won {article} <u>{TrimLeadingThe(_partName)}</u> {prettyPartType}. " +
+                $"You can now choose to add {themLower} to one of your owned cars or sell {themLower} for {_cachedLootboxSellPrice:N0} CR.";
+
             sellButtonText.text = $"SELL FOR {_cachedLootboxSellPrice:N0} CR";
         }
         else // UI flow for cars lootbox
@@ -904,7 +908,11 @@ public class CarDisplay : MonoBehaviour
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
-        if (_partsRandomized) returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(_partName)}</u> for {amount:N0} CR.";
+        if (_partsRandomized)
+        {
+            string article = ArticleForPart(_lastSelectedPartType);
+            returnOrSpinAgainPopUpText.text = $"You sold {article} <u>{TrimLeadingThe(_partName)}</u> for {amount:N0} CR.";
+        }
         else returnOrSpinAgainPopUpText.text = $"You sold a <u>{TrimLeadingThe(currentCar.car_name)}</u> for {amount:N0} CR.";
         lockUiElement.SetActive(true);
         lockImage.SetActive(true);
@@ -1403,8 +1411,10 @@ public class CarDisplay : MonoBehaviour
             ? currentCar.car_name + (currentCarIndex > 0 ? $" ({currentCarIndex})" : "")
             : "car";
 
+        string prettyType = PrettyPartType(_lastSelectedPartType);
+        string article = ArticleForPart(_lastSelectedPartType);
         returnOrSpinAgainPopUpText.text =
-            $"You installed a <u>{TrimLeadingThe(partName)}</u> on your {TrimLeadingThe(carLabel)}.";
+            $"You installed {article} <u>{TrimLeadingThe(partName)}</u> {prettyType} on your {TrimLeadingThe(carLabel)}.";
 
         // Reset state vars
         garageUIscript.inPartApplyState = false;
@@ -1833,6 +1843,20 @@ public class CarDisplay : MonoBehaviour
         if (string.IsNullOrWhiteSpace(s)) return s;
         return s.StartsWith("The ", System.StringComparison.OrdinalIgnoreCase) ? s.Substring(4) : s;
     }
+
+    private static bool UsesPluralArticle(string partTypeRaw)
+    {
+        if (string.IsNullOrEmpty(partTypeRaw)) return false;
+        string t = partTypeRaw.ToUpperInvariant();
+        return t == "WHEELS" || t == "SIDESKIRTS";
+    }
+
+    private static string ArticleForPart(string partTypeRaw) =>
+        UsesPluralArticle(partTypeRaw) ? "some" : "a";
+    private static string PronounForPart_Lower(string partTypeRaw) =>
+        UsesPluralArticle(partTypeRaw) ? "them" : "it";
+    private static string PronounForPart_Capital(string partTypeRaw) =>
+        UsesPluralArticle(partTypeRaw) ? "Them" : "It";
 
     private static void ActivateSwitch(PartHolder newHolder, int newIndex, ref PartHolder prevHolder, ref int prevIndex)
     {
