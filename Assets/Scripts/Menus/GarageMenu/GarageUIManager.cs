@@ -40,8 +40,11 @@ public class GarageUIManager : MonoBehaviour
     // show a “cannot apply” message if the shown car lacks the part slot/variant.
     public bool inPartApplyState = false;
     public bool ownedOnlyBrowse = false;
-
     public bool inCarReplaceState = false;
+    // Guards for recursive owned-only navigation
+    private int _ownedNavDepth = 0;
+    private const int OWNED_NAV_LIMIT = 512;
+
 
     [Space(10)]
     [Header("UI Popups for buying items")]
@@ -422,6 +425,16 @@ public class GarageUIManager : MonoBehaviour
     /*------------------------------------- GARAGE UI FUNCTIONS -------------------------------------*/
     public void ChangeCar(int change)
     {
+        // Recursion guard (owned-only navigation can call back into ChangeCar)
+        bool rootCall = (_ownedNavDepth == 0);
+        _ownedNavDepth++;
+        if (_ownedNavDepth > OWNED_NAV_LIMIT)
+        {
+            _ownedNavDepth = 0;
+            Debug.LogWarning("ChangeCar: owned-only recursion limit reached. Aborting navigation.");
+            return;
+        }
+
         // Ensure CarDisplay's name→index map exists (needed by DisplayCar() path).
         if (carDisplay.typeNameIndexBuilt == false)
         {
@@ -473,67 +486,41 @@ public class GarageUIManager : MonoBehaviour
             // --- OWNED ONLY BROWSE MODE ---
             if (inPartApplyState || ownedOnlyBrowse)
             {
-                var save = SaveManager.Instance.SaveData;
-                if (save.Cars != null && save.Cars.Count > 0)
+                // Match regular browse logic exactly for bounds + type rollover
+                if (currentCarIndex < 0)
                 {
-                    // Direction of travel based on the incoming change that was already applied once above.
-                    int step = (change == 0) ? 0 : (change > 0 ? 1 : -1);
-                    int safety = Mathf.Max(1, save.Cars.Count * 2);
+                    currentCarType = GetPrevType(currentCarType);
+                    typeBucket = GetCarTypeBucket(currentCarType);
+                    numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+                    maxVariations = typeBucket.items.Count;
 
-                    while (safety-- > 0)
-                    {
-                        // Recompute bounds for the *current* type
-                        numOfThisCarTypeOwned = save.Cars.Count(kv => kv.Key.CarType == currentCarType);
-                        var typeBucketLocal = GetCarTypeBucket(currentCarType);
-                        int maxVariationsLocal = typeBucketLocal.items.Count;
+                    currentCarIndex = Mathf.Min(
+                        Mathf.Max(numOfThisCarTypeOwned - 1, 0),
+                        Mathf.Max(maxVariations - 1, 0)
+                    );
+                }
+                else if (currentCarIndex > Mathf.Min(numOfThisCarTypeOwned - 1, maxVariations - 1))
+                {
+                    currentCarType = GetNextType(currentCarType);
+                    typeBucket = GetCarTypeBucket(currentCarType);
+                    numOfThisCarTypeOwned = SaveManager.Instance.SaveData.Cars.Count(kv => kv.Key.CarType == currentCarType);
+                    maxVariations = typeBucket.items.Count;
 
-                        int ownedMax = Mathf.Max(numOfThisCarTypeOwned - 1, 0);
-                        int varMax = Mathf.Max(maxVariationsLocal - 1, 0);
-                        int maxIdx = Mathf.Min(ownedMax, varMax);
+                    currentCarIndex = 0;
+                }
 
-                        // Handle range overflow by rolling types and landing at the *correct edge*.
-                        if (currentCarIndex < 0)
-                        {
-                            currentCarType = GetPrevType(currentCarType);
-
-                            // resync bounds for the new type
-                            numOfThisCarTypeOwned = save.Cars.Count(kv => kv.Key.CarType == currentCarType);
-                            typeBucketLocal = GetCarTypeBucket(currentCarType);
-                            maxVariationsLocal = typeBucketLocal.items.Count;
-
-                            ownedMax = Mathf.Max(numOfThisCarTypeOwned - 1, 0);
-                            varMax = Mathf.Max(maxVariationsLocal - 1, 0);
-                            maxIdx = Mathf.Min(ownedMax, varMax);
-
-                            // moving LEFT → land on the *last owned* index
-                            currentCarIndex = maxIdx;
-                        }
-                        else if (currentCarIndex > maxIdx)
-                        {
-                            currentCarType = GetNextType(currentCarType);
-
-                            // resync bounds for the new type
-                            numOfThisCarTypeOwned = save.Cars.Count(kv => kv.Key.CarType == currentCarType);
-                            typeBucketLocal = GetCarTypeBucket(currentCarType);
-                            maxVariationsLocal = typeBucketLocal.items.Count;
-
-                            ownedMax = Mathf.Max(numOfThisCarTypeOwned - 1, 0);
-                            varMax = Mathf.Max(maxVariationsLocal - 1, 0);
-                            maxIdx = Mathf.Min(ownedMax, varMax);
-
-                            // moving RIGHT → land on the *first* index
-                            currentCarIndex = 0;
-                        }
-
-                        // If this (type,index) is owned, we're done.
-                        bool isOwnedHere = save.Cars.ContainsKey((currentCarType, currentCarIndex));
-                        if (isOwnedHere)
-                            break;
-
-                        // Not owned → advance ONE step *from here* in the chosen direction and loop.
-                        if (step == 0) step = 1;      // defensive: treat ChangeCar(0) as “refresh/right”
-                        currentCarIndex += step;
-                    }
+                // If we didn't land on an owned (type,index), recurse once more in the same direction.
+                // If change==0 (refresh), treat it as +1 (forward).
+                var save = SaveManager.Instance.SaveData;
+                bool isOwnedHere = save.Cars.ContainsKey((currentCarType, currentCarIndex));
+                if (!isOwnedHere)
+                {
+                    int step = (change == 0) ? 1 : (change > 0 ? 1 : -1);
+                    saveData.CurrentCarType = currentCarType;
+                    saveData.CurrentCarIndex = currentCarIndex;
+                    SaveManager.Instance.SaveGame();
+                    ChangeCar(step);
+                    return; // IMPORTANT: stop this frame, let the recursive call render
                 }
 
                 // keep nav buttons enabled... except when there's only ONE owned car total
@@ -672,6 +659,8 @@ public class GarageUIManager : MonoBehaviour
         if (inPartApplyState) PreviewAwardedPartOnCurrentCar();
 
         UpdatePerformanceStats();
+
+        if (rootCall) _ownedNavDepth = 0;
     }
 
     // Revert the current car index back to the last car the player owns.
