@@ -422,7 +422,7 @@ public class Car : ScriptableObject
         ApplyMetallicToMaterial(targetMaterial, metallic);
     }
 
-    public void RandomizeColors(Material targetMaterial, ColorType colorType, bool isEmissiveMaterial)         // TODO: ADD SAVING LOGIC TO THIS FUNCTION
+    public void RandomizeColors(Material targetMaterial, ColorType colorType, bool isEmissiveMaterial)
     {
         Color baseColor;
         Color fresnelColor;

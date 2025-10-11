@@ -564,7 +564,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < carSpinCount - 4; i++)
+        for (int i = 0; i < carSpinCount - 2; i++)
         {
             if (skipRequested)
             {
@@ -679,7 +679,7 @@ public class CarDisplay : MonoBehaviour
         }
 
         bool earlySkip = false;
-        int limit = Mathf.Max(0, delays.Count - 3);
+        int limit = Mathf.Max(0, delays.Count - 2);
 
         for (int i = 0; i < limit; i++)
         {
