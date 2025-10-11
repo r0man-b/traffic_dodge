@@ -67,6 +67,13 @@ public class GarageUIManager : MonoBehaviour
     private GameObject currentCar;
     private Car car;
 
+    [Header("Part-Apply Preview (awarded part)")]
+    // Raw holder name we got from the lootbox flow: e.g. "EXHAUSTS", "FRONT_SPLITTERS", "WHEELS", ...
+    public string pendingAwardPartTypeRaw;
+    // Exact part name we’re trying to preview on owned cars.
+    public string pendingAwardPartName;
+
+
     // IMPORTANT: Car type is now a string (car name), not an int index.
     private string currentCarType;
     private int currentCarIndex;
@@ -656,6 +663,8 @@ public class GarageUIManager : MonoBehaviour
             Array.Sort(carParts[i], (part1, part2) => part1.price.CompareTo(part2.price));
         }
 
+        if (inPartApplyState) PreviewAwardedPartOnCurrentCar();
+
         UpdatePerformanceStats();
     }
 
@@ -1227,6 +1236,51 @@ public class GarageUIManager : MonoBehaviour
     {
         isPlayerInAllRimsMenu = true;
     }
+
+    // Deactivate the currently installed part in the awarded slot(s) and activate the awarded part
+    // so the player can PREVIEW it. Does nothing if the part name doesn’t exist on this car.
+    private void PreviewAwardedPartOnCurrentCar()
+    {
+        if (!inPartApplyState) return;                                   // only while choosing a car for an awarded part
+        if (string.IsNullOrEmpty(pendingAwardPartTypeRaw)) return;
+        if (string.IsNullOrEmpty(pendingAwardPartName)) return;
+        if (carParts == null || carParts.Length == 0) return;
+
+        var slots = ResolveSlotsForAward(pendingAwardPartTypeRaw);
+        if (slots == null || slots.Count == 0) return;
+
+        var save = SaveManager.Instance.SaveData;
+        if (!save.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
+            return; // should be owned-only, but defend anyway
+
+        foreach (int slot in slots)
+        {
+            // Safety: slot bounds & arrays present
+            if (slot < 0 || slot >= carParts.Length) continue;
+            var partsArray = carParts[slot];
+            if (partsArray == null || partsArray.Length == 0) continue;
+
+            // Find the awarded part by name on THIS car’s holder
+            int awardedIdx = Array.FindIndex(partsArray, p => p != null && p.name == pendingAwardPartName);
+            if (awardedIdx < 0) continue; // this car doesn’t have that specific variant — CarDisplay handles the “unapplicable” UI
+
+            // Determine what’s currently installed (fallback to default for this slot)
+            int installedIdx = carData.CarParts[slot].CurrentInstalledPart;
+            if (installedIdx == -1) installedIdx = GetDefaultPartIndex(slot);
+
+            // Hide installed (if valid)
+            if (installedIdx >= 0 && installedIdx < partsArray.Length && partsArray[installedIdx] != null)
+                partsArray[installedIdx].gameObject.SetActive(false);
+
+            // Show the awarded part
+            if (partsArray[awardedIdx] != null)
+                partsArray[awardedIdx].gameObject.SetActive(true);
+
+            // Special cases we do NOT touch here (no install): suspension height, performance stats etc.
+            // This is strictly a visual preview; you’ll persist on your later “Apply” implementation.
+        }
+    }
+
 
     /*----------------------------------- PAINT CUSTOMIZATION FUNCTIONS ------------------------------------*/
     public void DisplayColorsInUI(int part /* 0 = Primary Color, 1 = Secondary Color, 2 = Rim Color, 3 = Primary Light, 4 = Secondary Light, 5 = Tail Lights */)
@@ -2066,6 +2120,27 @@ public class GarageUIManager : MonoBehaviour
         }
         return 0;
     }
+
+    // Map lootbox raw holder name → our slot index/indices in carParts.
+    // Most map to a single slot; "WHEELS" applies to both front(2) and rear(4).
+    private static List<int> ResolveSlotsForAward(string rawType)
+    {
+        if (string.IsNullOrEmpty(rawType)) return null;
+
+        switch (rawType.ToUpperInvariant())
+        {
+            case "EXHAUSTS": return new List<int> { 0 };
+            case "FRONT_SPLITTERS": return new List<int> { 1 };
+            case "FRONT_WHEELS": return new List<int> { 2 };
+            case "REAR_SPLITTERS": return new List<int> { 3 };
+            case "REAR_WHEELS": return new List<int> { 4 };
+            case "SIDESKIRTS": return new List<int> { 5 };
+            case "SPOILERS": return new List<int> { 6 };
+            case "WHEELS": return new List<int> { 2, 4 }; // apply to both if present
+            default: return null;                    // not a cosmetic part slot we preview here
+        }
+    }
+
 
     // Utility function to adjust alpha values while keeping the original RGB values.
     void AdjustAlpha(RawImage rawImage, TextMeshProUGUI textMesh, Image image, float alpha)

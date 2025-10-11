@@ -277,6 +277,8 @@ public class CarDisplay : MonoBehaviour
             _spawnedModel.transform.SetPositionAndRotation(currentCar.turntablePositon, carHolder.rotation);
         }
 
+        // For lootbox part applying state only
+        if (garageUIscript.inPartApplyState) RefreshPartApplicabilityUI();
 
         _spawnedModel.SetActive(true);
         return _spawnedModel;
@@ -1085,10 +1087,13 @@ public class CarDisplay : MonoBehaviour
         // We are NOT replacing a car.
         if (garageUIscript != null)
         {
-            garageUIscript.inCarReplaceState = false;   // ensure replace mode is off
-                                                        // Flag a special “apply part” browse mode (skip unowned cars across ALL types).
-            garageUIscript.inPartApplyState = true;     // <-- add this bool to GarageUIManager
-            garageUIscript.ownedOnlyBrowse = true;      // <-- add this bool to GarageUIManager
+            garageUIscript.inCarReplaceState = false; // Ensure replace mode is off
+            garageUIscript.inPartApplyState = true; // Flag a special “apply part” browse mode (skip unowned cars across ALL types).
+            garageUIscript.ownedOnlyBrowse = true;
+
+            // >>> 1) Pass the awarded part info to GarageUIManager <<<
+            garageUIscript.pendingAwardPartTypeRaw = _lastSelectedPartType;
+            garageUIscript.pendingAwardPartName = _lastSelectedPart.name;
         }
 
         // Default UI: hide buy/sell/customize sets (we’re in a selection flow)
@@ -1100,7 +1105,7 @@ public class CarDisplay : MonoBehaviour
         if (lockImage != null) lockImage.SetActive(false);
         if (unapplicableTextObject != null) unapplicableTextObject.SetActive(false);
 
-        // Pick a sane starting car: use last owned if valid, else first owned entry.
+        // Pick a starting owned car
         string startType = save.LastOwnedCarType;
         int startIdx = save.LastOwnedCarIndex;
         if (!save.Cars.ContainsKey((startType, startIdx)))
@@ -1109,7 +1114,6 @@ public class CarDisplay : MonoBehaviour
             startType = first.CarType;
             startIdx = first.CarIndex;
         }
-
         save.CurrentCarType = startType;
         save.CurrentCarIndex = startIdx;
         SaveManager.Instance.SaveGame();
