@@ -1356,12 +1356,27 @@ public class CarDisplay : MonoBehaviour
         // Feedback & UI polish
         if (menuSounds != null) menuSounds.PlayAirWrenchSound();
 
-        // Disable the Add Part button now that it's installed
-        if (buttonSet4 != null)
-        {
-            var addBtn = buttonSet4.GetComponentInChildren<Button>(true);
-            if (addBtn != null) addBtn.interactable = false;
-        }
+        // Reset UI
+        buttonSet4.SetActive(false);
+        carName.gameObject.SetActive(false);
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(false);
+        returnOrSpinAgainPopUp.SetActive(true);
+
+        partName = _lastSelectedPart != null ? _lastSelectedPart.name : "Part";
+        string carLabel = currentCar != null
+            ? currentCar.car_name + (currentCarIndex > 0 ? $" ({currentCarIndex})" : "")
+            : "car";
+
+        // e.g. “You installed a Valen GT Splitter on your Valen GT (2).”
+        returnOrSpinAgainPopUpText.text =
+            $"You installed a <u>{TrimLeadingThe(partName)}</u> on your <u>{TrimLeadingThe(carLabel)}</u>.";
+
+        // Reset state vars
+        garageUIscript.inPartApplyState = false;
+        garageUIscript.ownedOnlyBrowse = false;
     }
 
     // UI flow for re-opening a car lootbox after spin.
@@ -1488,8 +1503,9 @@ public class CarDisplay : MonoBehaviour
         // Re-enable the car name at the bottom of the screen
         carName.gameObject.SetActive(true);
 
-        // Disable 'replace' button
+        // Disable lootbox-specific button sets
         buttonSet3.SetActive(false);
+        buttonSet4.SetActive(false);
 
         // Reset garage camera
         garageCamera.UnlockDistance();
