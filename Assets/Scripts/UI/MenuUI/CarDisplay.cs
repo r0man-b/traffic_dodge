@@ -54,6 +54,7 @@ public class CarDisplay : MonoBehaviour
     public GameObject addButton;
     public GameObject partAddButton;
     public GameObject replaceButton;
+    public GameObject freeRespinButton;
     public TextMeshProUGUI sellButtonText;
     public GameObject returnOrSpinAgainPopUp;
     public TextMeshProUGUI returnOrSpinAgainPopUpText;
@@ -1067,6 +1068,38 @@ public class CarDisplay : MonoBehaviour
             return;
         }
 
+        // --- Check if ANY owned car can accept this part; if not, keep popup open and offer a free respin ---
+        bool anyCompatibleOwned = false;
+        foreach (var kv in save.Cars.Keys)
+        {
+            var asset = FindCarAssetByType(kv.CarType);
+            if (IsAwardedPartCompatibleWithCarAsset(asset))
+            {
+                anyCompatibleOwned = true;
+                break;
+            }
+        }
+
+        if (!anyCompatibleOwned)
+        {
+            // Keep the lootbox popup up and let the player respin for free
+            if (lootCratePopUps != null) lootCratePopUps.SetActive(true);
+            if (addOrSellPopUp != null) addOrSellPopUp.SetActive(true);
+
+            // Hide add/replace; (sell stays available if present in your popup)
+            if (addButton != null) addButton.SetActive(false);
+            if (partAddButton != null) partAddButton.SetActive(false);
+            if (replaceButton != null) replaceButton.SetActive(false);
+
+            if (freeRespinButton != null) freeRespinButton.SetActive(true);
+
+            if (addOrSellPopUpText != null)
+                addOrSellPopUpText.text =
+                    "No compatible cars owned for this awarded part. You can sell the part for credits or do a <b>free respin</b> to try to win another part!";
+
+            return; // Do NOT close lootbox / open garage
+        }
+
         // --- Close lootbox UI, open the garage UI ---
 
         // Hide loot crate popups
@@ -1370,13 +1403,24 @@ public class CarDisplay : MonoBehaviour
             ? currentCar.car_name + (currentCarIndex > 0 ? $" ({currentCarIndex})" : "")
             : "car";
 
-        // e.g. “You installed a Valen GT Splitter on your Valen GT (2).”
         returnOrSpinAgainPopUpText.text =
-            $"You installed a <u>{TrimLeadingThe(partName)}</u> on your <u>{TrimLeadingThe(carLabel)}</u>.";
+            $"You installed a <u>{TrimLeadingThe(partName)}</u> on your {TrimLeadingThe(carLabel)}.";
 
         // Reset state vars
         garageUIscript.inPartApplyState = false;
         garageUIscript.ownedOnlyBrowse = false;
+    }
+
+    public void FreeRespin()
+    {
+        // Close current popups and re-run the parts randomization flow
+        if (lootCratePopUps != null) lootCratePopUps.SetActive(false);
+        if (addOrSellPopUp != null) addOrSellPopUp.SetActive(false);
+        if (returnOrSpinAgainPopUp != null) returnOrSpinAgainPopUp.SetActive(false);
+        if (freeRespinButton != null) freeRespinButton.SetActive(false);
+
+        // Make sure we’re in the right UI context (shop view usually), then spin again
+        RandomizeParts();
     }
 
     // UI flow for re-opening a car lootbox after spin.
@@ -2067,6 +2111,34 @@ public class CarDisplay : MonoBehaviour
                 return true;
         }
         return false;
+    }
+
+    // Checks if the awarded part exists in the given car asset's holders (using the prefab hierarchy).
+    private bool IsAwardedPartCompatibleWithCarAsset(Car carAsset)
+    {
+        if (carAsset == null || _lastSelectedPart == null || string.IsNullOrEmpty(_lastSelectedPartType))
+            return false;
+
+        var root = carAsset.carModel != null ? carAsset.carModel.transform : null;
+        if (root == null) return false;
+
+        var body = root.Find("BODY");
+        if (body == null) return false;
+
+        string partName = _lastSelectedPart.name;
+        string type = _lastSelectedPartType.ToUpperInvariant();
+
+        if (type == "WHEELS")
+        {
+            var frontH = root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>();
+            var rearH = root.Find("REAR_WHEELS")?.GetComponent<PartHolder>();
+            return HolderHasPartByName(frontH, partName) || HolderHasPartByName(rearH, partName);
+        }
+        else
+        {
+            var holder = body.Find(type)?.GetComponent<PartHolder>();
+            return HolderHasPartByName(holder, partName);
+        }
     }
 
     /// <summary>

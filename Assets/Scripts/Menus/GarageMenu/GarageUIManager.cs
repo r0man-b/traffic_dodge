@@ -536,11 +536,17 @@ public class GarageUIManager : MonoBehaviour
                     }
                 }
 
-                // keep nav buttons enabled...
+                // keep nav buttons enabled... except when there's only ONE owned car total
                 if (carDisplay != null)
                 {
-                    if (carDisplay.leftButton != null) carDisplay.leftButton.SetActive(true);
-                    if (carDisplay.rightButton != null) carDisplay.rightButton.SetActive(true);
+                    // total cars the player owns across ALL types
+                    int totalOwned = 0;
+                    if (save != null && save.Cars != null) totalOwned = save.Cars.Count;
+
+                    bool allowNav = totalOwned > 1;
+
+                    if (carDisplay.leftButton != null) carDisplay.leftButton.SetActive(allowNav);
+                    if (carDisplay.rightButton != null) carDisplay.rightButton.SetActive(allowNav);
                 }
             }
             else
