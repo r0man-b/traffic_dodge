@@ -54,5 +54,17 @@ public class MenuSounds : MonoBehaviour
     {
         menuSourceSounds[5].Play();
     }
+    public void PlayRouletteSpin()
+    {
+        menuSourceSounds[6].Play();
+    }
+    public void StopRouletteSpin()
+    {
+        menuSourceSounds[6].Stop();
+    }
+    public void PlayLootcrateOpen()
+    {
+        menuSourceSounds[7].Play();
+    }
 }
 

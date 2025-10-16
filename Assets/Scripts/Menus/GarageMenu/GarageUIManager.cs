@@ -152,7 +152,7 @@ public class GarageUIManager : MonoBehaviour
     private int currentPaintPrice;
 
     // Vars for metallic paints
-    private readonly float nonMetallicVal = 0.304f;
+    private readonly float nonMetallicVal = 0.1f;
     private readonly float rimNonMetallicVal = 0.001f;
     private readonly float metallicVal = 1f;
     static readonly int ID_Metallic = Shader.PropertyToID("_Metallic");

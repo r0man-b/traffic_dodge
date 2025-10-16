@@ -102,7 +102,7 @@ public class Car : ScriptableObject
     }
     private string currentCarType;
     private int currentCarIndex;
-    private const float NON_METALLIC_DEFAULT = 0.304f; // nonMetallicVal
+    private const float NON_METALLIC_DEFAULT = 0.1f; // nonMetallicVal
     private const float RIM_NON_METALLIC_DEFAULT = 0.001f; // nonMetallicVal for rims
     private const float METALLIC_DEFAULT = 1.0f;   // metallicVal
     private bool forceNeutralBodyColors = false;

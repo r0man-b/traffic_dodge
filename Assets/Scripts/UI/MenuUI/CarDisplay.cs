@@ -511,6 +511,9 @@ public class CarDisplay : MonoBehaviour
         backButton.SetActive(false);
         goRaceButton.SetActive(false);
 
+        // Play roulette sound effect
+        menuSounds.PlayRouletteSpin();
+
         skipRequested = false;     // reset each run
         EndSkipListen();           // just to be safe
         if (_spinCo != null) StopCoroutine(_spinCo);
@@ -881,6 +884,9 @@ public class CarDisplay : MonoBehaviour
         }
         else // UI flow for cars lootbox
         {
+            // Stop the sound
+            menuSounds.StopRouletteSpin();
+
             // Compute & cache the sell price from the currently displayed (randomized) car
             _cachedLootboxSellPrice = ComputeLootboxSellPrice();
             string name = currentCar != null ? currentCar.car_name : "car";
