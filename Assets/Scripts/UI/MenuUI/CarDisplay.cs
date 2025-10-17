@@ -534,6 +534,9 @@ public class CarDisplay : MonoBehaviour
         backButton.SetActive(false);
         goRaceButton.SetActive(false);
 
+        // Play roulette sound effect
+        menuSounds.PlayPartRouletteSpin();
+        
         // Deactivate currently displayed car while parts randomization occurs.
         if (_spawnedModel != null)
             _spawnedModel.SetActive(false);
@@ -572,7 +575,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < carSpinCount - 2; i++)
+        for (int i = 0; i < carSpinCount - 1; i++)
         {
             if (skipRequested)
             {
@@ -581,6 +584,7 @@ public class CarDisplay : MonoBehaviour
             }
 
             SpawnWeightedRandomCar();
+            menuSounds.PlayLootcrateTick();
             yield return new WaitForSecondsRealtime(delays[i]);
         }
 
@@ -687,7 +691,7 @@ public class CarDisplay : MonoBehaviour
         }
 
         bool earlySkip = false;
-        int limit = Mathf.Max(0, delays.Count - 2);
+        int limit = Mathf.Max(0, delays.Count - 1);
 
         for (int i = 0; i < limit; i++)
         {
@@ -700,6 +704,8 @@ public class CarDisplay : MonoBehaviour
             if (PickNonRepeating(out var holder, out int partIdx))
             {
                 ActivateSwitch(holder, partIdx, ref prevHolder, ref prevIndex);
+                menuSounds.PlayLootcrateTick();
+                menuSounds.PlayWoosh();
 
                 var parts = holder.GetPartArray();
                 if (parts != null && partIdx >= 0 && partIdx < parts.Length && parts[partIdx] != null)
@@ -713,6 +719,8 @@ public class CarDisplay : MonoBehaviour
         if (PickNonRepeating(out var finalHolder, out int finalPartIdx))
         {
             ActivateSwitch(finalHolder, finalPartIdx, ref prevHolder, ref prevIndex);
+            menuSounds.PlayLootcrateTick();
+            menuSounds.PlayWoosh();
 
             var finalPartsArray = finalHolder.GetPartArray();
             if (finalPartsArray != null && finalPartIdx >= 0 && finalPartIdx < finalPartsArray.Length)
@@ -858,8 +866,16 @@ public class CarDisplay : MonoBehaviour
     // Post spin UI.
     private void HandlePostSpin()
     {
+        menuSounds.PlayLootcrateAward();
+
         if (_partsRandomized) // UI flow for parts lootbox
         {
+            // Stop the sound
+            menuSounds.StopPartRouletteSpin();
+
+            // Reset the 'woosh' sound
+            menuSounds.ResetWooshPitch();
+
             // Disable default add button for cars & enable add button for parts
             addButton.SetActive(false);
             partAddButton.SetActive(true);
