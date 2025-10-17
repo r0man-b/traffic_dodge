@@ -575,7 +575,7 @@ public class CarDisplay : MonoBehaviour
         bool earlySkipTriggered = false;
         bool finalCarSpawned = false;
 
-        for (int i = 0; i < carSpinCount - 1; i++)
+        for (int i = 0; i < carSpinCount - 3; i++)
         {
             if (skipRequested)
             {
