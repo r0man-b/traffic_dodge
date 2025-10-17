@@ -925,6 +925,32 @@ public class CarDisplay : MonoBehaviour
     {
         var saveData = SaveManager.Instance.SaveData;
 
+        // --- Play the engine rev for the awarded car type ---
+        if (menuSounds != null)
+        {
+            // Ensure the type->index map exists.
+            if (!typeNameIndexBuilt)
+                BuildCarTypeNameIndex();
+
+            // Resolve the type index from the awarded car's type string.
+            // currentCarType holds the string key you use elsewhere (e.g., in SaveData).
+            if (!string.IsNullOrEmpty(currentCarType) &&
+                typeIndexByName.TryGetValue(currentCarType, out int typeIdx))
+            {
+                // Optional: clamp to available audio sources to be defensive.
+                if (menuSounds.engineRevSounds != null && menuSounds.engineRevSounds.Length > 0)
+                {
+                    typeIdx = Mathf.Clamp(typeIdx, 0, menuSounds.engineRevSounds.Length - 1);
+                    menuSounds.PlayEngineRev(typeIdx);
+                }
+                else
+                {
+                    // If engineRevSounds is misconfigured, skip gracefully.
+                    // (No Debug.Log here unless you want noise in production.)
+                }
+            }
+        }
+
         // Enforce the same per-type cap used in ConfirmBuy()
         const int maxPerType = 100;
         int ownedOfThisType = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
@@ -1281,6 +1307,32 @@ public class CarDisplay : MonoBehaviour
         {
             Debug.LogWarning("ReplaceOwnedCarWithLootboxCar: SaveData missing.");
             return;
+        }
+
+        // --- Play the engine rev for the awarded car type ---
+        if (menuSounds != null)
+        {
+            // Ensure the type->index map exists.
+            if (!typeNameIndexBuilt)
+                BuildCarTypeNameIndex();
+
+            // Resolve the type index from the awarded car's type string.
+            // currentCarType holds the string key you use elsewhere (e.g., in SaveData).
+            if (!string.IsNullOrEmpty(currentCarType) &&
+                typeIndexByName.TryGetValue(currentCarType, out int typeIdx))
+            {
+                // Optional: clamp to available audio sources to be defensive.
+                if (menuSounds.engineRevSounds != null && menuSounds.engineRevSounds.Length > 0)
+                {
+                    typeIdx = Mathf.Clamp(typeIdx, 0, menuSounds.engineRevSounds.Length - 1);
+                    menuSounds.PlayEngineRev(typeIdx);
+                }
+                else
+                {
+                    // If engineRevSounds is misconfigured, skip gracefully.
+                    // (No Debug.Log here unless you want noise in production.)
+                }
+            }
         }
 
         // Must have a captured lootbox snapshot
