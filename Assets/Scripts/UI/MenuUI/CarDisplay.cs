@@ -2267,7 +2267,10 @@ public class CarDisplay : MonoBehaviour
         // lock+text
         lockImage.SetActive(!applicable);
         if (unapplicableTextObject != null)
+        {
             unapplicableTextObject.SetActive(!applicable);
+            carName.gameObject.SetActive(applicable);
+        }
 
         // >>> While in the apply flow, enable/disable the Add Part button
         if (garageUIscript != null && garageUIscript.inPartApplyState && buttonSet4 != null)
