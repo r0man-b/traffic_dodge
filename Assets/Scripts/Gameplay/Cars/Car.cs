@@ -537,7 +537,7 @@ public class Car : ScriptableObject
         // Special handling for primary: propagate to secondary and random metallic easter egg
         if (colorType == ColorType.PRIMARY_COLOR)
         {
-            float metallicValue = (UnityEngine.Random.Range(0, 100) == 0) ? 1f : NON_METALLIC_DEFAULT;
+            float metallicValue = (UnityEngine.Random.Range(0, 20) == 0) ? 1f : NON_METALLIC_DEFAULT;
             targetMaterial.SetFloat("_Metallic", metallicValue);
 
             // Mirror to secondary (non-emissive here; emissive secondary handled elsewhere)
