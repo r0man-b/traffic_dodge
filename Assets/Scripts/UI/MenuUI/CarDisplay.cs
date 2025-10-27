@@ -122,6 +122,9 @@ public class CarDisplay : MonoBehaviour
     [Header("Randomize Parts")]
     [SerializeField] private Transform emptyPartHolder; // assign the EMPTY_PART_HOLDER in Inspector
 
+    [Header("Parts Randomization — Wheel Face")]
+    [SerializeField] private Camera garageViewCamera;          // Assign your garage camera (or leave null to use Camera.main)
+
     [Header("Part Apply UI")]
     [SerializeField] private GameObject unapplicableTextObject; // shown when the awarded part can't be used on the shown car
 
@@ -840,27 +843,29 @@ public class CarDisplay : MonoBehaviour
             yield return null;
         }
 
-        // Smooth ease back to the exact start rotation
-        const float returnDuration = 0.35f;
+        // Smooth ease-out phase (no forced realignment)
+        const float returnDuration = 0.7f;
         float t = 0f;
-        Quaternion from = emptyPartHolder.rotation;
+        float currentSpeed = spinMinSpeed; // starting from the last known speed
 
         while (t < returnDuration)
         {
-            // Honor a late skip here too
             if (skipRequested)
             {
                 emptyPartHolder.rotation = startWorldRot;
                 yield break;
             }
 
-            t += Time.unscaledDeltaTime;
-            float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 3f); // ease-out cubic
-            emptyPartHolder.rotation = Quaternion.Slerp(from, startWorldRot, k);
+            float dt = Time.unscaledDeltaTime;
+            t += dt;
+
+            // Smoothly decrease angular speed to 0 using quintic ease-out
+            float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 5f);
+            float omega = Mathf.Lerp(currentSpeed, 0f, k);
+
+            emptyPartHolder.Rotate(Vector3.up, omega * dt, Space.World);
             yield return null;
         }
-
-        emptyPartHolder.rotation = startWorldRot;
     }
 
     // Post spin UI.
@@ -2025,14 +2030,14 @@ public class CarDisplay : MonoBehaviour
     private static string PronounForPart_Capital(string partTypeRaw) =>
         UsesPluralArticle(partTypeRaw) ? "Them" : "It";
 
-    private static void ActivateSwitch(PartHolder newHolder, int newIndex, ref PartHolder prevHolder, ref int prevIndex)
+    private void ActivateSwitch(PartHolder newHolder, int newIndex, ref PartHolder prevHolder, ref int prevIndex)
     {
         if (newHolder == null) return;
 
         var newParts = newHolder.GetPartArray();
         if (newParts == null || newParts.Length == 0) return;
 
-        // Deactivate the previously activated part (even if from a different holder)
+        // Deactivate previous
         if (prevHolder != null && prevIndex >= 0)
         {
             var prevParts = prevHolder.GetPartArray();
@@ -2040,11 +2045,21 @@ public class CarDisplay : MonoBehaviour
                 prevParts[prevIndex].gameObject.SetActive(false);
         }
 
-        // Activate the new one
+        // Activate new
         if (newIndex >= 0 && newIndex < newParts.Length && newParts[newIndex] != null)
-            newParts[newIndex].gameObject.SetActive(true);
+        {
+            var go = newParts[newIndex].gameObject;
+            go.SetActive(true);
 
-        // Update the global previous pointer
+            // If this is the wheels holder, make sure the face is toward the camera
+            // Holder identity check by name (matches your EMPTY_PART_HOLDER child naming).
+            if (string.Equals(newHolder.name, "WHEELS", System.StringComparison.OrdinalIgnoreCase))
+            {
+                FlipWheelToFaceCamera();
+            }
+        }
+
+        // Update previous pointer
         prevHolder = newHolder;
         prevIndex = newIndex;
     }
@@ -2332,6 +2347,24 @@ public class CarDisplay : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Ensures a wheel part faces the camera.
+    /// </summary>
+    private void FlipWheelToFaceCamera()
+    {
+        Camera cam = garageViewCamera != null ? garageViewCamera : Camera.main;
+        if (cam == null || emptyPartHolder == null) return;
+
+        // Get current camera Y rotation (world space)
+        float camY = cam.transform.rotation.eulerAngles.y;
+
+        // Set EMPTY_PART_HOLDER's world-space rotation Y to (camY - 180)
+        Vector3 currentEuler = emptyPartHolder.rotation.eulerAngles;
+        emptyPartHolder.rotation = Quaternion.Euler(currentEuler.x, camY - 180f, currentEuler.z);
+    }
+
+
+    //UnityEditor.EditorApplication.isPaused = true;
     /// <summary>
     /// Enables input listening for "quick tap to skip" behavior during the spin.
     /// Resets internal state to ensure a clean capture of the next tap/gesture.
