@@ -482,7 +482,7 @@ public class PrefabManager : MonoBehaviour
         if (lane7traffic.Count < maxCarsPerLane) SpawnTraffic(7);
 
         // Spawn a powerup.
-        if (powerUpAllowedToSpawn && (Time.time - startTime) - powerUpSpawnTime >= Mathf.Max(-6.5f * playerController.accel + 30, 10)) SpawnPowerup();
+        if (!playerController.gameEnd && powerUpAllowedToSpawn && (Time.time - startTime) - powerUpSpawnTime >= Mathf.Max(-6.5f * playerController.accel + 30, 10)) SpawnPowerup();
 
         // If a road is behind the player, move it to the front.
         if (activeRoads[0].transform.position.z < playerPosZ - 99) RecycleRoad();
