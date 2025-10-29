@@ -5,6 +5,7 @@ using UnityEngine;
 public class GarageCamera : MonoBehaviour
 {
     public Camera cam;
+    public MainMenu mainMenu;
     public Transform target;
     public Vector3 previousPosition;
     private float distanceToTarget = 5.14f;
@@ -20,6 +21,9 @@ public class GarageCamera : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // Don't do anything if we are not in the garage
+        if (!(mainMenu.inGarage)) return;
+
         // ----- Zoom (mouse wheel) -----
         if (!lockToDistance)
         {

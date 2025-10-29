@@ -10,6 +10,8 @@ public class MainMenu : MonoBehaviour
     public GameObject MainMenuUI;
     public GameObject GarageUI;
     public GameObject CarSelectorUI;
+    public GarageCamera garageCam;
+    public bool inGarage = false;
     private void Awake()
     {
         // Set the volume of MenuMusic based on saved settings
@@ -40,13 +42,14 @@ public class MainMenu : MonoBehaviour
         {
             MainMenuUI.SetActive(false);
             GarageUI.SetActive(true);
-            //CarSelectorUI.SetActive(true); // TODO: Do I need this? Check exiting from customization submenu
+            garageCam.SetCameraPosition(0); // Default camera position
+            inGarage = true;
         }
         else
         {
             MainMenuUI.SetActive(true);
             GarageUI.SetActive(false);
-            //CarSelectorUI.SetActive(false); // TODO: Do I need this? Check exiting from customization submenu
+            inGarage = false;
         }
     }
 
