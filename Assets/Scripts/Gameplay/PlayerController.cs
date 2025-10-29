@@ -637,7 +637,7 @@ public class PlayerController : MonoBehaviour
                 }
 
                 // Increase camera FOV with acceleration.
-                if (accel < 2.38f /*215 mph is the hard cap on FOV*/ && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f) cam.fieldOfView = 55.634146f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
+                if (accel < 2.38f /*215 mph is the hard cap on FOV*/ && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f) cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
 
                 // Move camera closer to player as he speeds up.
                 if (!bullet)
