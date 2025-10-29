@@ -145,8 +145,8 @@ public class PlayerController : MonoBehaviour
         currentEnvironment = saveData.CurrentEnvironment;
 
         // Retrieve the current car type (string) and index from SaveData.
-        currentCarType = saveData.CurrentCarType;
-        currentCarIndex = saveData.CurrentCarIndex;
+        currentCarType = saveData.LastOwnedCarType;
+        currentCarIndex = saveData.LastOwnedCarIndex;
 
         // Build name -> index map once
         carTypeIndexByName.Clear();
