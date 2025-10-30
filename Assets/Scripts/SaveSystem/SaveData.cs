@@ -4,7 +4,7 @@ using System.Collections.Generic;
 public class SaveData
 {
     // Customization/CreditManager.cs
-    public long GlobalCredits;
+    public long GlobalCredits = 50000;
 
     // Game/UIManager.cs
     public float RecordDistance;
