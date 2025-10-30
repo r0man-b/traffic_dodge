@@ -1812,6 +1812,46 @@ public class CarDisplay : MonoBehaviour
         data.CarParts[slot].Ownership[idx] = true;
     }
 
+    /// Ensures the Ownership dictionary exists for a given slot.
+    private static void EnsureOwnershipDict(SaveData.CarData data, int slot)
+    {
+        if (data.CarParts[slot].Ownership == null)
+            data.CarParts[slot].Ownership = new Dictionary<int, bool>();
+    }
+
+    /// Marks the default part (by name) as owned in the given slot.
+    /// If there is no default part name or it is not found, marks index 0 (the 'None' entry) as owned.
+    private static void MarkDefaultOwned(SaveData.CarData data, int slot, PartHolder holder, string defaultPartName)
+    {
+        if (holder == null) return;
+
+        var arr = holder.GetPartArray();
+        if (arr == null || arr.Length == 0) return;
+
+        EnsureOwnershipDict(data, slot);
+
+        bool marked = false;
+
+        if (!string.IsNullOrWhiteSpace(defaultPartName))
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                var p = arr[i];
+                if (p != null && string.Equals(p.name, defaultPartName, System.StringComparison.Ordinal))
+                {
+                    data.CarParts[slot].Ownership[i] = true;
+                    marked = true;
+                    break;
+                }
+            }
+        }
+
+        if (!marked)
+        {
+            data.CarParts[slot].Ownership[0] = true;
+        }
+    }
+
     /// <summary>
     /// Copies all paint and light colors from a Car's materials into CarData.
     /// Light slots are treated specially (only emission is stored).
@@ -1896,6 +1936,93 @@ public class CarDisplay : MonoBehaviour
         // Record decals and livery (slots 11–12).
         SaveSlot(data, 11, body.Find("DECALS")?.GetComponent<PartHolder>());
         SaveSlot(data, 12, body.Find("LIVERIES")?.GetComponent<PartHolder>());
+
+        // mark default cosmetic parts as owned, even if not installed ---
+        // Mirrors the default fields used in ComputeLootboxSellPrice() (slots 0,2,3,4,6).
+        MarkDefaultOwned(
+            data, 0,
+            body.Find("EXHAUSTS")?.GetComponent<PartHolder>(),
+            currentCar != null ? currentCar.DefaultExhaust : null
+        );
+
+        // Front Splitters: no default → ensure index 0 is owned
+        MarkDefaultOwned(
+            data, 1,
+            body.Find("FRONT_SPLITTERS")?.GetComponent<PartHolder>(),
+            null
+        );
+
+        MarkDefaultOwned(
+            data, 2,
+            modelRoot.Find("FRONT_WHEELS")?.GetComponent<PartHolder>(),
+            currentCar != null ? currentCar.DefaultFrontWheels : null
+        );
+
+        MarkDefaultOwned(
+            data, 3,
+            body.Find("REAR_SPLITTERS")?.GetComponent<PartHolder>(),
+            currentCar != null ? currentCar.DefaultRearSplitter : null
+        );
+
+        MarkDefaultOwned(
+            data, 4,
+            modelRoot.Find("REAR_WHEELS")?.GetComponent<PartHolder>(),
+            currentCar != null ? currentCar.DefaultRearWheels : null
+        );
+
+        // Side Skirts: no default → ensure index 0 is owned
+        MarkDefaultOwned(
+            data, 5,
+            body.Find("SIDESKIRTS")?.GetComponent<PartHolder>(),
+            null
+        );
+
+        MarkDefaultOwned(
+            data, 6,
+            body.Find("SPOILERS")?.GetComponent<PartHolder>(),
+            currentCar != null ? currentCar.DefaultSpoiler : null
+        );
+
+        // Suspensions holder sits on BODY; if no explicit default, mark index 0
+        MarkDefaultOwned(
+            data, 7,
+            body.GetComponent<PartHolder>(),
+            null
+        );
+
+        // Engine: no default → ensure index 0 is owned
+        MarkDefaultOwned(
+            data, 8,
+            perf.Find("ENGINE")?.GetComponent<PartHolder>(),
+            null
+        );
+
+        // Transmission: no default → ensure index 0 is owned
+        MarkDefaultOwned(
+            data, 9,
+            perf.Find("TRANSMISSION")?.GetComponent<PartHolder>(),
+            null
+        );
+
+        // Lives: no default → ensure index 0 is owned
+        MarkDefaultOwned(
+            data, 10,
+            perf.Find("LIVES")?.GetComponent<PartHolder>(),
+            null
+        );
+
+        // Decals & Livery often use "None" at index 0; ensure it's owned
+        MarkDefaultOwned(
+            data, 11,
+            body.Find("DECALS")?.GetComponent<PartHolder>(),
+            null
+        );
+
+        MarkDefaultOwned(
+            data, 12,
+            body.Find("LIVERIES")?.GetComponent<PartHolder>(),
+            null
+        );
 
         // Copy paint/light colors from Car’s current materials.
         CopyColorsFromCar(data, currentCar);

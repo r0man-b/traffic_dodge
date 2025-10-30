@@ -8,6 +8,9 @@ using UnityEngine.UI;
 
 public class ShopMenu : MonoBehaviour
 {
+    [Header("External scripts")]
+    [SerializeField] private MainMenu mainMenuScript;
+
     [Header("UI Elements")]
     [SerializeField] private GameObject topLevelButtons;
     [SerializeField] private GameObject menu;
@@ -177,6 +180,7 @@ public class ShopMenu : MonoBehaviour
 
         // Continue to open the crate
         mainMenuUI.SetActive(false);
+        mainMenuScript.inGarage = true;
         topLevelButtons.SetActive(true);
         gameObject.SetActive(false);
         garageUI.SetActive(true);
@@ -443,6 +447,7 @@ public class ShopMenu : MonoBehaviour
     public void HandleEntranceFromGarageMenu(int previousMenu)
     {
         cameFromGarageMenu = true;
+        mainMenuScript.inGarage = false;
         previousMenuType = (MenuType) previousMenu;
     }
 

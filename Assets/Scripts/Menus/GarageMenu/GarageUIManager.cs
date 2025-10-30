@@ -233,7 +233,7 @@ public class GarageUIManager : MonoBehaviour
 
         carParts = new CarPart[13][];
         CacheComponents();
-        RevertToLastOwnedCar();
+        //RevertToLastOwnedCar();
         nitrocount.text = saveData.NitroCount.ToString();
     }
 
@@ -677,15 +677,13 @@ public class GarageUIManager : MonoBehaviour
             currentCarIndex = 0;
         }
 
+        // Persist the target selection
         saveData.CurrentCarType = currentCarType;
         saveData.CurrentCarIndex = currentCarIndex;
-
         SaveManager.Instance.SaveGame();
 
-        int oldCurrentCarIndex = currentCarIndex;
-        currentCarIndex = 0;
-        ChangeCar(oldCurrentCarIndex);
-        currentCarIndex = oldCurrentCarIndex;
+        // Refresh rendering/UI without changing index
+        ChangeCar(0);
     }
 
     public void SetLastOwnedCar()
@@ -1084,6 +1082,11 @@ public class GarageUIManager : MonoBehaviour
         // Escape the bottom level customization buckets where individual parts are bought.
         if (inItemDisplayMenu)
         {
+            // Disable any part buy popups if they exist
+            popUps.SetActive(false);
+            notEnoughCreditsPopUp.SetActive(false);
+            buyConfirmationPopUp.SetActive(false);
+
             // Reset garage camera to default position.
             garageCamera.SetCameraPosition(0);
 
@@ -1145,6 +1148,11 @@ public class GarageUIManager : MonoBehaviour
         // Escape the paint menu.
         else if (isPlayerInPaintMenu)
         {
+            // Disable any paint buy popups if they exist
+            paintPopUps.SetActive(false);
+            paintNotEnoughCreditsPopUp.SetActive(false);
+            paintBuyConfirmationPopUp.SetActive(false);
+
             colorBuckets[0].SetActive(true);
             colorBuckets[1].SetActive(false);
             colorBuckets[2].SetActive(false);

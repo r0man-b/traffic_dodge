@@ -50,8 +50,8 @@ namespace Settings
 		{
 			[GraphicsPreset.Trash] = new GraphicsPresetSettings { renderScale = 0.5f, antiAliasing = 0, useLowPolyTraffic = true, shadowsEnabled = false },
 			[GraphicsPreset.Low] = new GraphicsPresetSettings { renderScale = 0.75f, antiAliasing = 0, useLowPolyTraffic = true, shadowsEnabled = true },
-			[GraphicsPreset.Medium] = new GraphicsPresetSettings { renderScale = 1f, antiAliasing = 2, useLowPolyTraffic = true, shadowsEnabled = true },
-			[GraphicsPreset.High] = new GraphicsPresetSettings { renderScale = 1.5f, antiAliasing = 4, useLowPolyTraffic = false, shadowsEnabled = true },
+			[GraphicsPreset.Medium] = new GraphicsPresetSettings { renderScale = 1f, antiAliasing = 2, useLowPolyTraffic = false, shadowsEnabled = true },
+			[GraphicsPreset.High] = new GraphicsPresetSettings { renderScale = 1f, antiAliasing = 4, useLowPolyTraffic = false, shadowsEnabled = true },
 			[GraphicsPreset.Insane] = new GraphicsPresetSettings { renderScale = 2f, antiAliasing = 8, useLowPolyTraffic = false, shadowsEnabled = true },
 		};
 
@@ -80,6 +80,8 @@ namespace Settings
 			{
 				cameraData = sceneCamera.GetComponent<UniversalAdditionalCameraData>();
 			}
+
+			ApplyChanges();
 		}
 
 

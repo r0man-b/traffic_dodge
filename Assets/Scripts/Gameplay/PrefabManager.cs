@@ -501,7 +501,7 @@ public class PrefabManager : MonoBehaviour
                 if (lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(6);
                 if (lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(7);
             }
-            else // Once the player has crashed and exploded, start returning same lane traffic that is 100 units in front of him.
+            else // Once the player has crashed and exploded, start returning same lane traffic that is 200 units in front of him.
             {
                 if (lane5traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(5);
                 if (lane4traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(4);
@@ -1013,12 +1013,12 @@ public class PrefabManager : MonoBehaviour
 
         // 3. Subtract half value from lane0traffic–lane3traffic
         List<List<GameObject>> oppositeWayLanes = new List<List<GameObject>>()
-    {
-        lane0traffic,
-        lane1traffic,
-        lane2traffic,
-        lane3traffic
-    };
+        {
+            lane0traffic,
+            lane1traffic,
+            lane2traffic,
+            lane3traffic
+        };
 
         foreach (var lane in oppositeWayLanes)
         {
@@ -1090,6 +1090,8 @@ public class PrefabManager : MonoBehaviour
         float z = (laneList.Count > 0)
             ? laneList[^1].transform.position.z + distance
             : playerPosZ + distance;
+
+        if (lane == 4 && z < playerPosZ + 12) z = playerPosZ + 12;
 
         if (playerController.gameEnd && lane > 3)
         {
