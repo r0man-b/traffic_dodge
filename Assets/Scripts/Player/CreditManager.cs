@@ -19,6 +19,7 @@ public class CreditManager : MonoBehaviour
     private Coroutine creditChangeCoroutine;
     private long _displayedCredits;           // What the UI is currently showing (as a number)
     private bool _initialized;
+    private int _lastDigitCount;              // Number of digits the credits have
 
     private void OnEnable()
     {
@@ -90,6 +91,34 @@ public class CreditManager : MonoBehaviour
         ApplyAndAnimateTo(target);
     }
 
+    private void UpdateCreditText(long value)
+    {
+        if (creditsText == null) return;
+
+        string formatted = $"{value:N0} cr";
+
+        // Compute digit count without commas or suffix.
+        string digitsOnly = value.ToString();
+        int digitCount = digitsOnly.Length;
+
+        bool digitCountChanged = digitCount != _lastDigitCount;
+        _lastDigitCount = digitCount;
+
+        // Enable autosize only when necessary.
+        if (digitCountChanged)
+        {
+            creditsText.enableAutoSizing = true;
+            creditsText.text = formatted;
+            creditsText.ForceMeshUpdate();  // Allow TMP to resize once
+            creditsText.enableAutoSizing = false;
+        }
+        else
+        {
+            creditsText.enableAutoSizing = false;
+            creditsText.text = formatted;
+        }
+    }
+
     /// <summary>
     /// Returns the authoritative saved amount.
     /// </summary>
@@ -136,7 +165,7 @@ public class CreditManager : MonoBehaviour
         if (steps <= 0)
         {
             _displayedCredits = target;
-            if (creditsText != null) creditsText.text = $"{_displayedCredits:N0} cr";
+            if (creditsText != null) UpdateCreditText(_displayedCredits);
             changeDone = true;
             yield break;
         }
@@ -151,7 +180,7 @@ public class CreditManager : MonoBehaviour
             _displayedCredits += direction * step;
 
             if (creditsText != null)
-                creditsText.text = $"{_displayedCredits:N0} cr";
+                UpdateCreditText(_displayedCredits);
 
             if (menuSounds != null)
                 menuSounds.PlayCreditChange();
@@ -162,7 +191,7 @@ public class CreditManager : MonoBehaviour
         // Snap to target to avoid rounding residue.
         _displayedCredits = target;
         if (creditsText != null)
-            creditsText.text = $"{_displayedCredits:N0} cr";
+            UpdateCreditText(_displayedCredits);
 
         changeDone = true;
     }
