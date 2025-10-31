@@ -113,7 +113,7 @@ public class GarageUIManager : MonoBehaviour
 
     // Customization parts.
     private CarPart[][] carParts;
-    private PartHolder suspensionHolder;
+    [HideInInspector] public PartHolder suspensionHolder;
     private int currentPartIndex = 0;
 
     [Space(10)]

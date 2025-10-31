@@ -456,7 +456,7 @@ public class CarDisplay : MonoBehaviour
             buttonSet1.SetActive(true);
             buttonSet2.SetActive(false);
             menuSounds.PlayChaChing();
-            // DisplayCar(currentCar, currentCarType, currentCarIndex);
+            garageUIManager.suspensionHolder.SetSuspensionHeight(0);
         }
 
         garageUIManager.UpdatePerformanceStats();
