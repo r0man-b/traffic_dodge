@@ -105,7 +105,7 @@ public class CarDisplay : MonoBehaviour
     private Coroutine _turntableCo;
     private Quaternion _turntableStartRot;
     private Coroutine _partsTurntableCo;
-    private Quaternion _partsTurntableStartRot;
+    private readonly Quaternion _partsTurntableStartRot = Quaternion.identity;
     private bool skipRequested;
     private Coroutine _partsSpinCo;
     private bool _listenForSkip;
@@ -501,6 +501,7 @@ public class CarDisplay : MonoBehaviour
         nitroObject.SetActive(false);
         backButton.SetActive(false);
         goRaceButton.SetActive(false);
+        carName.gameObject.SetActive(true);
 
         // Play roulette sound effect
         menuSounds.PlayRouletteSpin();
@@ -525,6 +526,7 @@ public class CarDisplay : MonoBehaviour
         nitroObject.SetActive(false);
         backButton.SetActive(false);
         goRaceButton.SetActive(false);
+        carName.gameObject.SetActive(true);
 
         // Play roulette sound effect
         menuSounds.PlayPartRouletteSpin();
@@ -532,6 +534,10 @@ public class CarDisplay : MonoBehaviour
         // Deactivate currently displayed car while parts randomization occurs.
         if (_spawnedModel != null)
             _spawnedModel.SetActive(false);
+
+        // Deactivate last spawned parts model
+        if (_spawnedPartModel != null)
+            _spawnedPartModel.SetActive(false);
 
         // Reset the cached parts
         _lastSelectedPart = null;
@@ -610,7 +616,6 @@ public class CarDisplay : MonoBehaviour
 
         _spawnedPartModel = null; // reset tracker at start of run
 
-        _partsTurntableStartRot = emptyPartHolder.rotation;
         if (_partsTurntableCo != null) StopCoroutine(_partsTurntableCo);
         _partsTurntableCo = StartCoroutine(SpinEmptyPartsHolder(totalDuration));
 
@@ -620,51 +625,25 @@ public class CarDisplay : MonoBehaviour
         PartHolder prevHolder = null;
         int prevIndex = -1;
 
-        bool earlySkip = false;
         int limit = Mathf.Max(0, delays.Count - 1);
 
         for (int i = 0; i < limit; i++)
         {
-            _onFinalPartsTick = (i == (limit - 1));
-
-            if (_onFinalPartsTick) Debug.Log("ON FINAL TICK ON FINAL TICK ON FINAL TICK ON FINAL TICK  ON FINAL TICK ON FINAL TICK ");
-
-            if (skipRequested)
-            {
-                earlySkip = true;
-                break;
-            }
-
             if (TryPickNonRepeatingPart(candidates, prevHolder, prevIndex, out var holder, out int partIdx))
                 PreviewPart(holder, partIdx, ref prevHolder, ref prevIndex);
 
             yield return new WaitForSecondsRealtime(delays[i]);
         }
 
-        _onFinalPartsTick = false; // clear before the authoritative pick
+        _onFinalPartsTick = true;
+        if (_onFinalPartsTick) Debug.Log(Time.time + " ON FINAL TICK ON FINAL TICK ON FINAL TICK ON FINAL TICK  ON FINAL TICK ON FINAL TICK ");
 
         // Final pick (also non-repeating)
         if (TryPickNonRepeatingPart(candidates, prevHolder, prevIndex, out var finalHolder, out int finalIdx))
             FinalizePartSelection(finalHolder, finalIdx, ref prevHolder, ref prevIndex);
 
-        // === Skip handling & "only show popup after spin stops" ===
-        if (earlySkip)
-        {
-            // Ensure the last visible part is off when a skip is requested.
-            if (_spawnedPartModel != null) _spawnedPartModel.SetActive(false);
-
-            if (_partsTurntableCo != null)
-            {
-                StopCoroutine(_partsTurntableCo);
-                _partsTurntableCo = null;
-            }
-            emptyPartHolder.rotation = _partsTurntableStartRot;
-        }
-        else
-        {
-            if (_partsTurntableCo != null)
-                yield return _partsTurntableCo;
-        }
+        if (_partsTurntableCo != null)
+            yield return _partsTurntableCo;
 
         EndSkipListen();
         _partsSpinCo = null;
@@ -717,7 +696,6 @@ public class CarDisplay : MonoBehaviour
     {
         if (emptyPartHolder == null || totalDuration <= 0f) yield break;
 
-        Quaternion startWorldRot = emptyPartHolder.rotation;
         float elapsed = 0f;
 
         while (elapsed < totalDuration)
@@ -725,7 +703,7 @@ public class CarDisplay : MonoBehaviour
             // If the player skips during the coast, snap to final and finish
             if (skipRequested)
             {
-                emptyPartHolder.rotation = startWorldRot;
+                emptyPartHolder.rotation = _partsTurntableStartRot;
                 yield break;
             }
 
@@ -749,7 +727,7 @@ public class CarDisplay : MonoBehaviour
         {
             if (skipRequested)
             {
-                emptyPartHolder.rotation = startWorldRot;
+                emptyPartHolder.rotation = _partsTurntableStartRot;
                 yield break;
             }
 
@@ -1082,9 +1060,6 @@ public class CarDisplay : MonoBehaviour
             return;
         }
 
-        // Deactivate the awarded lootbox part from the turntable so it doesn't clip into the cars
-        _spawnedPartModel.SetActive(false);
-
         var save = SaveManager.Instance.SaveData;
         if (save == null || save.Cars == null || save.Cars.Count == 0)
         {
@@ -1126,7 +1101,7 @@ public class CarDisplay : MonoBehaviour
 
         // --- Close lootbox UI, open the garage UI ---
         // Hide the floating displayed lootbox part so it doesn't clip with the car in garage
-        HideDisplayedAwardedPart();
+        _spawnedPartModel.SetActive(false);
 
         // Hide loot crate popups
         if (lootCratePopUps != null) lootCratePopUps.SetActive(false);
@@ -2006,36 +1981,6 @@ public class CarDisplay : MonoBehaviour
         return null; // Not found
     }
 
-    private void HideDisplayedAwardedPart()
-    {
-        if (_lastSelectedPart == null || emptyPartHolder == null || string.IsNullOrEmpty(_lastSelectedPartType))
-            return;
-
-        var holderTf = emptyPartHolder.Find(_lastSelectedPartType);
-        var holder = holderTf ? holderTf.GetComponent<PartHolder>() : null;
-
-        if (holder != null)
-        {
-            var parts = holder.GetPartArray();
-            if (parts != null)
-            {
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    if (parts[i] == _lastSelectedPart && parts[i] != null)
-                    {
-                        parts[i].gameObject.SetActive(false);
-                        break;
-                    }
-                }
-            }
-        }
-        else
-        {
-            // Fallback if holder couldn’t be resolved
-            _lastSelectedPart.gameObject.SetActive(false);
-        }
-    }
-
     /// <summary>
     /// Gets rid of a leading "The ". Used for trimming "The " off of The Valen's string display name.
     /// </summary>
@@ -2082,7 +2027,7 @@ public class CarDisplay : MonoBehaviour
 
             // If this is the wheels holder, make sure the face is toward the camera
             // Holder identity check by name (matches your EMPTY_PART_HOLDER child naming).
-            if (string.Equals(newHolder.name, "WHEELS", System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(newHolder.name, "WHEELS", System.StringComparison.OrdinalIgnoreCase) && _partsTurntableCo != null)
             {
                 FlipWheelToFaceCamera();
             }
@@ -2237,8 +2182,11 @@ public class CarDisplay : MonoBehaviour
 
         if (partsFlow)
         {
+            // Check if we need to deactivate the currently spawned part
+            bool deactivateCurrent = !_onFinalPartsTick;
+
             // Stop parts spin, restore pose, ensure current visible part is off before redrawing
-            StopPartsSpinAndRestorePose(deactivateCurrent: true);
+            StopPartsSpinAndRestorePose(deactivateCurrent);
 
             // If we were already on the last tick, do not re-roll
             if (_onFinalPartsTick)
