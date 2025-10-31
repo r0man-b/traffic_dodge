@@ -233,7 +233,7 @@ public class GarageUIManager : MonoBehaviour
 
         carParts = new CarPart[13][];
         CacheComponents();
-        //RevertToLastOwnedCar();
+        RevertToLastOwnedCar();
         nitrocount.text = saveData.NitroCount.ToString();
     }
 

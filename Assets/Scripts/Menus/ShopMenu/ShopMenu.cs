@@ -418,6 +418,7 @@ public class ShopMenu : MonoBehaviour
             topLevelButtons.SetActive(true);
             gameObject.SetActive(false);
             garageUI.SetActive(true);
+            mainMenuScript.inGarage = true;
             cameFromGarageMenu = false;
             switch (previousMenuType)
             {

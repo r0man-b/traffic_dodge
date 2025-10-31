@@ -113,6 +113,8 @@ public class CarDisplay : MonoBehaviour
     private int _skipFingerId = -1;
     private int _cachedLootboxSellPrice = -1;
     private int _savedCarTier = -1;
+    private bool _onFinalTick = false;  // true only while showing the last randomized tick car
+
     // Parts lootbox selection cache
     private CarPart _lastSelectedPart;
     private string _lastSelectedPartType;
@@ -133,7 +135,7 @@ public class CarDisplay : MonoBehaviour
     /// </summary>
     private void Update()
     {
-        if (!_listenForSkip || skipRequested) return;
+        if (!_listenForSkip) return;
 
         // ----- Mouse (Editor/Standalone) -----
         if (Input.GetMouseButtonDown(0))
@@ -148,18 +150,40 @@ public class CarDisplay : MonoBehaviour
                 _pressStart = -1f;
                 if (held <= tapMaxDuration)
                 {
-                    skipRequested = true;  // quick tap => skip
+                    // Stop active coroutines immediately
+                    if (_spinCo != null) { StopCoroutine(_spinCo); _spinCo = null; }
+                    if (_turntableCo != null) { StopCoroutine(_turntableCo); _turntableCo = null; }
+
+                    // Restore turntable pose
+                    if (carHolder != null)
+                        carHolder.rotation = _turntableStartRot;
+
+                    // If we are on the last randomized tick, do NOT spawn a new car.
+                    if (_onFinalTick)
+                    {
+                        // Keep currently shown car; just finish the flow
+                        EndSkipListen();
+                        HandlePostSpin();
+                        return;
+                    }
+
+                    // Otherwise, prevent awarding the interim car and spawn a fresh final pick
+                    if (_spawnedModel != null)
+                        _spawnedModel.SetActive(false);
+
+                    SpawnWeightedRandomCar();
+
                     EndSkipListen();
+                    HandlePostSpin();
                     return;
                 }
-                // longer hold => ignore (keep listening)
+                // longer hold => ignore
             }
         }
 
         // ----- Touch (Mobile) -----
         if (Input.touchCount > 0)
         {
-            // use the first active finger (or the one we captured)
             for (int i = 0; i < Input.touchCount; i++)
             {
                 Touch t = Input.GetTouch(i);
@@ -182,11 +206,33 @@ public class CarDisplay : MonoBehaviour
 
                         if (held <= tapMaxDuration)
                         {
-                            skipRequested = true;  // quick tap => skip
+                            // Stop active coroutines immediately
+                            if (_spinCo != null) { StopCoroutine(_spinCo); _spinCo = null; }
+                            if (_turntableCo != null) { StopCoroutine(_turntableCo); _turntableCo = null; }
+
+                            // Restore turntable pose
+                            if (carHolder != null)
+                                carHolder.rotation = _turntableStartRot;
+
+                            // If we are on the last randomized tick, do NOT spawn a new car.
+                            if (_onFinalTick)
+                            {
+                                EndSkipListen();
+                                HandlePostSpin();
+                                return;
+                            }
+
+                            // Otherwise, replace interim car with a fresh final pick
+                            if (_spawnedModel != null)
+                                _spawnedModel.SetActive(false);
+
+                            SpawnWeightedRandomCar();
+
                             EndSkipListen();
+                            HandlePostSpin();
                             return;
                         }
-                        // longer hold => ignore (keep listening)
+                        // longer hold => ignore
                     }
                 }
             }
@@ -517,6 +563,7 @@ public class CarDisplay : MonoBehaviour
         // Play roulette sound effect
         menuSounds.PlayRouletteSpin();
 
+        _onFinalTick = false;      // reset each run
         skipRequested = false;     // reset each run
         EndSkipListen();           // just to be safe
         if (_spinCo != null) StopCoroutine(_spinCo);
@@ -548,6 +595,8 @@ public class CarDisplay : MonoBehaviour
         _lastSelectedPart = null;
         _lastSelectedPartType = null;
 
+        _onFinalTick = false;      // reset each run
+
         // Prepare skip state shared with Update()
         skipRequested = false;
         EndSkipListen();
@@ -573,53 +622,25 @@ public class CarDisplay : MonoBehaviour
         _turntableStartRot = (carHolder != null) ? carHolder.rotation : Quaternion.identity;
         _turntableCo = StartCoroutine(SpinTurntable(totalDuration));
 
-        BeginSkipListen();  // <-- start listening for a quick tap here
+        BeginSkipListen();
 
-        bool earlySkipTriggered = false;
-        bool finalCarSpawned = false;
-
+        // Visual ticks; Update() may stop us at any time
         for (int i = 0; i < carSpinCount - 3; i++)
         {
-            if (skipRequested)
-            {
-                earlySkipTriggered = true;
-                break;
-            }
+            // Mark only the LAST loop iteration as "final tick"
+            _onFinalTick = (i == (carSpinCount - 4));
+            if (_onFinalTick) Debug.Log("ON FINAL TICK ON FINAL TICK ON FINAL TICK ON FINAL TICK  ON FINAL TICK ON FINAL TICK ");
 
             SpawnWeightedRandomCar();
             menuSounds.PlayLootcrateTick();
             yield return new WaitForSecondsRealtime(delays[i]);
         }
 
-        if (!earlySkipTriggered)
-            finalCarSpawned = true;
+        // Finish the turntable easing if still running
+        if (_turntableCo != null)
+            yield return _turntableCo;
 
-        if (skipRequested)
-        {
-            // stop spinning and snap to final pose
-            if (_turntableCo != null)
-            {
-                StopCoroutine(_turntableCo);
-                _turntableCo = null;
-            }
-            if (carHolder != null)
-                carHolder.rotation = _turntableStartRot;
-
-            if (!finalCarSpawned)
-                SpawnWeightedRandomCar();
-
-            EndSkipListen();   // <-- stop listening
-            _spinCo = null;
-            HandlePostSpin();
-            yield break;
-        }
-        else
-        {
-            if (_turntableCo != null)
-                yield return _turntableCo; // wait until turntable finishes/returns
-        }
-
-        EndSkipListen();       // <-- stop listening
+        EndSkipListen();
         _spinCo = null;
         HandlePostSpin();
     }
@@ -773,13 +794,6 @@ public class CarDisplay : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < totalDuration)
         {
-            // If the player skips during the coast, snap to final and finish
-            if (skipRequested)
-            {
-                target.rotation = startWorldRot;
-                yield break;
-            }
-
             float dt = Time.unscaledDeltaTime;
             elapsed += dt;
 
@@ -799,13 +813,6 @@ public class CarDisplay : MonoBehaviour
 
         while (t < returnDuration)
         {
-            // Honor a late skip here too
-            if (skipRequested)
-            {
-                target.rotation = startWorldRot;
-                yield break;
-            }
-
             t += Time.unscaledDeltaTime;
             float k = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / returnDuration), 3f); // ease-out cubic
             target.rotation = Quaternion.Slerp(from, startWorldRot, k);
@@ -872,6 +879,7 @@ public class CarDisplay : MonoBehaviour
     private void HandlePostSpin()
     {
         menuSounds.PlayLootcrateAward();
+        _onFinalTick = false; // reset each run
 
         if (_partsRandomized) // UI flow for parts lootbox
         {
