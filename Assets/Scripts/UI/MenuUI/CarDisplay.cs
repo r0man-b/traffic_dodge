@@ -118,6 +118,7 @@ public class CarDisplay : MonoBehaviour
 
     // Parts lootbox selection cache
     private CarPart _lastSelectedPart;
+    private CarPartData _lastSelectedPartData;
     private string _lastSelectedPartType;
     private GameObject _spawnedPartModel;
     private string _partName;
@@ -1128,7 +1129,7 @@ public class CarDisplay : MonoBehaviour
 
             // >>> 1) Pass the awarded part info to GarageUIManager <<<
             garageUIscript.pendingAwardPartTypeRaw = _lastSelectedPartType;
-            garageUIscript.pendingAwardPartName = _lastSelectedPart.name;
+            garageUIscript.pendingAwardPartData = _lastSelectedPartData; // NEW (you will add this field in GarageUIManager)
         }
 
         // Default UI: hide buy/sell/customize sets (we’re in a selection flow)
@@ -1337,8 +1338,7 @@ public class CarDisplay : MonoBehaviour
 
         // Map type → holder(s) + save slot(s)
         string type = _lastSelectedPartType.ToUpperInvariant();
-        string partName = _lastSelectedPart.name;
-
+        var data = _lastSelectedPartData;
         bool success = false;
 
         switch (type)
@@ -1348,20 +1348,20 @@ public class CarDisplay : MonoBehaviour
                     var frontH = root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>();
                     var rearH = root.Find("REAR_WHEELS")?.GetComponent<PartHolder>();
 
-                    int fIdx = FindIndexByName(frontH, partName);
-                    int rIdx = FindIndexByName(rearH, partName);
+                    int fIdx = FindIndexByData(frontH, data);
+                    int rIdx = FindIndexByData(rearH, data);
 
                     if (fIdx >= 0)
                     {
                         ActivateOnly(frontH, fIdx);
-                        carData.CarParts[2].CurrentInstalledPart = fIdx; // FRONT_WHEELS slot
+                        carData.CarParts[2].CurrentInstalledPart = fIdx; // FRONT_WHEELS
                         carData.CarParts[2].Ownership[fIdx] = true;
                         success = true;
                     }
                     if (rIdx >= 0)
                     {
                         ActivateOnly(rearH, rIdx);
-                        carData.CarParts[4].CurrentInstalledPart = rIdx; // REAR_WHEELS slot
+                        carData.CarParts[4].CurrentInstalledPart = rIdx; // REAR_WHEELS
                         carData.CarParts[4].Ownership[rIdx] = true;
                         success = true;
                     }
@@ -1374,13 +1374,11 @@ public class CarDisplay : MonoBehaviour
             case "SIDESKIRTS":
             case "SPOILERS":
                 {
-                    // Holder lives under BODY with the same name
                     var holder = body.Find(type)?.GetComponent<PartHolder>();
-                    int idx = FindIndexByName(holder, partName);
+                    int idx = FindIndexByData(holder, data);
                     if (idx < 0) break;
 
                     ActivateOnly(holder, idx);
-
                     int slot = type switch
                     {
                         "EXHAUSTS" => 0,
@@ -1425,7 +1423,7 @@ public class CarDisplay : MonoBehaviour
         addOrSellPopUp.SetActive(false);
         returnOrSpinAgainPopUp.SetActive(true);
 
-        partName = _lastSelectedPart != null ? _lastSelectedPart.name : "Part";
+        string partName = _lastSelectedPart != null ? _lastSelectedPart.name : "Part";
         string carLabel = currentCar != null
             ? currentCar.car_name + (currentCarIndex > 0 ? $" ({currentCarIndex})" : "")
             : "car";
@@ -1618,6 +1616,7 @@ public class CarDisplay : MonoBehaviour
 
         // Clear part selection cache
         _lastSelectedPart = null;
+        _lastSelectedPartData = null;
         _lastSelectedPartType = null;
         _partName = null;
     }
@@ -2169,7 +2168,13 @@ public class CarDisplay : MonoBehaviour
             _lastSelectedPart = arr[idx];
             _lastSelectedPartType = holder != null ? holder.name : null;
             _spawnedPartModel = arr[idx] != null ? arr[idx].gameObject : null;
+
+            // NEW: cache canonical identity
+            var cp = _lastSelectedPart != null ? _lastSelectedPart.GetComponent<CarPart>() : null;
+            _lastSelectedPartData = cp != null ? cp.carPartData : null;
+
             if (arr[idx] != null) carName.text = arr[idx].name;
+            _partName = arr[idx] != null ? arr[idx].name : "Part"; // keep for UI strings
         }
     }
 
@@ -2426,72 +2431,78 @@ public class CarDisplay : MonoBehaviour
     // True if the currently-awarded part exists in the shown car's relevant PartHolder(s).
     private bool IsAwardedPartApplicableToCurrentCar()
     {
-        if (_lastSelectedPart == null || string.IsNullOrEmpty(_lastSelectedPartType) || currentCar == null)
+        if (_lastSelectedPartData == null || string.IsNullOrEmpty(_lastSelectedPartType) || _spawnedModel == null)
             return false;
 
-        string awardedName = _lastSelectedPart.name;
         var root = _spawnedModel.transform;
-        if (root == null) return false;
-
-        // BODY node for most holders
         var body = root.Find("BODY");
         if (body == null) return false;
 
-        // Wheels are special: they’re at root as FRONT_WHEELS / REAR_WHEELS, not under BODY.
         if (string.Equals(_lastSelectedPartType, "WHEELS", System.StringComparison.OrdinalIgnoreCase))
         {
-            bool inFront = HolderHasPartByName(root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>(), awardedName);
-            bool inRear = HolderHasPartByName(root.Find("REAR_WHEELS")?.GetComponent<PartHolder>(), awardedName);
-            return inFront || inRear;
+            var front = root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>();
+            var rear = root.Find("REAR_WHEELS")?.GetComponent<PartHolder>();
+            return HolderHasPartByData(front, _lastSelectedPartData) || HolderHasPartByData(rear, _lastSelectedPartData);
         }
         else
         {
-            // Most cosmetic holders are under BODY with the same name as the type.
             var holder = body.Find(_lastSelectedPartType)?.GetComponent<PartHolder>();
-            return HolderHasPartByName(holder, awardedName);
+            return HolderHasPartByData(holder, _lastSelectedPartData);
         }
-    }
-
-    private static bool HolderHasPartByName(PartHolder holder, string partName)
-    {
-        if (holder == null || string.IsNullOrEmpty(partName)) return false;
-        var arr = holder.GetPartArray();
-        if (arr == null || arr.Length == 0) return false;
-        for (int i = 0; i < arr.Length; i++)
-        {
-            if (arr[i] != null && string.Equals(arr[i].name, partName, System.StringComparison.Ordinal))
-                return true;
-        }
-        return false;
     }
 
     // Checks if the awarded part exists in the given car asset's holders (using the prefab hierarchy).
     private bool IsAwardedPartCompatibleWithCarAsset(Car carAsset)
     {
-        if (carAsset == null || _lastSelectedPart == null || string.IsNullOrEmpty(_lastSelectedPartType))
+        if (carAsset == null || _lastSelectedPartData == null || string.IsNullOrEmpty(_lastSelectedPartType))
             return false;
 
         var root = carAsset.carModel != null ? carAsset.carModel.transform : null;
         if (root == null) return false;
-
         var body = root.Find("BODY");
         if (body == null) return false;
 
-        string partName = _lastSelectedPart.name;
-        string type = _lastSelectedPartType.ToUpperInvariant();
-
-        if (type == "WHEELS")
+        if (string.Equals(_lastSelectedPartType, "WHEELS", System.StringComparison.OrdinalIgnoreCase))
         {
-            var frontH = root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>();
-            var rearH = root.Find("REAR_WHEELS")?.GetComponent<PartHolder>();
-            return HolderHasPartByName(frontH, partName) || HolderHasPartByName(rearH, partName);
+            var front = root.Find("FRONT_WHEELS")?.GetComponent<PartHolder>();
+            var rear = root.Find("REAR_WHEELS")?.GetComponent<PartHolder>();
+            return HolderHasPartByData(front, _lastSelectedPartData) || HolderHasPartByData(rear, _lastSelectedPartData);
         }
         else
         {
-            var holder = body.Find(type)?.GetComponent<PartHolder>();
-            return HolderHasPartByName(holder, partName);
+            var holder = body.Find(_lastSelectedPartType)?.GetComponent<PartHolder>();
+            return HolderHasPartByData(holder, _lastSelectedPartData);
         }
     }
+
+    private static bool HolderHasPartByData(PartHolder holder, CarPartData data)
+    {
+        if (holder == null || data == null) return false;
+        var arr = holder.GetPartArray();
+        if (arr == null || arr.Length == 0) return false;
+        for (int i = 0; i < arr.Length; i++)
+        {
+            if (arr[i] == null) continue;
+            var cp = arr[i].GetComponent<CarPart>();
+            if (cp != null && cp.carPartData == data) return true;
+        }
+        return false;
+    }
+
+    private static int FindIndexByData(PartHolder holder, CarPartData data)
+    {
+        if (holder == null || data == null) return -1;
+        var arr = holder.GetPartArray();
+        if (arr == null || arr.Length == 0) return -1;
+        for (int i = 0; i < arr.Length; i++)
+        {
+            if (arr[i] == null) continue;
+            var cp = arr[i].GetComponent<CarPart>();
+            if (cp != null && cp.carPartData == data) return i;
+        }
+        return -1;
+    }
+
 
     /// <summary>
     /// Ensures a wheel part faces the camera.

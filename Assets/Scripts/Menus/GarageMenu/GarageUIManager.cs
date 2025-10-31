@@ -73,9 +73,8 @@ public class GarageUIManager : MonoBehaviour
     [Header("Part-Apply Preview (awarded part)")]
     // Raw holder name we got from the lootbox flow: e.g. "EXHAUSTS", "FRONT_SPLITTERS", "WHEELS", ...
     public string pendingAwardPartTypeRaw;
-    // Exact part name we’re trying to preview on owned cars.
-    public string pendingAwardPartName;
-
+    // Exact part data ID we’re trying to preview on owned cars.
+    public CarPartData pendingAwardPartData;
 
     // IMPORTANT: Car type is now a string (car name), not an int index.
     private string currentCarType;
@@ -1246,7 +1245,7 @@ public class GarageUIManager : MonoBehaviour
     {
         if (!inPartApplyState) return;                                   // only while choosing a car for an awarded part
         if (string.IsNullOrEmpty(pendingAwardPartTypeRaw)) return;
-        if (string.IsNullOrEmpty(pendingAwardPartName)) return;
+        if (pendingAwardPartData == null) return;                         // NEW: use canonical identity
         if (carParts == null || carParts.Length == 0) return;
 
         var slots = ResolveSlotsForAward(pendingAwardPartTypeRaw);
@@ -1260,12 +1259,23 @@ public class GarageUIManager : MonoBehaviour
         {
             // Safety: slot bounds & arrays present
             if (slot < 0 || slot >= carParts.Length) continue;
-            var partsArray = carParts[slot];
+            var partsArray = carParts[slot];                               // expected: CarPart[]
             if (partsArray == null || partsArray.Length == 0) continue;
 
-            // Find the awarded part by name on THIS car’s holder
-            int awardedIdx = Array.FindIndex(partsArray, p => p != null && p.name == pendingAwardPartName);
-            if (awardedIdx < 0) continue; // this car doesn’t have that specific variant — CarDisplay handles the “unapplicable” UI
+            // Find the awarded part by CarPartData on THIS car’s holder
+            int awardedIdx = -1;
+            for (int i = 0; i < partsArray.Length; i++)
+            {
+                var p = partsArray[i];
+                if (p == null) continue;
+                var cp = p.GetComponent<CarPart>();
+                if (cp != null && cp.carPartData == pendingAwardPartData)
+                {
+                    awardedIdx = i;
+                    break;
+                }
+            }
+            if (awardedIdx < 0) continue; // this car doesn’t have that variant — CarDisplay handles the “unapplicable” UI
 
             // Determine what’s currently installed (fallback to default for this slot)
             int installedIdx = carData.CarParts[slot].CurrentInstalledPart;
@@ -1279,8 +1289,7 @@ public class GarageUIManager : MonoBehaviour
             if (partsArray[awardedIdx] != null)
                 partsArray[awardedIdx].gameObject.SetActive(true);
 
-            // Special cases we do NOT touch here (no install): suspension height, performance stats etc.
-            // This is strictly a visual preview; you’ll persist on your later “Apply” implementation.
+            // Note: this is a visual preview only; durability/performance/stats remain unchanged until Apply.
         }
     }
 
