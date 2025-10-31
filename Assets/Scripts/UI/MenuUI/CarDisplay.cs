@@ -114,10 +114,12 @@ public class CarDisplay : MonoBehaviour
     private int _cachedLootboxSellPrice = -1;
     private int _savedCarTier = -1;
     private bool _onFinalTick = false;  // true only while showing the last randomized tick car
+    private bool _onFinalPartsTick = false;  // true only while showing the last randomized tick part
 
     // Parts lootbox selection cache
     private CarPart _lastSelectedPart;
     private string _lastSelectedPartType;
+    private GameObject _spawnedPartModel;
     private string _partName;
     private bool _partsRandomized = false; // State flag to determine if we have opened a car or parts lootbox
 
@@ -150,24 +152,119 @@ public class CarDisplay : MonoBehaviour
                 _pressStart = -1f;
                 if (held <= tapMaxDuration)
                 {
-                    // Stop active coroutines immediately
-                    if (_spinCo != null) { StopCoroutine(_spinCo); _spinCo = null; }
-                    if (_turntableCo != null) { StopCoroutine(_turntableCo); _turntableCo = null; }
+                    // ==== PARTS FLOW? ====
+                    bool partsFlow = (_partsSpinCo != null) || (_partsTurntableCo != null);
 
-                    // Restore turntable pose
-                    if (carHolder != null)
-                        carHolder.rotation = _turntableStartRot;
-
-                    // If we are on the last randomized tick, do NOT spawn a new car.
-                    if (_onFinalTick)
+                    if (partsFlow)
                     {
-                        // Keep currently shown car; just finish the flow
+                        // Stop parts coroutines immediately
+                        if (_partsSpinCo != null) { StopCoroutine(_partsSpinCo); _partsSpinCo = null; }
+                        if (_partsTurntableCo != null) { StopCoroutine(_partsTurntableCo); _partsTurntableCo = null; }
+
+                        // Restore parts holder pose
+                        if (emptyPartHolder != null)
+                            emptyPartHolder.rotation = _partsTurntableStartRot;
+
+                        // If we are on the last randomized tick for parts, do NOT spawn a new part.
+                        if (_onFinalPartsTick)
+                        {
+                            EndSkipListen();
+                            HandlePostSpin();
+                            return;
+                        }
+
+                        // Otherwise, replace the interim part with a fresh final pick
+                        // Build candidates just like in the coroutine (no new helpers)
+                        var candidates = new List<PartHolder>(6);
+                        System.Func<string, PartHolder> H = child =>
+                            emptyPartHolder != null ? emptyPartHolder.Find(child)?.GetComponent<PartHolder>() : null;
+                        var names = new[] { "EXHAUSTS", "FRONT_SPLITTERS", "REAR_SPLITTERS", "SIDESKIRTS", "SPOILERS", "WHEELS" };
+
+                        foreach (var n in names)
+                        {
+                            var h = H(n);
+                            if (h != null && h.GetPartArray() != null && h.GetPartArray().Length > 0)
+                                candidates.Add(h);
+                        }
+
+                        PartHolder pickedHolder = null;
+                        int pickedIdx = -1;
+
+                        if (candidates.Count > 0)
+                        {
+                            // Try a random holder/index using existing helper
+                            for (int a = 0; a < 10; a++)
+                            {
+                                var h = candidates[Random.Range(0, candidates.Count)];
+                                if (TryRandomIndex(h, out int pi))
+                                {
+                                    pickedHolder = h;
+                                    pickedIdx = pi;
+                                    break;
+                                }
+                            }
+                            // Fallback: first valid
+                            if (pickedHolder == null)
+                            {
+                                foreach (var h in candidates)
+                                {
+                                    var arr = h.GetPartArray();
+                                    for (int iIdx = 0; arr != null && iIdx < arr.Length; iIdx++)
+                                    {
+                                        if (arr[iIdx] != null)
+                                        {
+                                            pickedHolder = h;
+                                            pickedIdx = iIdx;
+                                            break;
+                                        }
+                                    }
+                                    if (pickedHolder != null) break;
+                                }
+                            }
+                        }
+
+                        // Activate the chosen part and update caches/UI
+                        PartHolder dummyPrevHolder = null;
+                        int dummyPrevIndex = -1;
+
+                        if (pickedHolder != null && pickedIdx >= 0)
+                        {
+                            ActivateSwitch(pickedHolder, pickedIdx, ref dummyPrevHolder, ref dummyPrevIndex);
+                            menuSounds.PlayLootcrateTick();
+                            menuSounds.PlayWoosh();
+
+                            var finalArr = pickedHolder.GetPartArray();
+                            if (finalArr != null && pickedIdx < finalArr.Length && finalArr[pickedIdx] != null)
+                            {
+                                _lastSelectedPart = finalArr[pickedIdx];
+                                _lastSelectedPartType = pickedHolder.name;
+                                carName.text = finalArr[pickedIdx].name;
+                            }
+                        }
+
                         EndSkipListen();
                         HandlePostSpin();
                         return;
                     }
 
-                    // Otherwise, prevent awarding the interim car and spawn a fresh final pick
+                    // ==== CAR FLOW (existing behavior) ====
+                    // Stop active car coroutines immediately
+                    if (_spinCo != null) { StopCoroutine(_spinCo); _spinCo = null; }
+                    if (_turntableCo != null) { StopCoroutine(_turntableCo); _turntableCo = null; }
+
+                    // Restore car turntable pose
+                    if (carHolder != null)
+                        carHolder.rotation = _turntableStartRot;
+
+                    // If we are on the last randomized car tick, do NOT spawn a new car.
+                    if (_onFinalTick)
+                    {
+                        EndSkipListen();
+                        HandlePostSpin();
+                        return;
+                    }
+
+                    // Otherwise, replace interim car with a fresh final pick
                     if (_spawnedModel != null)
                         _spawnedModel.SetActive(false);
 
@@ -206,15 +303,115 @@ public class CarDisplay : MonoBehaviour
 
                         if (held <= tapMaxDuration)
                         {
-                            // Stop active coroutines immediately
+                            // ==== PARTS FLOW? ====
+                            bool partsFlow = (_partsSpinCo != null) || (_partsTurntableCo != null);
+
+                            if (partsFlow)
+                            {
+                                // Stop parts coroutines immediately
+                                if (_partsSpinCo != null) { StopCoroutine(_partsSpinCo); _partsSpinCo = null; }
+                                if (_partsTurntableCo != null) { StopCoroutine(_partsTurntableCo); _partsTurntableCo = null; }
+
+                                // Always deactivate the currently displayed part during a skip
+                                if (_spawnedPartModel != null)
+                                    _spawnedPartModel.SetActive(false);
+
+                                // Restore parts holder pose
+                                if (emptyPartHolder != null)
+                                    emptyPartHolder.rotation = _partsTurntableStartRot;
+
+                                // If we are on the last randomized tick for parts, do NOT spawn a new part.
+                                if (_onFinalPartsTick)
+                                {
+                                    EndSkipListen();
+                                    HandlePostSpin();
+                                    return;
+                                }
+
+                                // Otherwise, replace the interim part with a fresh final pick
+                                // Build candidates just like in the coroutine (no new helpers)
+                                var candidates = new List<PartHolder>(6);
+                                System.Func<string, PartHolder> H = child =>
+                                    emptyPartHolder != null ? emptyPartHolder.Find(child)?.GetComponent<PartHolder>() : null;
+                                var names = new[] { "EXHAUSTS", "FRONT_SPLITTERS", "REAR_SPLITTERS", "SIDESKIRTS", "SPOILERS", "WHEELS" };
+
+                                foreach (var n in names)
+                                {
+                                    var h = H(n);
+                                    if (h != null && h.GetPartArray() != null && h.GetPartArray().Length > 0)
+                                        candidates.Add(h);
+                                }
+
+                                PartHolder pickedHolder = null;
+                                int pickedIdx = -1;
+
+                                if (candidates.Count > 0)
+                                {
+                                    // Try a random holder/index using existing helper
+                                    for (int a = 0; a < 10; a++)
+                                    {
+                                        var h = candidates[Random.Range(0, candidates.Count)];
+                                        if (TryRandomIndex(h, out int pi))
+                                        {
+                                            pickedHolder = h;
+                                            pickedIdx = pi;
+                                            break;
+                                        }
+                                    }
+                                    // Fallback: first valid
+                                    if (pickedHolder == null)
+                                    {
+                                        foreach (var h in candidates)
+                                        {
+                                            var arr = h.GetPartArray();
+                                            for (int iIdx = 0; arr != null && iIdx < arr.Length; iIdx++)
+                                            {
+                                                if (arr[iIdx] != null)
+                                                {
+                                                    pickedHolder = h;
+                                                    pickedIdx = iIdx;
+                                                    break;
+                                                }
+                                            }
+                                            if (pickedHolder != null) break;
+                                        }
+                                    }
+                                }
+
+                                // Activate the chosen part and update caches/UI
+                                PartHolder dummyPrevHolder = null;
+                                int dummyPrevIndex = -1;
+
+                                if (pickedHolder != null && pickedIdx >= 0)
+                                {
+                                    ActivateSwitch(pickedHolder, pickedIdx, ref dummyPrevHolder, ref dummyPrevIndex);
+                                    menuSounds.PlayLootcrateTick();
+                                    menuSounds.PlayWoosh();
+
+                                    var finalArr = pickedHolder.GetPartArray();
+                                    if (finalArr != null && pickedIdx < finalArr.Length && finalArr[pickedIdx] != null)
+                                    {
+                                        _lastSelectedPart = finalArr[pickedIdx];
+                                        _lastSelectedPartType = pickedHolder.name;
+                                        carName.text = finalArr[pickedIdx].name;
+                                    }
+                                }
+
+                                EndSkipListen();
+                                HandlePostSpin();
+                                return;
+                            }
+
+                            // ==== CAR FLOW (existing behavior) ====
+                            // Stop active car coroutines immediately
                             if (_spinCo != null) { StopCoroutine(_spinCo); _spinCo = null; }
                             if (_turntableCo != null) { StopCoroutine(_turntableCo); _turntableCo = null; }
 
-                            // Restore turntable pose
+                            // Restore car turntable pose
                             if (carHolder != null)
                                 carHolder.rotation = _turntableStartRot;
 
-                            // If we are on the last randomized tick, do NOT spawn a new car.
+                            // If we are on the last randomized car tick, do NOT spawn a new car.
                             if (_onFinalTick)
                             {
                                 EndSkipListen();
@@ -675,6 +872,8 @@ public class CarDisplay : MonoBehaviour
         float totalDuration = 0f;
         for (int i = 0; i < delays.Count; i++) totalDuration += delays[i];
 
+        _spawnedPartModel = null; // reset tracker at start of run
+
         _partsTurntableStartRot = emptyPartHolder.rotation;
         if (_partsTurntableCo != null) StopCoroutine(_partsTurntableCo);
         _partsTurntableCo = StartCoroutine(SpinEmptyPartsHolder(totalDuration));
@@ -689,7 +888,6 @@ public class CarDisplay : MonoBehaviour
         bool PickNonRepeating(out PartHolder holder, out int idx)
         {
             holder = null; idx = -1;
-            // Try up to N times to avoid repeating the exact same (holder,idx)
             const int attempts = 10;
             for (int a = 0; a < attempts; a++)
             {
@@ -703,7 +901,6 @@ public class CarDisplay : MonoBehaviour
                     return true;
                 }
             }
-            // Fallback (accept whatever)
             var hFallback = candidates[Random.Range(0, candidates.Count)];
             if (TryRandomIndex(hFallback, out int piFallback))
             {
@@ -719,6 +916,9 @@ public class CarDisplay : MonoBehaviour
 
         for (int i = 0; i < limit; i++)
         {
+            // Mark only the LAST loop iteration as "final tick" for parts
+            _onFinalPartsTick = (i == (limit - 1));
+
             if (skipRequested)
             {
                 earlySkip = true;
@@ -733,11 +933,18 @@ public class CarDisplay : MonoBehaviour
 
                 var parts = holder.GetPartArray();
                 if (parts != null && partIdx >= 0 && partIdx < parts.Length && parts[partIdx] != null)
+                {
                     carName.text = parts[partIdx].name;
+                    _spawnedPartModel = parts[partIdx].gameObject; // track currently visible interim part
+                }
             }
 
             yield return new WaitForSecondsRealtime(delays[i]);
         }
+
+        // We only reach here if we didn't break the loop.
+        // Clear the flag before doing the final, authoritative pick.
+        _onFinalPartsTick = false;
 
         // Final pick (also non-repeating)
         if (PickNonRepeating(out var finalHolder, out int finalPartIdx))
@@ -751,6 +958,9 @@ public class CarDisplay : MonoBehaviour
             {
                 _lastSelectedPart = finalPartsArray[finalPartIdx];
                 _lastSelectedPartType = finalHolder != null ? finalHolder.name : null;
+
+                // track the final, authoritative visible part
+                _spawnedPartModel = finalPartsArray[finalPartIdx] != null ? finalPartsArray[finalPartIdx].gameObject : null;
             }
             carName.text = finalPartsArray != null && finalPartsArray[finalPartIdx] != null
                 ? finalPartsArray[finalPartIdx].name
@@ -760,6 +970,10 @@ public class CarDisplay : MonoBehaviour
         // === Skip handling & "only show popup after spin stops" ===
         if (earlySkip)
         {
+            // Deactivate whatever interim part is currently shown at the moment of skip
+            if (_spawnedPartModel != null)
+                _spawnedPartModel.SetActive(false);
+
             // Stop rotation and snap back immediately
             if (_partsTurntableCo != null)
             {
@@ -880,6 +1094,7 @@ public class CarDisplay : MonoBehaviour
     {
         menuSounds.PlayLootcrateAward();
         _onFinalTick = false; // reset each run
+        _onFinalPartsTick = false;
 
         if (_partsRandomized) // UI flow for parts lootbox
         {
@@ -1190,6 +1405,9 @@ public class CarDisplay : MonoBehaviour
             Debug.LogWarning("PrepareToAddPartToOwnedCar: No awarded part cached. Did you open a parts lootbox?");
             return;
         }
+
+        // Deactivate the awarded lootbox part from the turntable so it doesn't clip into the cars
+        _spawnedPartModel.SetActive(false);
 
         var save = SaveManager.Instance.SaveData;
         if (save == null || save.Cars == null || save.Cars.Count == 0)
