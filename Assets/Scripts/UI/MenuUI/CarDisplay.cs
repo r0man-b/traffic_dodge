@@ -460,11 +460,60 @@ public class CarDisplay : MonoBehaviour
         }
 
         garageUIManager.UpdatePerformanceStats();
+        NormalizeOwnedPointersAfterSell(SaveManager.Instance.SaveData);
         SaveManager.Instance.SaveGame(); // Save changes to the data.
         buyConfirmationPopUp.SetActive(false);
         notEnoughCreditsPopUp.SetActive(false);
         sellConfirmationPopUp.SetActive(false);
         cannotSellPopUp.SetActive(false);
+    }
+
+    // Guarantees that SaveData.LastOwnedCarType/Index (and CurrentCarType/Index) always point to an
+    // actually owned car after a sale, regardless of whether the player sold the last copy, a middle
+    // copy that caused index shifts, or the final car overall.
+    private static void NormalizeOwnedPointersAfterSell(SaveData save)
+    {
+        // Local helper
+        static bool HasPair(SaveData s, string t, int i) =>
+            !string.IsNullOrEmpty(t) && s.Cars.ContainsKey((t, i));
+
+        // Nothing owned anymore → clear pointers and return
+        if (save.Cars == null || save.Cars.Count == 0)
+        {
+            save.LastOwnedCarType = string.Empty;
+            save.LastOwnedCarIndex = 0;
+            save.CurrentCarType = string.Empty;
+            save.CurrentCarIndex = 0;
+            return;
+        }
+
+        // Choose a deterministic fallback ("first owned car"): by type, then by index
+        var firstAny = save.Cars.Keys
+            .OrderBy(k => k.CarType)
+            .ThenBy(k => k.CarIndex)
+            .First();
+
+        // If LastOwned points to a non-existent pair, try to keep type if possible; otherwise fall back to firstAny
+        if (!HasPair(save, save.LastOwnedCarType, save.LastOwnedCarIndex))
+        {
+            var sameType = save.Cars.Keys
+                .Where(k => k.CarType == save.LastOwnedCarType)
+                .OrderBy(k => k.CarIndex)
+                .ToList();
+
+            if (sameType.Count > 0)
+            {
+                // pick the lowest index of that type
+                var pick = sameType[0];
+                save.LastOwnedCarType = pick.CarType;
+                save.LastOwnedCarIndex = pick.CarIndex;
+            }
+            else
+            {
+                save.LastOwnedCarType = firstAny.CarType;
+                save.LastOwnedCarIndex = firstAny.CarIndex;
+            }
+        }
     }
 
     // Update performance stats text.
