@@ -10,6 +10,7 @@ public class ShopMenu : MonoBehaviour
 {
     [Header("External scripts")]
     [SerializeField] private MainMenu mainMenuScript;
+    [SerializeField] private MenuSounds menuSounds;
 
     [Header("UI Elements")]
     [SerializeField] private GameObject topLevelButtons;
@@ -271,7 +272,10 @@ public class ShopMenu : MonoBehaviour
         int prev = _selectedQuantity;
         _selectedQuantity = Mathf.Clamp(_selectedQuantity + delta, MinSelected, MaxSelected);
         if (_selectedQuantity != prev)
+        {
+            menuSounds.PlayCreditChange();
             RefreshAllTexts();
+        }
     }
 
     private void RefreshAllTexts()

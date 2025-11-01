@@ -259,6 +259,7 @@ public class CarDisplay : MonoBehaviour
                     lockImage.SetActive(false);
                     buttonSet1.SetActive(false);
                     buttonSet2.SetActive(true); // Set all bottom buttons to be visible if car is owned.
+                    goRaceButton.SetActive(true);
                 }
                 else
                 {
@@ -266,6 +267,7 @@ public class CarDisplay : MonoBehaviour
                     lockImage.SetActive(true);
                     buttonSet1.SetActive(true); // Set only the 'buy' button to be visible if car is not owned.
                     buttonSet2.SetActive(false);
+                    goRaceButton.SetActive(false);
                 }
             }
 
