@@ -987,15 +987,19 @@ public class GarageUIManager : MonoBehaviour
         if (!isPartOwned)
         {
             popUps.SetActive(true);
+
+            // Select part type text based on part index: 12 = LIVERIES, 11 = DECALS, else "part"
+            string partTypeText = (partIndex == 12) ? "livery" : (partIndex == 11) ? "decal  set" : "part";
+
             if (creditManager.GetCredits() < carParts[partIndex][partType].price)
             {
-                notEnoughCreditsPopUpText.text = "You  do  not  have  enough  credits  to   purchase  this  part";
+                notEnoughCreditsPopUpText.text = $"You  do  not  have  enough  credits  to   purchase  this  {partTypeText}";
                 notEnoughCreditsPopUp.SetActive(true);
                 buyConfirmationPopUp.SetActive(false);
             }
             else
             {
-                buyConfirmationPopUpText.text = "Buy  this  part  for  " + carParts[partIndex][partType].price.ToString("N0") + "  CR?";
+                buyConfirmationPopUpText.text = $"Buy  this  {partTypeText}  for  " + carParts[partIndex][partType].price.ToString("N0") + "  CR?";
                 notEnoughCreditsPopUp.SetActive(false);
                 buyButton.onClick.RemoveAllListeners();
                 buyButton.onClick.AddListener(() => BuyPart(partType, partIndex));
@@ -1070,6 +1074,12 @@ public class GarageUIManager : MonoBehaviour
 
         scrollController.buttonPrices[oldIndex].text = "OWNED";
         scrollController.buttonPrices[partType].text = "INSTALLED";
+
+        // Play spray can for decals (11) and livery (12), otherwise air wrench
+        if (partIndex == 11 || partIndex == 12)
+            menuSounds.PlaySprayCan();
+        else
+            menuSounds.PlayAirWrenchSound();
 
         notEnoughCreditsPopUp.SetActive(false);
         buyConfirmationPopUp.SetActive(false);
