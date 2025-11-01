@@ -2563,6 +2563,7 @@ public class CarDisplay : MonoBehaviour
         bool applicable = IsAwardedPartApplicableToCurrentCar();
 
         // lock+text
+        lockUiElement.SetActive(!applicable);
         lockImage.SetActive(!applicable);
         if (unapplicableTextObject != null)
         {
