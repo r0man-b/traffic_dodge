@@ -31,6 +31,12 @@ public class BackButtonHandler : MonoBehaviour
             yield return new WaitUntil(() => popupClosed);
         }
 
+        // Reset the options menu layout before leaving
+        if (optionsAnimator != null)
+        {
+            optionsAnimator.ResetMenu();
+        }
+
         // Proceed with closing options and opening main menu
         optionsMenu.SetActive(false);
         mainMenu.SetActive(true);

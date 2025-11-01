@@ -47,6 +47,10 @@ public class ToggleGraphicsOptions : MonoBehaviour
         BasicGraphicsOptionsModeButtonRight.onClick.AddListener(OnRightButtonClicked);
     }
 
+    private void OnEnable()
+    {
+        ToggleToBasic();
+    }
 
     public void ToggleToAdvanced()
     {

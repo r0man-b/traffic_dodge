@@ -38,6 +38,24 @@ public class OptionsMenuAnimator : MonoBehaviour
         StartCoroutine(OnButtonClickRoutine(buttonIndex));
     }
 
+    public void ResetMenu()
+    {
+        StopAllCoroutines();
+
+        // Reset tracked state
+        currentOpenIndex = -1;
+
+        // Disable all option groups
+        foreach (var group in optionGroups)
+        {
+            group.SetActive(false);
+        }
+
+        // Move panels to their default positions
+        buttonPanel.anchoredPosition = centerPos;
+        optionsPanel.anchoredPosition = optionsHiddenPos;
+    }
+
     private IEnumerator OnButtonClickRoutine(int buttonIndex)
     {
         bool waitForPopup = currentOpenIndex == 2;
