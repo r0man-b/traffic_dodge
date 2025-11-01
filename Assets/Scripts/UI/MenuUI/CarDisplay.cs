@@ -62,6 +62,7 @@ public class CarDisplay : MonoBehaviour
     [Header("UI elements that get disabled/enabled during/after lootbox spin")]
     public GameObject nitroObject;
     public GameObject backButton;
+    public GameObject backButtonForLootboxAwards;
     public GameObject goRaceButton;
     public GameObject shopMenu;
     public GameObject mainMenuUI;
@@ -1096,6 +1097,9 @@ public class CarDisplay : MonoBehaviour
         // Re-enable the car name string
         carName.gameObject.SetActive(true);
 
+        // Enable back button that allows us to get back to this state
+        backButtonForLootboxAwards.SetActive(true);
+
         // Edge buttons: disable left (we're at first), right only if >1 owned
         if (leftButton != null) leftButton.SetActive(false);
         if (rightButton != null) rightButton.SetActive(ownedOfType > 1);
@@ -1168,6 +1172,9 @@ public class CarDisplay : MonoBehaviour
 
         // Turn on the name label at the bottom
         if (carName != null) carName.gameObject.SetActive(true);
+
+        // Enable back button that allows us to get back to this state
+        backButtonForLootboxAwards.SetActive(true);
 
         // We are NOT replacing a car.
         if (garageUIscript != null)
@@ -1600,6 +1607,99 @@ public class CarDisplay : MonoBehaviour
         garageUIscript.ChangeCar(0);
     }
 
+    // Returns from Car Replace or Part Apply state back to the initial award popup.
+    // Restores the correct popup layout for the current award type (car vs. part).
+    public void ReturnToAwardPopup()
+    {
+        // Defensive null checks
+        if (garageUIscript == null || garageUI == null || lootCratePopUps == null || addOrSellPopUp == null)
+            return;
+
+        // Always reset camera and hide name label while showing popups
+        if (garageCamera != null)
+        {
+            garageCamera.UnlockDistance();
+            garageCamera.SetCameraPosition(0);
+        }
+        if (carName != null) carName.gameObject.SetActive(false);
+
+        // Show the lootbox popup container
+        lootCratePopUps.SetActive(true);
+        addOrSellPopUp.SetActive(true);
+
+        // Disable browse buttons
+        if (leftButton != null) leftButton.SetActive(false);
+        if (rightButton != null) rightButton.SetActive(false);
+
+        // Remove the temporary back button used during apply/replace flows
+        if (backButtonForLootboxAwards != null) backButtonForLootboxAwards.SetActive(false);
+
+        // Common popup defaults
+        if (returnOrSpinAgainPopUp != null) returnOrSpinAgainPopUp.SetActive(false);
+        if (lockUiElement != null) lockUiElement.SetActive(false);
+        if (lockImage != null) lockImage.SetActive(false);
+        if (unapplicableTextObject != null) unapplicableTextObject.SetActive(false);
+
+        // Reset the bottom button sets (we are returning to a popup state)
+        if (buttonSet1 != null) buttonSet1.SetActive(false);
+        if (buttonSet2 != null) buttonSet2.SetActive(false);
+        if (buttonSet3 != null) buttonSet3.SetActive(false);
+        if (buttonSet4 != null) buttonSet4.SetActive(false);
+
+        // Case 1: Returning from "Replace Car" flow
+        if (garageUIscript.inCarReplaceState)
+        {
+            // Exit replace mode
+            garageUIscript.inCarReplaceState = false;
+
+            // Show popup options appropriate to the “max per type” scenario:
+            // Replace is available; Add stays hidden (mirrors PrepareToReplaceOwnedCar() entry point).
+            if (addButton != null) addButton.SetActive(false);
+            if (replaceButton != null) replaceButton.SetActive(true);
+            if (partAddButton != null) partAddButton.SetActive(false);
+            if (freeRespinButton != null) freeRespinButton.SetActive(false);
+
+            // Keep the existing award message & sell price (already set by HandlePostSpin/EnsureLootboxSellPriceCached)
+            EnsureLootboxSellPriceCached();
+            // No further text changes needed; addOrSellPopUpText was already set when the award appeared.
+            return;
+        }
+
+        // Case 2: Returning from “Apply Part to Car” flow
+        if (garageUIscript.inPartApplyState)
+        {
+            // Exit apply mode and owned-only browse
+            garageUIscript.inPartApplyState = false;
+            garageUIscript.ownedOnlyBrowse = false;
+
+            // Restore the parts-award popup layout:
+            // Show the Part Add button; hide car Add/Replace.
+            if (addButton != null) addButton.SetActive(false);
+            if (replaceButton != null) replaceButton.SetActive(false);
+            if (partAddButton != null) partAddButton.SetActive(true);
+            if (freeRespinButton != null) freeRespinButton.SetActive(false);
+
+            // Ensure sell price cached (used by existing sell button)
+            EnsureLootboxSellPriceCached();
+
+            // Re-display the awarded part
+            _spawnedPartModel.SetActive(true);
+
+            // Re-deactivate currently displayed car.
+            if (_spawnedModel != null)
+                _spawnedModel.SetActive(false);
+
+            // Re-zoom garage camera in on the awarded part
+            garageCamera.SetCameraForPartsRandomization();
+
+            // Keep the previously composed message; it already says what part was won and the sell price.
+            return;
+        }
+
+        // If neither state was active, do nothing further (safety).
+    }
+
+
     // Reset all UI elements to their default states.
     private void ResetUIElements()
     {
@@ -1626,6 +1726,7 @@ public class CarDisplay : MonoBehaviour
         // Disable lootbox-specific button sets
         buttonSet3.SetActive(false);
         buttonSet4.SetActive(false);
+        backButtonForLootboxAwards.SetActive(false);
 
         // Reset garage camera
         garageCamera.UnlockDistance();
