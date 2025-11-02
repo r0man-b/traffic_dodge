@@ -1364,6 +1364,10 @@ public class GarageUIManager : MonoBehaviour
                 else if (change > 0 && currentPaintType == 2) currentPaintType = 4;
                 else currentPaintType += change;
                 currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
+
+                // Deactivate paint switch buttons if on edge of available paint types
+                buttonSwitchPaintTypeLeft.gameObject.SetActive(!(currentPaintType == 1));
+                buttonSwitchPaintTypeRight.gameObject.SetActive(!(currentPaintType == 4));
                 break;
             }
 
@@ -1381,6 +1385,10 @@ public class GarageUIManager : MonoBehaviour
                     else currentPaintType += change;
                     currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
                 }
+
+                // Deactivate paint switch buttons if on edge of available paint types
+                buttonSwitchPaintTypeLeft.gameObject.SetActive(!(currentPaintType == 1));
+                buttonSwitchPaintTypeRight.gameObject.SetActive(!(currentPaintType == 4));
                 break;
             }
             
@@ -1392,6 +1400,10 @@ public class GarageUIManager : MonoBehaviour
 
                 else currentPaintType += change;
                 currentPaintType = Mathf.Clamp(currentPaintType, 1, 4);
+                
+                // Deactivate paint switch buttons if on edge of available paint types
+                buttonSwitchPaintTypeLeft.gameObject.SetActive(!(currentPaintType == 1));
+                buttonSwitchPaintTypeRight.gameObject.SetActive(!(currentPaintType == 4));
                 break;
             }
         }
