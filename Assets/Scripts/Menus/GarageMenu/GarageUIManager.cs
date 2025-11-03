@@ -28,7 +28,6 @@ public class GarageUIManager : MonoBehaviour
     public GarageCamera garageCamera;
     public ScrollViewControllerBottomLayer scrollController;
     public CreditManager creditManager;
-    public TextMeshProUGUI nitrocount;
     public MenuSounds menuSounds;
     public int previousPartType = -1;
     public int previousPartIndex = -1;
@@ -58,7 +57,6 @@ public class GarageUIManager : MonoBehaviour
     public GameObject paintPopUps;
     public GameObject paintBuyConfirmationPopUp;
     public TextMeshProUGUI paintBuyConfirmationPopUpText;
-    public Button paintBuyButton;
     public GameObject paintNotEnoughCreditsPopUp;
     public TextMeshProUGUI paintNotEnoughCreditsPopUpText;
 
@@ -233,7 +231,6 @@ public class GarageUIManager : MonoBehaviour
         carParts = new CarPart[13][];
         CacheComponents();
         RevertToLastOwnedCar();
-        nitrocount.text = saveData.NitroCount.ToString();
     }
 
     private void Update()
@@ -2101,11 +2098,6 @@ public class GarageUIManager : MonoBehaviour
         if (livesIndex != -1) car.numlives = carParts[10][livesIndex].maxLives;
 
         carDisplay.UpdateStats(car.accelMaxValue, car.accelIncreaseRate, car.numlives);
-    }
-
-    public void UpdateNitroCount()
-    {
-        nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
     }
 
     // Get the index of a default installed part

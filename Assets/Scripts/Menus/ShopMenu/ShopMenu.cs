@@ -18,12 +18,12 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private GameObject popups;
     [SerializeField] private GameObject nitroImage;              // Shows a nitro-can icon when buying Credits
     [SerializeField] private GameObject notEnoughNitroPopUp;     // Shown when player lacks nitros for a Credits purchase
-    [SerializeField] private CreditManager CreditManager;           // Object holding a `CreditManager` component
+    [SerializeField] private CreditManager creditManager;        // Object holding a `CreditManager` component
+    [SerializeField] private NitroManager nitroManager;          // Object holding a `NitroManager` component
     [SerializeField] private GameObject garageUI;
     [SerializeField] private GarageUIManager garageUIManager;
     [SerializeField] private GameObject mainMenuUI;
     [SerializeField] private CarDisplay carDisplay;
-    public TextMeshProUGUI nitrocount;
 
     [Header("Popup UI")]
     [SerializeField] private TMP_Text packTitleText;       // e.g., "NITRO PACK OF X" or "X CR"
@@ -78,12 +78,6 @@ public class ShopMenu : MonoBehaviour
 
     private float _plusHoldDuration;
     private float _minusHoldDuration;
-
-    private void Awake()
-    {
-        if (nitrocount != null && SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
-            nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
-    }
 
     #region Public entry point (called by your Shop button)
     /// <summary>
@@ -161,9 +155,7 @@ public class ShopMenu : MonoBehaviour
     public void OpenLootCrate()
     {
         int nitroCost = Mathf.RoundToInt(_currentItem.priceOfItem);
-        int playerNitro = (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
-            ? SaveManager.Instance.SaveData.NitroCount
-            : 0;
+        int playerNitro = nitroManager.GetNitro();
 
         // Check if the player has enough nitros
         if (playerNitro < nitroCost)
@@ -173,8 +165,7 @@ public class ShopMenu : MonoBehaviour
         }
 
         // Deduct nitros
-        SaveManager.Instance.SaveData.NitroCount = Mathf.Max(0, playerNitro - nitroCost);
-        SaveManager.Instance.SaveGame();
+        nitroManager.ChangeNitro(-nitroCost);
 
         // Update nitro count UI
         RefreshAllTexts();
@@ -280,9 +271,6 @@ public class ShopMenu : MonoBehaviour
 
     private void RefreshAllTexts()
     {
-        if (nitrocount != null && SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
-            nitrocount.text = SaveManager.Instance.SaveData.NitroCount.ToString();
-
         if (_currentItem == null) return;
 
         // Quantity numeric field
@@ -346,18 +334,9 @@ public class ShopMenu : MonoBehaviour
     // Nitro fulfillment after verified purchase
     public void OnNitroPurchaseSucceeded()
     {
-        long grant = (long)_currentItem.quantityOfItem * _selectedQuantity;
+        int grant = _currentItem.quantityOfItem * _selectedQuantity;
 
-        if (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
-        {
-            // Clamp to int range if SaveData.NitroCount is an int
-            long newValue = (long)SaveManager.Instance.SaveData.NitroCount + grant;
-            if (newValue > int.MaxValue) newValue = int.MaxValue;
-            if (newValue < int.MinValue) newValue = int.MinValue;
-            SaveManager.Instance.SaveData.NitroCount = (int)newValue;
-
-            SaveManager.Instance.SaveGame();
-        }
+        nitroManager.ChangeNitro(grant);
 
         RefreshAllTexts();
         HandleBackButton();
@@ -367,9 +346,7 @@ public class ShopMenu : MonoBehaviour
     {
         // Cost is in nitro cans; must have enough nitro to proceed.
         int nitroCost = Mathf.RoundToInt(_selectedQuantity * _currentItem.priceOfItem);
-        int playerNitro = (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
-            ? SaveManager.Instance.SaveData.NitroCount
-            : 0;
+        int playerNitro = nitroManager.GetNitro();
 
         if (playerNitro < nitroCost)
         {
@@ -378,18 +355,13 @@ public class ShopMenu : MonoBehaviour
         }
 
         // Deduct nitro and grant credits
+        nitroManager.ChangeNitro(-nitroCost);
         long grantCreditsLong = (long)_currentItem.quantityOfItem * _selectedQuantity;
 
-        if (SaveManager.Instance != null && SaveManager.Instance.SaveData != null)
-        {
-            SaveManager.Instance.SaveData.NitroCount = Mathf.Max(0, playerNitro - nitroCost);
-            SaveManager.Instance.SaveGame();
-        }
-
         // Update credits via CreditManager (method expects int)
-        if (CreditManager != null)
+        if (creditManager != null)
         {
-            CreditManager.ChangeCredits(grantCreditsLong);
+            creditManager.ChangeCredits(grantCreditsLong);
         }
         else
         {

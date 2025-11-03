@@ -63,6 +63,7 @@ public class UIManager : MonoBehaviour
     public float oncomingDistance = 0.0f;
     double topSpeed = 0;
     private CreditManager creditManager;
+    private NitroManager nitroManager;
     private PlayerController playerController;
     private SoundManager soundManager;
 
@@ -78,6 +79,9 @@ public class UIManager : MonoBehaviour
 
         // Find 'CreditManager' script.
         creditManager = credits.GetComponent<CreditManager>();
+
+        // Find 'NitroManager' script.
+        nitroManager = nitrocount.GetComponent<NitroManager>();
     }
 
     void Start()
@@ -251,7 +255,7 @@ public class UIManager : MonoBehaviour
 
             // Award one Nitro for every 100 units of excess distance
             nitrosEarned = 1 + Mathf.FloorToInt(excessDistance / 100f);
-            saveData.NitroCount += nitrosEarned;
+            nitroManager.ChangeNitro(nitrosEarned);
 
             // Set DistanceUntilNextNitro to the remainder to reach next 100-mile threshold
             float remainder = excessDistance % 100f;
@@ -264,7 +268,6 @@ public class UIManager : MonoBehaviour
         }
 
         // Load & save player stats.
-        nitrocount.text = saveData.NitroCount.ToString();
         long current_credits = saveData.GlobalCredits;
         float oldRecordDistance = saveData.RecordDistance;
         double oldRecordSpeed = saveData.RecordSpeed;
