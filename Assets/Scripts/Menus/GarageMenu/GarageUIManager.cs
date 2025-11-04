@@ -1499,6 +1499,9 @@ public class GarageUIManager : MonoBehaviour
         // Determine which palette button this was.
         int presetIndex = GetPresetIndexInBucket(clickedButton);
 
+        // Move the border to the newly selected preset; leave the checkmark on the previously purchased preset.
+        ApplyBorderForBucket(currentPaintType, presetIndex);
+
         var saveData = SaveManager.Instance.SaveData;
         if (saveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
         {
@@ -1770,7 +1773,7 @@ public class GarageUIManager : MonoBehaviour
             // Save metallic color.
             colorData.MetallicMap = pending.MetallicMap;
             
-            // Display checkmark on newly purchased paint button.
+            // Display checkmark & border on newly purchased paint button.
             if (_pendingPreset.TryGetValue(colorType, out var sel))
             {
                 colorData.SelectedPaintType = sel.paintType;
@@ -1778,6 +1781,9 @@ public class GarageUIManager : MonoBehaviour
 
                 // Immediately reflect in UI for the current bucket.
                 ApplyCheckmarkForBucket(sel.paintType, sel.presetIndex);
+
+                // Keep the border on the purchased/installed preset as well.
+                ApplyBorderForBucket(sel.paintType, sel.presetIndex);
             }
 
             SaveManager.Instance.SaveGame();
@@ -1866,6 +1872,14 @@ public class GarageUIManager : MonoBehaviour
             default:
                 Debug.LogError("Invalid part to revert");
                 break;
+        }
+
+        for (int t = 0; t < colorBuckets.Count; t++)
+            ClearBordersForBucket(t);
+
+        if (saved.SelectedPresetIndex >= 0)
+        {
+            ApplyBorderForBucket(saved.SelectedPaintType, saved.SelectedPresetIndex);
         }
 
         // Remove pending preview for this part, if any.
@@ -1960,15 +1974,49 @@ public class GarageUIManager : MonoBehaviour
         if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
         {
             ClearCheckmarksForBucket(paintType);
+            ClearBordersForBucket(paintType);
             return;
         }
 
         var saved = carData.Colors[partIndex];
         if (saved.SelectedPaintType == paintType && saved.SelectedPresetIndex >= 0)
+        {
             ApplyCheckmarkForBucket(paintType, saved.SelectedPresetIndex);
+            ApplyBorderForBucket(paintType, saved.SelectedPresetIndex); // border starts on the installed preset
+        }
         else
+        {
             ClearCheckmarksForBucket(paintType);
+            ClearBordersForBucket(paintType);
+        }
     }
+
+    // Turn on a single child named "Border" under the selected slot; turn off others.
+    private void ApplyBorderForBucket(int paintType, int presetIndex)
+    {
+        if (paintType < 0 || paintType >= colorBuckets.Count) return;
+        var bucket = colorBuckets[paintType].transform;
+
+        for (int i = 0; i < bucket.childCount; i++)
+        {
+            var border = bucket.GetChild(i).Find("Border");
+            if (border != null) border.gameObject.SetActive(i == presetIndex);
+        }
+    }
+
+    // Clear all borders in a bucket.
+    private void ClearBordersForBucket(int paintType)
+    {
+        if (paintType < 0 || paintType >= colorBuckets.Count) return;
+        var bucket = colorBuckets[paintType].transform;
+
+        for (int i = 0; i < bucket.childCount; i++)
+        {
+            var border = bucket.GetChild(i).Find("Border");
+            if (border != null) border.gameObject.SetActive(false);
+        }
+    }
+
 
     // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard. (DEPRECATED)
     public void SetColor(Button clickedButton)
