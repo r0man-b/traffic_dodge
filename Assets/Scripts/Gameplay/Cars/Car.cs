@@ -420,11 +420,12 @@ public class Car : ScriptableObject
         ApplyMetallicToMaterial(targetMaterial, metallic);
     }
 
-    public void RandomizeColors(Material targetMaterial, ColorType colorType, bool isEmissiveMaterial)
+    public PaintFlags RandomizeColors(Material targetMaterial, ColorType colorType, bool isEmissiveMaterial, bool isPrimaryColorUniquePearlescent = false)
     {
         Color baseColor;
         Color fresnelColor;
         Color fresnelColor2;
+        PaintFlags paintFlags = new PaintFlags(false, false);
 
         // --- Emissive lights (headlights / secondary / tails): 50% pale tint, 50% match primary ---
         if (isEmissiveMaterial)
@@ -449,7 +450,7 @@ public class Car : ScriptableObject
 
             // Lights stay non-metallic
             ApplyMetallicToMaterial(targetMaterial, NON_METALLIC_DEFAULT);
-            return; // important: skip the rest of the body/rim logic
+            return paintFlags; // important: skip the rest of the body/rim logic
         }
 
         // -------- Non-emissive materials (body/rims) ----------
@@ -486,12 +487,18 @@ public class Car : ScriptableObject
                     baseColor = fresnelPresets[UnityEngine.Random.Range(3, fresnelPresets.Length)];
                     fresnelColor = fresnelPresets[UnityEngine.Random.Range(3, fresnelPresets.Length)];
                     fresnelColor2 = fresnelPresets[UnityEngine.Random.Range(3, fresnelPresets.Length)];
+                    paintFlags.UniquePearlescent = true;
                 }
                 else
                 {
                     baseColor = primary;
                     fresnelColor = primary;
                     fresnelColor2 = primary;
+
+                    // If our primary has a unique pearlescent flag and we fell into this conditional, then
+                    // the rims match this primary paint, therefore, we set the rims' paint flags pearlescent to true
+                    // as well
+                    if (isPrimaryColorUniquePearlescent) paintFlags.UniquePearlescent = true; 
                 }
             }
         }
@@ -520,6 +527,7 @@ public class Car : ScriptableObject
                     baseColor = fresnelPresets[UnityEngine.Random.Range(0, fresnelPresets.Length)];
                     fresnelColor = fresnelPresets[UnityEngine.Random.Range(0, fresnelPresets.Length)];
                     fresnelColor2 = fresnelPresets[UnityEngine.Random.Range(0, fresnelPresets.Length)];
+                    paintFlags.UniquePearlescent = true;
                 }
             }
         }
@@ -540,6 +548,9 @@ public class Car : ScriptableObject
             float metallicValue = (UnityEngine.Random.Range(0, 20) == 0) ? 1f : NON_METALLIC_DEFAULT;
             targetMaterial.SetFloat("_Metallic", metallicValue);
 
+            // Save metal paint flag if paint is metallic
+            if (metallicValue >= 0.99f) paintFlags.UniqueMetal = true;
+
             // Mirror to secondary (non-emissive here; emissive secondary handled elsewhere)
             secondColor.color = baseColor;
             if (secondColor.HasProperty("_FresnelColor"))
@@ -555,10 +566,16 @@ public class Car : ScriptableObject
         if (colorType == ColorType.RIM_COLOR)
         {
             float metallicValue = (UnityEngine.Random.Range(0, 5) == 0) ? 1f : RIM_NON_METALLIC_DEFAULT;
+            
+            // Save metal paint flag if rim paint is metallic
+            if (metallicValue >= 0.99f) paintFlags.UniqueMetal = true;
+            
             targetMaterial.SetFloat("_Metallic", metallicValue);
             targetMaterial.SetColor("_EmissionColor", Color.black);
             targetMaterial.DisableKeyword("_EMISSION");
         }
+
+        return paintFlags;
     }
 
     public void ApplyLivery(int index)
@@ -967,7 +984,7 @@ public class Car : ScriptableObject
     }
 
     // Spawn car with randomized customizations. Will be used for cars spawned from lootboxes.
-    public void RandomizeCar(string carType, int carIndex, Transform currentCarModel, bool isOwned = true)
+    public int RandomizeCar(string carType, int carIndex, Transform currentCarModel, bool isOwned = true)
     {
         currentCarType = carType;
         currentCarIndex = carIndex;
@@ -1179,16 +1196,30 @@ public class Car : ScriptableObject
         ApplyLivery(0);
 
         // Randomize colors.
-        RandomizeColors(primColor, ColorType.PRIMARY_COLOR, false);
-        RandomizeColors(rimColor, ColorType.RIM_COLOR, false);
+        PaintFlags primFlags = RandomizeColors(primColor, ColorType.PRIMARY_COLOR, false);
+        PaintFlags rimFlags = RandomizeColors(rimColor, ColorType.RIM_COLOR, false, primFlags.UniquePearlescent);
         RandomizeColors(primLight, ColorType.PRIMARY_LIGHT, true);
         RandomizeColors(secondLight, ColorType.SECONDARY_LIGHT, true);
         RandomizeColors(tailLight, ColorType.TAIL_LIGHT, true);
+        PaintFlags secFlags = primFlags;
 
         primColor.SetFloat("_Brightness", 1.21f);
 
         // Save the updated data to disk.
-        SaveManager.Instance.SaveGame();
+        SaveManager.Instance.SaveGame(); // TODO: Why do I need this here?
+
+        PaintTraits traits = PaintTraits.None;
+
+        if (primFlags.UniquePearlescent) traits |= PaintTraits.UniquePearlescentPrimary;
+        if (primFlags.UniqueMetal) traits |= PaintTraits.UniqueMetalPrimary;
+
+        if (secFlags.UniquePearlescent) traits |= PaintTraits.UniquePearlescentSecondary;
+        if (secFlags.UniqueMetal) traits |= PaintTraits.UniqueMetalSecondary;
+
+        if (rimFlags.UniquePearlescent) traits |= PaintTraits.UniquePearlescentRims;
+        if (rimFlags.UniqueMetal) traits |= PaintTraits.UniqueMetalRims;
+
+        return (int)traits;
     }
 
     // --- Helper: generate a pale-but-visible light color (higher saturation, slightly lower value) ---

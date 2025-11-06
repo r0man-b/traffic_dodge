@@ -59,6 +59,14 @@ public class SaveData
         */
         public ColorData[] Colors = new ColorData[6];
 
+        // Lootbox car paint characteristics
+        public bool hasUniquePearlescentPrimary;
+        public bool hasUniqueMetalPrimary;
+        public bool hasUniquePearlescentSecondary;
+        public bool hasUniqueMetalSecondary;
+        public bool hasUniquePearlescentRims;
+        public bool hasUniqueMetalRims;
+
         public CarData()
         {
             for (int i = 0; i < CarParts.Length; i++)
@@ -70,6 +78,13 @@ public class SaveData
             {
                 Colors[i] = new ColorData(); // Initialize each color with a new ColorData.
             }
+
+            hasUniquePearlescentPrimary = false;
+            hasUniqueMetalPrimary = false;
+            hasUniquePearlescentSecondary = false;
+            hasUniqueMetalSecondary = false;
+            hasUniquePearlescentRims = false;
+            hasUniqueMetalRims = false;
         }
     }
     [System.Serializable]

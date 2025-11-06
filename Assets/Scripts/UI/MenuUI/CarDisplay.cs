@@ -88,6 +88,7 @@ public class CarDisplay : MonoBehaviour
     public bool typeNameIndexBuilt = false;
     private SaveData.CarData _pendingLootboxSnapshot; // parts/colors captured from the lootbox car
     private string _pendingLootboxType;               // type of the lootbox car (for safety checks)
+    private int _lastPaintTraitMask = 0; // << stores paint mask returned by RandomizeCar()
 
     [Header("Lootbox Spin Parameters")]
     private readonly int carSpinCount = 100;
@@ -224,7 +225,7 @@ public class CarDisplay : MonoBehaviour
         {
             carName.text = currentCar.car_name;
 
-            _car.RandomizeCar(currentCarType, currentCarIndex, _spawnedModel.transform, false);
+            _lastPaintTraitMask = _car.RandomizeCar(currentCarType, currentCarIndex, _spawnedModel.transform, false);
 
             // For lootbox path we place using local offsets under holder.
             // Your previous code overwrote the local position with the turntable values directly.
@@ -841,12 +842,15 @@ public class CarDisplay : MonoBehaviour
             // Compute & cache the sell price from the currently displayed (randomized) car
             _cachedLootboxSellPrice = ComputeLootboxSellPrice();
             string name = currentCar != null ? currentCar.car_name : "car";
+            string trimmedName = TrimLeadingThe(name);
+
+            string paintSuffix = BuildUniquePaintSuffix(_lastPaintTraitMask);
 
             // Activate post-spin UI popups
             lootCratePopUps.SetActive(true);
             addOrSellPopUp.SetActive(true);
             addOrSellPopUpText.text =
-                $"Congratulations! You won a <u>{TrimLeadingThe(name)}</u>. " +
+                $"Congratulations! You won a <u>{trimmedName}</u>{paintSuffix}. " +
                 $"You can now choose to add it to your garage or sell it for { _cachedLootboxSellPrice:N0} CR.";
             sellButtonText.text = $"SELL FOR { _cachedLootboxSellPrice:N0} CR";
         }
@@ -922,6 +926,10 @@ public class CarDisplay : MonoBehaviour
 
         // Snapshot from the displayed, randomized model
         var snapshot = BuildCarDataFromDisplayedModel();
+
+        // Apply the paint traits from the most recent lootbox randomization
+        ApplyTraitMaskToCarData(_lastPaintTraitMask, snapshot);
+
         saveData.Cars[newCarKey] = snapshot;
 
         // Persist selection pointers
@@ -2059,6 +2067,23 @@ public class CarDisplay : MonoBehaviour
     }
 
     /// <summary>
+    /// Sets the car paint flags for lootbox cars
+    /// </summary>
+    void ApplyTraitMaskToCarData(int mask, SaveData.CarData carData)
+    {
+        PaintTraits t = (PaintTraits)mask;
+
+        carData.hasUniquePearlescentPrimary = t.HasFlag(PaintTraits.UniquePearlescentPrimary);
+        carData.hasUniqueMetalPrimary = t.HasFlag(PaintTraits.UniqueMetalPrimary);
+
+        carData.hasUniquePearlescentSecondary = t.HasFlag(PaintTraits.UniquePearlescentSecondary);
+        carData.hasUniqueMetalSecondary = t.HasFlag(PaintTraits.UniqueMetalSecondary);
+
+        carData.hasUniquePearlescentRims = t.HasFlag(PaintTraits.UniquePearlescentRims);
+        carData.hasUniqueMetalRims = t.HasFlag(PaintTraits.UniqueMetalRims);
+    }
+
+    /// <summary>
     /// Caches the computed lootbox sell price if not already cached.
     /// Prevents recalculating repeatedly.
     /// </summary>
@@ -2152,8 +2177,27 @@ public class CarDisplay : MonoBehaviour
         UsesPluralArticle(partTypeRaw) ? "some" : "a";
     private static string PronounForPart_Lower(string partTypeRaw) =>
         UsesPluralArticle(partTypeRaw) ? "them" : "it";
-    private static string PronounForPart_Capital(string partTypeRaw) =>
-        UsesPluralArticle(partTypeRaw) ? "Them" : "It";
+
+    // Builds the "unique paintjob" suffix for award text based on the lootbox trait mask.
+    private static string BuildUniquePaintSuffix(int mask)
+    {
+        // Requires the PaintTraits flags used elsewhere in this class.
+        PaintTraits t = (PaintTraits)mask;
+
+        bool hasPearl =
+            t.HasFlag(PaintTraits.UniquePearlescentPrimary) ||
+            t.HasFlag(PaintTraits.UniquePearlescentSecondary);
+
+        bool hasMetal =
+            t.HasFlag(PaintTraits.UniqueMetalPrimary) ||
+            t.HasFlag(PaintTraits.UniqueMetalSecondary);
+
+        if (hasPearl && hasMetal) return " with a unique metal and pearlescent paintjob";
+        if (hasPearl) return " with a unique pearlescent paintjob";
+        if (hasMetal) return " with a unique metal paintjob";
+        return string.Empty;
+    }
+
 
     private void ActivateSwitch(PartHolder newHolder, int newIndex, ref PartHolder prevHolder, ref int prevIndex)
     {

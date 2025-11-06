@@ -136,6 +136,7 @@ public class GarageUIManager : MonoBehaviour
     public Button buttonSwitchPaintTypeLeft;
     public Button buttonSwitchPaintTypeRight;
     public TextMeshProUGUI paintType;
+    public TextMeshProUGUI uniquePaintText;
     public List<GameObject> colorBuckets;
     public Shader matteShader;
     public Shader glossShader;
@@ -1307,6 +1308,48 @@ public class GarageUIManager : MonoBehaviour
         whichPartToPaint = part;
         isPlayerInPaintMenu = true;
 
+        // Set the unique paint text string
+        uniquePaintText.gameObject.SetActive(false);
+        if (whichPartToPaint >= 0 && whichPartToPaint <= 2)
+        {
+            var save = SaveManager.Instance.SaveData;
+            if (save != null && save.Cars.TryGetValue((currentCarType, currentCarIndex), out SaveData.CarData cd) && cd != null)
+            {
+                bool pearlescent = false;
+                bool metal = false;
+
+                switch (whichPartToPaint)
+                {
+                    case 0:
+                        pearlescent = cd.hasUniquePearlescentPrimary;
+                        metal = cd.hasUniqueMetalPrimary;
+                        break;
+                    case 1:
+                        pearlescent = cd.hasUniquePearlescentSecondary;
+                        metal = cd.hasUniqueMetalSecondary;
+                        break;
+                    case 2:
+                        pearlescent = cd.hasUniquePearlescentRims;
+                        metal = cd.hasUniqueMetalRims;
+                        break;
+                    default:
+                        break;
+                }
+
+                if (pearlescent || metal)
+                {
+                    if (pearlescent && metal)
+                        uniquePaintText.text = "Unique pearlescent and metal paint currently applied*";
+                    else if (pearlescent)
+                        uniquePaintText.text = "Unique pearlescent paint currently applied*";
+                    else
+                        uniquePaintText.text = "Unique metal paint currently applied*";
+
+                    uniquePaintText.gameObject.SetActive(true);
+                }
+            }
+        }
+
         if (whichPartToPaint == 0 || whichPartToPaint == 1) // Primary or Secondary color
         {
             currentPaintType = 1;
@@ -1723,7 +1766,28 @@ public class GarageUIManager : MonoBehaviour
         paintBuyConfirmationPopUp.SetActive(false);
         paintPopUps.SetActive(true);
         string typeOfPaint = (currentPaintType == 0) ? "lights" : "paint";
-        paintBuyConfirmationPopUpText.text = "Buy  " + typeOfPaint + "  for  " + paintPrice.ToString("N0") + "  CR?";
+
+        // Check if player is replacing a unique paint for this part
+        bool warnUnique = false;
+        var save = SaveManager.Instance.SaveData;
+        if (save != null && save.Cars.TryGetValue((currentCarType, currentCarIndex), out var car))
+        {
+            switch (whichPartToPaint)
+            {
+                case 0: warnUnique = car.hasUniquePearlescentPrimary || car.hasUniqueMetalPrimary; break;
+                case 1: warnUnique = car.hasUniquePearlescentSecondary || car.hasUniqueMetalSecondary; break;
+                case 2: warnUnique = car.hasUniquePearlescentRims || car.hasUniqueMetalRims; break;
+            }
+        }
+
+        // Build confirmation text
+        string baseMsg = $"Buy {typeOfPaint} for <u>{paintPrice:N0} CR?</u>";
+        if (warnUnique)
+        {
+            baseMsg += " Warning: purchasing this paint will overwrite the unique color you have installed";
+        }
+
+        paintBuyConfirmationPopUpText.text = baseMsg;
         paintBuyConfirmationPopUp.SetActive(true);
 
         currentPaintPrice = paintPrice;
@@ -1784,6 +1848,33 @@ public class GarageUIManager : MonoBehaviour
 
                 // Keep the border on the purchased/installed preset as well.
                 ApplyBorderForBucket(sel.paintType, sel.presetIndex);
+            }
+
+            // Any purchased paint replaces uniqueness for that part.
+            // Hide the unique paint banner and clear the corresponding flags.
+            if (uniquePaintText != null)
+                uniquePaintText.gameObject.SetActive(false);
+
+            switch (whichPartToPaint)
+            {
+                case 0: // Primary
+                    carData.hasUniquePearlescentPrimary = false;
+                    carData.hasUniqueMetalPrimary = false;
+                    break;
+
+                case 1: // Secondary
+                    carData.hasUniquePearlescentSecondary = false;
+                    carData.hasUniqueMetalSecondary = false;
+                    break;
+
+                case 2: // Rims
+                    carData.hasUniquePearlescentRims = false;
+                    carData.hasUniqueMetalRims = false;
+                    break;
+
+                default:
+                    // Lighting elements have no unique paint flags.
+                    break;
             }
 
             SaveManager.Instance.SaveGame();
