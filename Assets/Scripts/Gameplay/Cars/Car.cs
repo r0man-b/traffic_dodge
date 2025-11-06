@@ -492,8 +492,8 @@ public class Car : ScriptableObject
                 else
                 {
                     baseColor = primary;
-                    fresnelColor = primary;
-                    fresnelColor2 = primary;
+                    fresnelColor = primColor.GetColor("_FresnelColor");
+                    fresnelColor2 = primColor.GetColor("_FresnelColor2");
 
                     // If our primary has a unique pearlescent flag and we fell into this conditional, then
                     // the rims match this primary paint, therefore, we set the rims' paint flags pearlescent to true
