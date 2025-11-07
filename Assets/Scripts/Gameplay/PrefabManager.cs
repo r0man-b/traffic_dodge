@@ -115,7 +115,8 @@ public class PrefabManager : MonoBehaviour
     public int maxCarsPerLane = 4;
     public float trafficDensity = 2;
     private float originalTrafficDensity;
-    public Transform originalParent;
+    private bool useLowPolyTraffic = false;
+    public Transform[] originalParent;
 
     // Vars for the tornado.
     private float attractionSpeed = 1f; // Speed at which cars are attracted to the tornado.
@@ -200,6 +201,9 @@ public class PrefabManager : MonoBehaviour
         // Set the power up spawn time.
         powerUpSpawnTime = Random.Range(15, 30);
 
+        // Set low poly traffic state flag
+        useLowPolyTraffic = SaveManager.Instance.SaveData.UseLowPolyTraffic;
+
         // Intialize list.
         allLaneTraffic.Add(lane0traffic);
         allLaneTraffic.Add(lane1traffic);
@@ -266,7 +270,7 @@ public class PrefabManager : MonoBehaviour
         }
         PutTrafficBehindPlayer();
 
-        trafficDensity = SaveManager.Instance.SaveData.TrafficDensity;
+        trafficDensity = Mathf.Max(1f, SaveManager.Instance.SaveData.TrafficDensity * 0.75f);
         if (trafficDensity < 0)
         {
             trafficDensity = 3;
@@ -332,7 +336,8 @@ public class PrefabManager : MonoBehaviour
                         {
                             StartCoroutine(ExplodeTraffic(trafficExplosionParent, car.transform, true));
                             car.SetActive(false);
-                            car.transform.SetParent(originalParent);
+                            if (useLowPolyTraffic) car.transform.SetParent(originalParent[1]);
+                            else car.transform.SetParent(originalParent[0]);
                             tornadoTraffic.Remove(car);
                             ReturnTraffic(laneIndex);
                         }
@@ -394,8 +399,16 @@ public class PrefabManager : MonoBehaviour
                     }
                     else // If the car is not yet within range of the tornado, continue moving it as normally.
                     {
-                        if (car.transform.parent != originalParent)
-                            car.transform.SetParent(originalParent);
+                        if (useLowPolyTraffic)
+                        {
+                            if (car.transform.parent != originalParent[1])
+                                car.transform.SetParent(originalParent[1]);
+                        }
+                        else
+                        {
+                            if (car.transform.parent != originalParent[0])
+                                car.transform.SetParent(originalParent[0]);
+                        }
                         car.transform.position += car.transform.forward * adjustedSpeed;
                     }
                 }
@@ -415,7 +428,7 @@ public class PrefabManager : MonoBehaviour
         }
         if (playerController.currentLane != 7 && playerController.currentLane != 3)
         {
-            if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f)
+            if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
             {
                 soundManager.PlayWoosh(false);
                 rightCar = allLaneTraffic[playerController.currentLane + 1][0];
@@ -1044,11 +1057,11 @@ public class PrefabManager : MonoBehaviour
             : playerController.oldAccel;
         trafficScaler = Mathf.Max(trafficScaler, 1);
         distance *= trafficDensity * trafficScaler;
-        if (trafficDensity == 1 && lane < 4) distance *= 1.25f;
+        if (lane < 4) distance *= 1.25f;
 
         int vehicle_id = vehicle_ids[Random.Range(0, vehicle_ids.Length)];
 
-        BaseTrafficList[] currentTrafficPrefabList = SaveManager.Instance.SaveData.UseLowPolyTraffic
+        BaseTrafficList[] currentTrafficPrefabList = useLowPolyTraffic
             ? trafficPrefabsLowPoly
             : trafficPrefabs;
 
@@ -1141,13 +1154,16 @@ public class PrefabManager : MonoBehaviour
         Vector3 resetPosition = new(lane_positions[vehicle_variation], yReturnValue, -101 + 10 * vehicle_id);
 
         // Deactivate and reset vehicle
-        tornadoTraffic.Remove(vehicle);
-        vehicle.SetActive(false);
         vehicle.transform.SetPositionAndRotation(resetPosition, Quaternion.identity);
-        vehicle.transform.SetParent(originalParent);
+        if (playerController.tornado || playerController.tornadoExplodeCars)
+        {
+            tornadoTraffic.Remove(vehicle);
+            if (useLowPolyTraffic) vehicle.transform.SetParent(originalParent[1]);
+            else vehicle.transform.SetParent(originalParent[0]);
+        }
 
         // Return to appropriate prefab pool
-        if (SaveManager.Instance.SaveData.UseLowPolyTraffic)
+        if (useLowPolyTraffic)
         {
             trafficPrefabsLowPoly[vehicle_id].trafficVariations.Add(vehicle);
         }
