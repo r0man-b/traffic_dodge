@@ -305,7 +305,7 @@ public class CarDisplay : MonoBehaviour
             cannotSellPopUp.SetActive(false);
             sellConfirmationPopUp.SetActive(false);
         }
-        else if (numOfThisCarTypeOwned >= 100)
+        else if (numOfThisCarTypeOwned >= 10)
         {
             cannotSellPopUpText.text = "You  cannot  buy  anymore  cars  of  this  type";
             cannotSellPopUp.SetActive(true);
@@ -891,7 +891,7 @@ public class CarDisplay : MonoBehaviour
         }
 
         // Enforce the same per-type cap used in ConfirmBuy()
-        const int maxPerType = 100;
+        const int maxPerType = 10;
         int ownedOfThisType = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
 
         if (ownedOfThisType >= maxPerType)
