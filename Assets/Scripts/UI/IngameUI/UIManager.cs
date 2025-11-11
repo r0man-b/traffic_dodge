@@ -26,6 +26,13 @@ public class UIManager : MonoBehaviour
     private Color imageColor;
     private Color yellow = new(1f, 0.96f, 0f, 1f);
     private Color teal = new(0.47f, 0.96f, 1f, 1f);
+    public GameObject recoverChoicePanel;           // parent container for the two buttons and cost label
+    public UnityEngine.UI.Button recoverButton;     // “Recover (x nitro)”
+    public UnityEngine.UI.Button finishButton;      // “End Run”
+    public TextMeshProUGUI recoverCostText;         // displays current nitro cost
+    private int currentRecoverNitroCost = 1;
+    private bool recoverDecisionMade = false;
+    private bool recoverChosen = false;
 
     // Variables for lane split countdown.
     public TextMeshProUGUI lanesplitcountdown;
@@ -91,8 +98,16 @@ public class UIManager : MonoBehaviour
 
         // Get the default colour of our images.
         imageColor = new(lanesplitimage.color.r, lanesplitimage.color.g, lanesplitimage.color.b, lanesplitimage.color.a);
-    }
 
+        // Button listeners
+        if (recoverButton != null) recoverButton.onClick.AddListener(OnRecoverPressed);
+        if (finishButton != null) finishButton.onClick.AddListener(OnFinishPressed);
+
+        if (recoverChoicePanel != null)
+            recoverChoicePanel.SetActive(false);
+        //if (recoverErrorText != null)
+        //    recoverErrorText.gameObject.SetActive(false);
+    }
 
     void FixedUpdate()
     {
@@ -298,9 +313,30 @@ public class UIManager : MonoBehaviour
         speedo.color = new Color(0, 0, 0, 0);
         lives.SetActive(false);
         lanesplit.SetActive(false);
-
-        // Display Game Over & wait for 2 seconds unless skipped.
         gameover.gameObject.SetActive(true);
+
+        // Show choices and wait for decision
+        ShowRecoverChoices();
+        yield return StartCoroutine(WaitForRecoverDecision());
+        HideRecoverChoices();
+
+        if (recoverChosen)
+        {
+            // Recovery path: restart gameplay with countdown, do NOT award credits/nitro here
+            playerController.RecoverAndRestart();
+            ResetUIForRecovery();
+
+            // Allow a new EndGameSequence later
+            gameEndSet = false;
+
+            // Persist updated nitro state/cost across this run if desired
+            SaveManager.Instance.SaveGame();
+
+            // Exit coroutine early to resume play
+            yield break;
+        }
+
+        // If we reach here, player chose to finish the run; proceed with the existing end screen flow.
         yield return StartCoroutine(WaitOrSkip(2f));
 
         // Update distance & top speed statistics.
@@ -753,6 +789,103 @@ public class UIManager : MonoBehaviour
 
             // Wait for 0.5 seconds.
             yield return StartCoroutine(WaitOrSkip(0.5f));
+        }
+    }
+
+    public void ResetUIForRecovery()
+    {
+        // Re-enable in-race HUD
+        distance.color = teal;
+        speedo.color = teal;
+        lives.SetActive(true);
+        lanesplit.SetActive(false);
+
+        // Reset countdown state
+        inRaceCountdown = true;
+        countdownStarted = false;
+        countdown.text = "3";
+
+        // Clear skip state so end screen flow works next time we actually finish
+        skip = false;
+        skipHandled = false;
+
+        // Hide any Game Over / end widgets
+        gameover.gameObject.SetActive(false);
+        game_end_widgets.SetActive(false);
+
+        // Ensure stats containers are hidden until the true end
+        distance_speed_stats.SetActive(false);
+        record_stats.SetActive(false);
+        replayButton.SetActive(false);
+        quitButton.SetActive(false);
+    }
+
+    private void ShowRecoverChoices()
+    {
+        // Prepare UI
+        if (recoverChoicePanel != null) recoverChoicePanel.SetActive(true);
+        UpdateRecoverChoiceInteractivity();
+    }
+
+    private void HideRecoverChoices()
+    {
+        if (recoverChoicePanel != null) recoverChoicePanel.SetActive(false);
+        //if (recoverErrorText != null) recoverErrorText.gameObject.SetActive(false);
+    }
+
+    private void UpdateRecoverChoiceInteractivity()
+    {
+        int nitros = SaveManager.Instance.SaveData.NitroCount;
+        if (recoverCostText != null)
+            recoverCostText.text = $"Recover Car: {currentRecoverNitroCost} nitro";
+
+        bool canAfford = nitros >= currentRecoverNitroCost;
+        if (recoverButton != null) recoverButton.interactable = canAfford;
+
+        //if (recoverErrorText != null)
+        //{
+        //    recoverErrorText.gameObject.SetActive(!canAfford);
+        //    recoverErrorText.text = "Not enough nitro.";
+        //}
+    }
+
+    private void OnRecoverPressed()
+    {
+        int nitros = SaveManager.Instance.SaveData.NitroCount;
+        if (nitros < currentRecoverNitroCost)
+        {
+            UpdateRecoverChoiceInteractivity();
+            return;
+        }
+
+        // Deduct nitro using NitroManager if available; else write SaveData directly.
+        if (nitroManager != null)
+            nitroManager.ChangeNitro(-currentRecoverNitroCost);
+        else
+            SaveManager.Instance.SaveData.NitroCount = Mathf.Max(0, nitros - currentRecoverNitroCost);
+
+        // Double next cost
+        currentRecoverNitroCost = Mathf.Max(1, currentRecoverNitroCost * 2);
+
+        recoverChosen = true;
+        recoverDecisionMade = true;
+    }
+
+    private void OnFinishPressed()
+    {
+        recoverChosen = false;
+        recoverDecisionMade = true;
+    }
+
+    private IEnumerator WaitForRecoverDecision()
+    {
+        recoverDecisionMade = false;
+        recoverChosen = false;
+        while (!recoverDecisionMade)
+        {
+            // Keep button interactability in sync if nitro changes elsewhere
+            UpdateRecoverChoiceInteractivity();
+            yield return null;
         }
     }
 

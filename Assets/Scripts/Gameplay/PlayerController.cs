@@ -91,6 +91,8 @@ public class PlayerController : MonoBehaviour
     public GameObject explosionParent;
     public ParticleSystem explosion;
     public ParticleSystem rain;
+    private Vector3 rainDefaultPosition;
+    private Quaternion rainDefaultRotation;
 
     // Input variables.
     private float touchDownTime = 0;
@@ -353,6 +355,10 @@ public class PlayerController : MonoBehaviour
         defaultRot = transform.rotation;
         rotLeft = transform.rotation * Quaternion.Euler(0, -10, 0);
         rotRight = transform.rotation * Quaternion.Euler(0, 10, 0);
+
+        // Cache default rain transform for later restoration on recovery.
+        rainDefaultPosition = rain.transform.position;
+        rainDefaultRotation = rain.transform.rotation;
 
         // Find 'SoundManager' script.
         GameObject SoundManagerObject = GameObject.Find("SoundManager");
@@ -1493,6 +1499,42 @@ public class PlayerController : MonoBehaviour
                 rain.transform.SetPositionAndRotation(currentRainPosition, currentRainRotation);
             }
         }
+    }
+
+    public void RecoverAndRestart()
+    {
+        // Reset explosion/collision state
+        inTrafficExplosion = false;
+        inTornadoExplosion = false;
+        inBulletExplosion = false;
+        gameEnd = false;
+
+        // Reset camera & motion/shake state
+        cameraFovLerped = false;
+        explosionShakeIntensity = 1f;
+        shakeIntensity = 0.05f;
+        inSidewaysJolt = false;
+        whichWay = 0;
+
+        // Reset powerups
+        aggro = false;
+        tornado = false;
+        bullet = false;
+        tornadoExplodeCars = false;
+        tornadoObject.SetActive(false);
+
+        // Reset car & lives
+        accel = 0.5f;
+        accelTimeOffset = 0f;
+        transform.rotation = defaultRot;
+        carObject.SetActive(true);
+        if (!invincible) numlives = currentCar.numlives;
+
+        // Restore rain orientation
+        rain.transform.SetPositionAndRotation(rainDefaultPosition, rainDefaultRotation);
+
+        // Reset countdown/race timing
+        startTime = Time.time - 3;
     }
 
     // --- add inside PlayerController (e.g., under fields or at the end of the class) ---
