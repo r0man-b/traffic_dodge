@@ -19,6 +19,7 @@ public class PlayerController : MonoBehaviour
     private int whichWay = 0; // -1 = left, 0 = straight, 1 = right.
     private float lastLaneSplitTime = -5.0f;
     public bool currentlyLaneSplitting = false;
+    private Coroutine laneSplitCoroutine;
     private float lastXPosition;
     public int numlives = 0;
     public Car currentCar;
@@ -719,7 +720,15 @@ public class PlayerController : MonoBehaviour
                 )
         {
             if ((Time.time - startTime) - lastLaneSplitTime >= 5) // Only initiate a lane split if the lane split cooldown has expired.
-                StartCoroutine(LaneSplitRoutine(0.12f, 1f / accel, lastTouchDirection));
+            {
+                if (laneSplitCoroutine != null)
+                {
+                    StopCoroutine(laneSplitCoroutine);
+                    laneSplitCoroutine = null;
+                }
+
+                laneSplitCoroutine = StartCoroutine(LaneSplitRoutine(0.12f, 1f / accel, lastTouchDirection));
+            }
             else SnapToClosestLane(movement_val);
         }
 
@@ -1232,6 +1241,9 @@ public class PlayerController : MonoBehaviour
         carObject.transform.SetLocalPositionAndRotation(initialCarPosition, initialCarRotation); // Make sure we get back to the original position and rotation exactly.
         yield return new WaitForSeconds(1f);
         sparks.SetActive(false);
+
+        // Mark coroutine as finished
+        laneSplitCoroutine = null;
     }
 
 
@@ -1394,7 +1406,7 @@ public class PlayerController : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
 
-        if (invincible || isRecovering || other.CompareTag("TrafficBoundingBox")) return;
+        if (invincible || isRecovering || tornado || bullet || other.CompareTag("TrafficBoundingBox")) return;
         if (other.gameObject.name.StartsWith("Powerup") && powerupsOnStandby) // Checks if we have collided with a powerup.
         {
             powerupCountdown = Time.time - startTime;
@@ -1480,9 +1492,17 @@ public class PlayerController : MonoBehaviour
             inTrafficExplosion = true;
             StartCoroutine(prefabManager.ExplodeTraffic(explosionParent.transform, transform, false));
             other.gameObject.SetActive(false);
-            pauseButton.SetActive(false);
+
+            // There is a 2 second post powerup invincibility, end the game if it has been over 2 seconds since the last powerup ended.
             if (((Time.time - startTime) - timeSinceLastPowerup > 2))
             {
+                // Ensure lane split coroutine is stopped if it is still running
+                if (laneSplitCoroutine != null)
+                {
+                    StopCoroutine(laneSplitCoroutine);
+                    laneSplitCoroutine = null;
+                }
+
                 // Update state variables.
                 gameEnd = true;
                 inTrafficExplosion = false;
@@ -1497,6 +1517,9 @@ public class PlayerController : MonoBehaviour
                 accel = 0;
                 carObject.SetActive(false);
                 explosion.Play();
+
+                // UI
+                pauseButton.SetActive(false);
 
                 // Make the rain appear verticle.
                 Vector3 currentRainPosition = rain.transform.position;
@@ -1535,14 +1558,21 @@ public class PlayerController : MonoBehaviour
         accel = 0.5f;
         accelTimeOffset = 0f;
         transform.rotation = defaultRot;
+        carObject.transform.rotation = Quaternion.identity;
         carObject.SetActive(true);
+        soundManager.PlayEngineSound();
         if (!invincible) numlives = currentCar.numlives;
+
+        // UI
+        pauseButton.SetActive(true);
 
         // Restore rain orientation
         rain.transform.SetPositionAndRotation(rainDefaultPosition, rainDefaultRotation);
 
         // Reset countdown/race timing
         startTime = Time.time - 3;
+        lastLaneSplitTime = 1; // Set to 1 for lane splitting to be enabled upon exit of recovery animation
+        timeSinceLastPowerup = 0;
 
         // Start car flashing animation
         StartCoroutine(RecoverFlashAndGhost(recoverDuration, startFlashInterval, endFlashInterval));
@@ -1580,6 +1610,7 @@ public class PlayerController : MonoBehaviour
 
         Destroy(carObject);
         SetUpCar();
+        soundManager.SetUpCarSounds();
     }
 
     // --- add inside PlayerController (e.g., under fields or at the end of the class) ---

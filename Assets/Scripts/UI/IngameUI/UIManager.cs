@@ -799,6 +799,7 @@ public class UIManager : MonoBehaviour
         speedo.color = teal;
         lives.SetActive(true);
         lanesplit.SetActive(false);
+        inLaneSplitCooldown = false;
 
         // Reset countdown state
         inRaceCountdown = true;

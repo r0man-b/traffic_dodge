@@ -94,12 +94,7 @@ public class SoundManager : MonoBehaviour
         }
         SaveManager.Instance.SaveGame();
 
-        // Set up engine sounds.
-        enginesounds = playerController.carObject.GetComponents<AudioSource>();
-
-        // Set up lane split steam sounds
-        lanesplitsteamsource1 = playerController.carObject.transform.Find("BODY").transform.Find("LeftSteam").GetComponent<AudioSource>();
-        lanesplitsteamsource2 = playerController.carObject.transform.Find("BODY").transform.Find("RightSteam").GetComponent<AudioSource>();
+        SetUpCarSounds();
 
         // Set up tornado sounds
         AudioSource[] tornadosounds = tornado.transform.GetComponents<AudioSource>();
@@ -189,6 +184,21 @@ public class SoundManager : MonoBehaviour
         startTime = Time.time;
     }
 
+    public void SetUpCarSounds()
+    {
+        // Set up engine sounds.
+        enginesounds = playerController.carObject.GetComponents<AudioSource>();
+
+        // Set up lane split steam sounds
+        lanesplitsteamsource1 = playerController.carObject.transform.Find("BODY").transform.Find("LeftSteam").GetComponent<AudioSource>();
+        lanesplitsteamsource2 = playerController.carObject.transform.Find("BODY").transform.Find("RightSteam").GetComponent<AudioSource>();
+    }
+
+    public void PlayEngineSound()
+    {
+        enginesounds[1].Play();
+    }
+
     void Update()
     {
         windaccelsource.volume = Mathf.Min(playerController.accel / 4, 0.4f) * SaveManager.Instance.SaveData.EffectsVolumeMultiplier; ;
@@ -221,7 +231,7 @@ public class SoundManager : MonoBehaviour
         if (!engineplayed && Time.time - startTime >= drop)
         {
             enginesounds[0].Stop();
-            enginesounds[1].Play();
+            PlayEngineSound();
             engineplayed = true;
             currentEngineSoundIndex = 1;
         }

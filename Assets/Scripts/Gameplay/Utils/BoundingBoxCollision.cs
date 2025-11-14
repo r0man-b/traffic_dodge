@@ -24,6 +24,11 @@ public class BoundingBoxCollision : MonoBehaviour
         }
     }
 
+    private void OnDisable()
+    {
+        sparksPrefab.SetActive(false);  // Deactivate the sparks.
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (playerController.currentlyLaneSplitting) return;
