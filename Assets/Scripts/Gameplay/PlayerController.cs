@@ -1525,6 +1525,8 @@ public class PlayerController : MonoBehaviour
                 // Make the rain appear verticle.
                 Vector3 currentRainPosition = rain.transform.position;
                 Quaternion currentRainRotation = rain.transform.rotation;
+                rainDefaultPosition = currentRainPosition;
+                rainDefaultRotation = currentRainRotation;
                 currentRainPosition.y = 20f;
                 currentRainPosition.z += -0.038f * cam.fieldOfView - 12f;
                 currentRainRotation *= Quaternion.Euler(-60, 0, 0);
