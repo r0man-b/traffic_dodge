@@ -15,6 +15,7 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI gameover;
     public TextMeshProUGUI credits;
     public TextMeshProUGUI nitrocount;
+    private TextMeshProUGUI nitroEarnedTextInstance;
     public GameObject game_end_widgets;
     public GameObject distance_speed_stats;
     public GameObject record_stats;
@@ -298,13 +299,23 @@ public class UIManager : MonoBehaviour
         // Add a new text if nitro earned this race was over than zero.
         if (nitrosEarned > 0)
         {
-            TextMeshProUGUI nitroEarnedText = Instantiate(nitrocount, nitrocount.transform.parent);
-            RectTransform nitroEarnedTextRectTransform = nitroEarnedText.GetComponent<RectTransform>();
+            nitroEarnedTextInstance = Instantiate(nitrocount, nitrocount.transform.parent);
+
+            // Remove NitroManager so this clone does not auto-update like the HUD nitro counter
+            var clonedNitroManager = nitroEarnedTextInstance.GetComponent<NitroManager>();
+            if (clonedNitroManager != null)
+            {
+                Destroy(clonedNitroManager);
+            }
+
+            RectTransform nitroEarnedTextRectTransform = nitroEarnedTextInstance.GetComponent<RectTransform>();
             nitroEarnedTextRectTransform.sizeDelta = new Vector2(400f, nitroEarnedTextRectTransform.sizeDelta.y);
-            nitroEarnedTextRectTransform.anchoredPosition += new Vector2(150f, 0f);
-            nitroEarnedText.lineSpacing = -35f;
-            nitroEarnedText.fontSize = 45f;
-            nitroEarnedText.text = "<b><i>+" + nitrosEarned + " nitro earned !</i></b>";
+            nitroEarnedTextRectTransform.anchoredPosition += new Vector2(150f, -50f);
+            nitroEarnedTextInstance.lineSpacing = -35f;
+            nitroEarnedTextInstance.fontSize = 45f;
+
+            // Static, one-off message – no script should change this anymore
+            nitroEarnedTextInstance.text = $"<b><i>+{nitrosEarned} nitro earned !</i></b>";
         }
 
         // Display game end widgets and disable in-race widgets.
@@ -819,6 +830,13 @@ public class UIManager : MonoBehaviour
         record_stats.SetActive(false);
         replayButton.SetActive(false);
         quitButton.SetActive(false);
+
+        // Destroy nitro-earned popup if it exists
+        if (nitroEarnedTextInstance != null)
+        {
+            Destroy(nitroEarnedTextInstance.gameObject);
+            nitroEarnedTextInstance = null;
+        }
     }
 
     private void ShowRecoverChoices()
