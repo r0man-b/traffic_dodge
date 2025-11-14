@@ -1554,13 +1554,16 @@ public class PlayerController : MonoBehaviour
         tornadoExplodeCars = false;
         tornadoObject.SetActive(false);
 
+        // Reset audio side-effects (aggro, bullet, wind, engine flags)
+        soundManager.ResetAudioOnRecovery();
+
         // Reset car & lives
         accel = 0.5f;
         accelTimeOffset = 0f;
         transform.rotation = defaultRot;
         carObject.transform.rotation = Quaternion.identity;
         carObject.SetActive(true);
-        soundManager.PlayEngineSound();
+        soundManager.PlayEngineSound();   // engine persists through flashing, destroy, respawn
         if (!invincible) numlives = currentCar.numlives;
 
         // UI
@@ -1610,7 +1613,9 @@ public class PlayerController : MonoBehaviour
 
         Destroy(carObject);
         SetUpCar();
-        soundManager.SetUpCarSounds();
+
+        // Rebind and re-register lane split sounds as a new car object has been spawned
+        soundManager.SetUpLaneSplitSounds(true);
     }
 
     // --- add inside PlayerController (e.g., under fields or at the end of the class) ---

@@ -51,6 +51,7 @@ public class SoundManager : MonoBehaviour
     // Array to store engine sounds.
     public AudioSource[] enginesounds;
     private int currentEngineSoundIndex = 0;
+    private bool engineAudioInitialized = false;
 
     // State variables.
     private bool engineplayed = false;
@@ -95,6 +96,8 @@ public class SoundManager : MonoBehaviour
         SaveManager.Instance.SaveGame();
 
         SetUpCarSounds();
+        SetUpLaneSplitSounds();
+        EnsurePersistentEngineAudio();
 
         // Set up tornado sounds
         AudioSource[] tornadosounds = tornado.transform.GetComponents<AudioSource>();
@@ -186,13 +189,105 @@ public class SoundManager : MonoBehaviour
 
     public void SetUpCarSounds()
     {
-        // Set up engine sounds.
+        // Set up engine sounds from the current car
         enginesounds = playerController.carObject.GetComponents<AudioSource>();
 
-        // Set up lane split steam sounds
-        lanesplitsteamsource1 = playerController.carObject.transform.Find("BODY").transform.Find("LeftSteam").GetComponent<AudioSource>();
-        lanesplitsteamsource2 = playerController.carObject.transform.Find("BODY").transform.Find("RightSteam").GetComponent<AudioSource>();
+        // Rebuild specificAudioSources and originalPitches for the new car
+        specificAudioSources = new AudioSource[]
+        {
+        enginesounds[1],           // accel
+        enginesounds[2],           // scream
+        songs[currentSongIndex],   // current song
+        beepsource
+        };
+
+        originalPitches.Clear();
+        foreach (AudioSource audioSource in specificAudioSources)
+        {
+            if (audioSource != null)
+                originalPitches[audioSource] = audioSource.pitch;
+        }
     }
+
+    public void SetUpLaneSplitSounds(bool restarting = false)
+    {
+        // Set up lane split steam sounds
+        lanesplitsteamsource1 = playerController.carObject.transform
+            .Find("BODY").Find("LeftSteam").GetComponent<AudioSource>();
+        lanesplitsteamsource2 = playerController.carObject.transform
+            .Find("BODY").Find("RightSteam").GetComponent<AudioSource>();
+
+        if (restarting)
+        {
+            RegisterAudioSource(lanesplitsteamsource1, 20);
+            RegisterAudioSource(lanesplitsteamsource2, 21);
+        }
+    }
+
+    public void ResetAudioOnRecovery()
+    {
+        // Stop any ongoing bullet effects
+        if (bulletEffectsCoroutine != null)
+        {
+            StopCoroutine(bulletEffectsCoroutine);
+            bulletEffectsCoroutine = null;
+        }
+
+        // Reset state flags
+        inAggro = false;
+        inBullet = false;
+        engineplayed = true;      // we will start accel manually via PlayEngineSound
+        engineScreamPlayed = false;
+        windScreamPlayed = false;
+        explosplayed = false;
+
+        // Reset volume modifier used by aggro
+        volumeModifier = 2f;
+
+        // Restore pitches for the tracked audio sources (enginesounds[1], enginesounds[2], song, beep)
+        foreach (var kvp in originalPitches)
+        {
+            if (kvp.Key != null)
+                kvp.Key.pitch = kvp.Value;
+        }
+
+        // Restore engine and wind volumes from the original snapshot
+        float fxMul = SaveManager.Instance.SaveData.EffectsVolumeMultiplier;
+
+        // wind
+        windaccelsource.volume = originalSoundManagerAudioSourceVolumes[13] * fxMul;
+        windscreamsource.volume = originalSoundManagerAudioSourceVolumes[14] * fxMul;
+
+        // engines (indices 24, 25, 26 in originalSoundManagerAudioSourceVolumes)
+        if (enginesounds != null && enginesounds.Length >= 3)
+        {
+            enginesounds[0].volume = originalSoundManagerAudioSourceVolumes[24] * fxMul;
+            enginesounds[1].volume = originalSoundManagerAudioSourceVolumes[25] * fxMul;
+            enginesounds[2].volume = originalSoundManagerAudioSourceVolumes[26] * fxMul;
+
+            // Also reset their pitch to something sane in case they were left altered
+            enginesounds[0].pitch = 1f;
+            enginesounds[1].pitch = 1f;
+            enginesounds[2].pitch = 1f;
+
+            // Stop any engine audio currently playing; PlayEngineSound will start accel
+            enginesounds[0].Stop();
+            enginesounds[1].Stop();
+            enginesounds[2].Stop();
+        }
+
+        // Reset and restart wind
+        windaccelsource.Stop();
+        windscreamsource.Stop();
+        windaccelsource.pitch = 1f;
+        windscreamsource.pitch = 1f;
+        windaccelsource.Play();       // ensure wind base starts again
+
+        // Make sure low-pass is off (no aggro muffling)
+        AudioLowPassFilter lowPass = FindObjectOfType<AudioLowPassFilter>();
+        if (lowPass) lowPass.enabled = false;
+    }
+
 
     public void PlayEngineSound()
     {
@@ -365,14 +460,13 @@ public class SoundManager : MonoBehaviour
 
         if (inBullet)
         {
-            //songs[currentSongIndex].pitch *= 1.2f;
-            //songs[currentSongIndex].volume *= 1.5f;
             bulletsource.Play();
 
             originalEnginePitch = enginesounds[2].pitch;
             if (bulletEffectsCoroutine != null) StopCoroutine(bulletEffectsCoroutine);
             bulletEffectsCoroutine = StartCoroutine(BulletEffects());
-            
+
+            // Make sure scream plays even after a recovery: engineScreamPlayed is reset there
             if (!engineScreamPlayed)
             {
                 enginesounds[2].Play();
@@ -384,11 +478,20 @@ public class SoundManager : MonoBehaviour
             songs[currentSongIndex].volume /= 2f;
 
             if (bulletEffectsCoroutine != null) StopCoroutine(bulletEffectsCoroutine);
+            bulletEffectsCoroutine = null;
+
             enginesounds[2].pitch = originalEnginePitch;
             enginesounds[2].volume /= 2f;
+
+            // If the scream was only used for bullet (engineScreamPlayed == false),
+            // pause it and ensure the normal accel engine is audible.
             if (!engineScreamPlayed)
             {
                 enginesounds[2].Pause();
+
+                // Safety: if accel engine is not playing, restart it
+                if (!enginesounds[1].isPlaying)
+                    enginesounds[1].Play();
             }
         }
     }
@@ -541,4 +644,73 @@ public class SoundManager : MonoBehaviour
             }
         }
     }
+
+    public void EnsurePersistentEngineAudio()
+    {
+        // Get the engine sources on the current car (templates).
+        var templateEngines = playerController.carObject.GetComponents<AudioSource>();
+        if (templateEngines == null || templateEngines.Length == 0)
+        {
+            Debug.LogError("No engine AudioSources found on carObject.");
+            return;
+        }
+
+        if (!engineAudioInitialized)
+        {
+            // First time: create persistent copies.
+            enginesounds = new AudioSource[templateEngines.Length];
+
+            //Transform parent = engineAudioParent != null ? engineAudioParent : this.transform;
+            Transform parent =  this.transform;
+
+            for (int i = 0; i < templateEngines.Length; i++)
+            {
+                AudioSource newSrc = parent.gameObject.AddComponent<AudioSource>();
+                CopyEngineAudioSettings(templateEngines[i], newSrc);
+                enginesounds[i] = newSrc;
+
+                // Optional: stop template from ever playing.
+                templateEngines[i].enabled = false;
+            }
+
+            engineAudioInitialized = true;
+        }
+        else
+        {
+            // Already have persistent sources; update their settings for the new car.
+            int count = Mathf.Min(enginesounds.Length, templateEngines.Length);
+            for (int i = 0; i < count; i++)
+            {
+                CopyEngineAudioSettings(templateEngines[i], enginesounds[i]);
+                templateEngines[i].enabled = false;
+            }
+        }
+    }
+
+    private void CopyEngineAudioSettings(AudioSource template, AudioSource target)
+    {
+        target.clip = template.clip;
+        target.outputAudioMixerGroup = template.outputAudioMixerGroup;
+
+        target.mute = template.mute;
+        target.bypassEffects = template.bypassEffects;
+        target.bypassListenerEffects = template.bypassListenerEffects;
+        target.bypassReverbZones = template.bypassReverbZones;
+
+        target.playOnAwake = false;          // you control playback manually
+        target.loop = template.loop;
+        target.priority = template.priority;
+        target.volume = template.volume;
+        target.pitch = template.pitch;
+        target.panStereo = template.panStereo;
+        target.spatialBlend = template.spatialBlend;
+        target.reverbZoneMix = template.reverbZoneMix;
+
+        target.dopplerLevel = template.dopplerLevel;
+        target.spread = template.spread;
+        target.rolloffMode = template.rolloffMode;
+        target.minDistance = template.minDistance;
+        target.maxDistance = template.maxDistance;
+    }
+
 }
