@@ -110,9 +110,7 @@ public class SoundManager : MonoBehaviour
             enginesounds[1],
             enginesounds[2],
             songs[currentSongIndex],
-            beepsource//,
-            //crashsource//,
-            //trafficexplossource
+            beepsource
         };
         foreach (AudioSource audioSource in specificAudioSources)
         {
@@ -191,22 +189,6 @@ public class SoundManager : MonoBehaviour
     {
         // Set up engine sounds from the current car
         enginesounds = playerController.carObject.GetComponents<AudioSource>();
-
-        // Rebuild specificAudioSources and originalPitches for the new car
-        specificAudioSources = new AudioSource[]
-        {
-        enginesounds[1],           // accel
-        enginesounds[2],           // scream
-        songs[currentSongIndex],   // current song
-        beepsource
-        };
-
-        originalPitches.Clear();
-        foreach (AudioSource audioSource in specificAudioSources)
-        {
-            if (audioSource != null)
-                originalPitches[audioSource] = audioSource.pitch;
-        }
     }
 
     public void SetUpLaneSplitSounds(bool restarting = false)
@@ -555,7 +537,7 @@ public class SoundManager : MonoBehaviour
                 {
                     audioSource.pitch *= 0.6f;
                 }
-                else audioSource.pitch *= 0.8f;
+                else audioSource.pitch *= 0.2f;
             }
             if (!engineScreamPlayed) enginesounds[2].Play();
 
