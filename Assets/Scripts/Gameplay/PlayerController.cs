@@ -717,6 +717,7 @@ public class PlayerController : MonoBehaviour
                     && !gameEnd
                     && !bullet
                     && raceStarted
+                    && !isRecovering
                 )
         {
             if ((Time.time - startTime) - lastLaneSplitTime >= 5) // Only initiate a lane split if the lane split cooldown has expired.
@@ -1609,10 +1610,10 @@ public class PlayerController : MonoBehaviour
 
         // Guarantee we end visible and exit recovering state
         if (!carObject.activeSelf) carObject.SetActive(true);
-        isRecovering = false;
 
         Destroy(carObject);
         SetUpCar();
+        isRecovering = false;
 
         // Rebind and re-register lane split sounds as a new car object has been spawned
         soundManager.SetUpLaneSplitSounds(true);

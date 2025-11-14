@@ -247,11 +247,6 @@ public class SoundManager : MonoBehaviour
             enginesounds[1].volume = originalSoundManagerAudioSourceVolumes[25] * fxMul;
             enginesounds[2].volume = originalSoundManagerAudioSourceVolumes[26] * fxMul;
 
-            // Also reset their pitch to something sane in case they were left altered
-            enginesounds[0].pitch = 1f;
-            enginesounds[1].pitch = 1f;
-            enginesounds[2].pitch = 1f;
-
             // Stop any engine audio currently playing; PlayEngineSound will start accel
             enginesounds[0].Stop();
             enginesounds[1].Stop();
@@ -261,8 +256,8 @@ public class SoundManager : MonoBehaviour
         // Reset and restart wind
         windaccelsource.Stop();
         windscreamsource.Stop();
-        windaccelsource.pitch = 1f;
-        windscreamsource.pitch = 1f;
+        windaccelsource.pitch = 1.07f;
+        windscreamsource.pitch = 1.07f;
         windaccelsource.Play();       // ensure wind base starts again
 
         // Make sure low-pass is off (no aggro muffling)
@@ -393,7 +388,7 @@ public class SoundManager : MonoBehaviour
             // Pausing logic: Update states and pause currently playing audio.
             for (int i = 0; i < audioSources.Count; i++)
             {
-                if (audioSources[i].isPlaying)
+                if (audioSources[i].isPlaying) // TODO: Bug
                 {
                     Debug.Log(audioSources[i].name);
                     audioSourceStates[i] = true; // Mark as playing.
@@ -537,7 +532,7 @@ public class SoundManager : MonoBehaviour
                 {
                     audioSource.pitch *= 0.6f;
                 }
-                else audioSource.pitch *= 0.2f;
+                else audioSource.pitch *= 0.5f;
             }
             if (!engineScreamPlayed) enginesounds[2].Play();
 
@@ -583,8 +578,10 @@ public class SoundManager : MonoBehaviour
             }
             else
             {
+                // Engine crossfade: quicker fade-in on the target
                 float t = elapsedTime / duration;
-                float tFadeIn = Mathf.Clamp01(elapsedTime / (duration / 3)); // This will fade in over 1/3 of the duration.
+                float tFadeIn = Mathf.Clamp01(elapsedTime / (duration / 3f));
+
                 sourceFrom.volume = Mathf.Lerp(originalSourceFromVolume, 0f, t);
                 sourceTo.volume = Mathf.Lerp(0f, originalSourceToVolume, tFadeIn);
             }
@@ -592,11 +589,9 @@ public class SoundManager : MonoBehaviour
             yield return null;
         }
 
+        // Stop old source, restore its volume
         sourceFrom.Stop();
-        sourceFrom.volume = originalSourceFromVolume; // Reset the volume of the old source.
-        specificAudioSources[1] = sourceTo;
-        originalPitches.Remove(sourceFrom);
-        originalPitches[sourceTo] = sourceTo.pitch;
+        sourceFrom.volume = originalSourceFromVolume;
     }
 
     // Add audio source to main list along with its state (false).

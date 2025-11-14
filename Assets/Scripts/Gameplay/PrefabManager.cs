@@ -282,7 +282,7 @@ public class PrefabManager : MonoBehaviour
 
     void Update()
     {
-        if (trafficDensity > 1)
+        if (trafficDensity > 1 && !playerController.gameEnd)
         {
             trafficDensity -= (Time.deltaTime * originalTrafficDensity) / 1000;
         }
