@@ -88,6 +88,8 @@ public class CarDisplay : MonoBehaviour
     public bool typeNameIndexBuilt = false;
     private SaveData.CarData _pendingLootboxSnapshot; // parts/colors captured from the lootbox car
     private string _pendingLootboxType;               // type of the lootbox car (for safety checks)
+    private int _pendingLootboxIndex = -1;            // which variant index was awarded
+
     private int _lastPaintTraitMask = 0; // << stores paint mask returned by RandomizeCar()
 
     [Header("Lootbox Spin Parameters")]
@@ -1057,6 +1059,10 @@ public class CarDisplay : MonoBehaviour
         // Snapshot the lootbox car BEFORE leaving this screen ---
         _pendingLootboxSnapshot = BuildCarDataFromDisplayedModel(); // uses the lootbox _spawnedModel
         _pendingLootboxType = currentCarType;
+        _pendingLootboxIndex = currentCarIndex;
+
+        // Carry over unique paintjob flags into the snapshot
+        ApplyTraitMaskToCarData(_lastPaintTraitMask, _pendingLootboxSnapshot);
 
         // Target the lootbox car's type
         string targetType = currentCarType;
@@ -1106,6 +1112,9 @@ public class CarDisplay : MonoBehaviour
 
         // Re-enable the car name string
         carName.gameObject.SetActive(true);
+
+        // Prevent player from entering the race from this state as dire things may happen
+        goRaceButton.SetActive(false);
 
         // Enable back button that allows us to get back to this state
         backButtonForLootboxAwards.SetActive(true);
@@ -1661,6 +1670,22 @@ public class CarDisplay : MonoBehaviour
         {
             // Exit replace mode
             garageUIscript.inCarReplaceState = false;
+
+            // Spawn the awarded lootbox car behind the popup,
+            // instead of leaving the last viewed garage car visible.
+            if (_pendingLootboxSnapshot != null && !string.IsNullOrEmpty(_pendingLootboxType))
+            {
+                var awardAsset = FindCarAssetByType(_pendingLootboxType);
+                if (awardAsset != null)
+                {
+                    int idx = (_pendingLootboxIndex < 0) ? 0 : _pendingLootboxIndex;
+
+                    // Show it in lootbox mode again. This will:
+                    // - set currentCar/currentCarType/currentCarIndex to the AWARDED car
+                    // - randomize visuals (which is acceptable for preview)
+                    DisplayCar(awardAsset, _pendingLootboxType, idx, true);
+                }
+            }
 
             // Show popup options appropriate to the “max per type” scenario:
             // Replace is available; Add stays hidden (mirrors PrepareToReplaceOwnedCar() entry point).
