@@ -44,6 +44,11 @@ public class PlayerController : MonoBehaviour
     private Quaternion defaultRot;
     private Quaternion rotLeft;
     private Quaternion rotRight;
+    // Recovery flash configuration.
+    private float recoverDuration = 3f;       // Total flashing time
+    private float startFlashInterval = 0.25f; // Slowest interval at start (seconds)
+    private float endFlashInterval = 0.02f; // Fastest interval at end (seconds)
+    private bool isRecovering = false;
 
     // Camera variables.
     public GameObject cameraObject;
@@ -138,40 +143,8 @@ public class PlayerController : MonoBehaviour
         return idx;
     }
 
-    void Awake()
+    private void SetUpCar()
     {
-        // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
-        
-        // Get current environment.
-        currentEnvironment = saveData.CurrentEnvironment;
-
-        // Retrieve the current car type (string) and index from SaveData.
-        currentCarType = saveData.LastOwnedCarType;
-        currentCarIndex = saveData.LastOwnedCarIndex;
-
-        // Build name -> index map once
-        carTypeIndexByName.Clear();
-        for (int i = 0; i < carCollection.carTypes.Count; i++)
-        {
-            var bucket = carCollection.carTypes[i];
-            if (bucket.items == null || bucket.items.Count == 0) continue;
-
-            // Preferred: Car ScriptableObject exposes a stable type name, e.g., public string TypeName
-            var firstCar = bucket.items[0] as Car;
-            if (firstCar == null)
-                throw new System.InvalidOperationException($"CarCollection.carTypes[{i}] contains a non-Car asset.");
-
-            string typeName = firstCar.car_name;      // if you have Car.TypeName
-            if (string.IsNullOrWhiteSpace(typeName))
-                typeName = firstCar.name;             // fallback to asset name if needed
-
-            if (carTypeIndexByName.ContainsKey(typeName))
-                throw new System.InvalidOperationException($"Duplicate car type name '{typeName}' in CarCollection.");
-
-            carTypeIndexByName[typeName] = i;
-        }
-
         // Retrieve the Car instance from the collection using the string key.
         int typeIdx = GetCarTypeIndex(currentCarType);
         currentCar = (Car)carCollection.carTypes[typeIdx].items[currentCarIndex];
@@ -288,22 +261,57 @@ public class PlayerController : MonoBehaviour
             oldCp._MixMultiplier = newCp._MixMultiplier;
 
             // Remove or disable the new component
-            // Option A (recommended at runtime): fully remove to avoid duplicate SRP callbacks
-            Destroy(newCp);
-
-            // Option B (editor-friendly): keep the component but disable it
-            // newCp.enabled = false;
+            Destroy(newCp); // avoids SRP callbacks and cost
         }
 
         // Set TextureSize and Xth frame explicitly for the old component
         oldCp.TextureSize = TextureSize_Old.x256;  // per your requirement
-        oldCp.RunForEveryXthFrame = 2;                      // per your requirement
+        oldCp.RunForEveryXthFrame = 2;             // per your requirement
+
+        // Optional brightness boost logic (your existing helper)
         BoostBrightnessIfMetallic(currentCar.primColor, 3f);
         BoostBrightnessIfMetallic(currentCar.secondColor, 3f);
         BoostBrightnessIfMetallic(currentCar.rimColor, 3f);
 
         // Initialize probe/renderers so it is ready on first frame
         oldCp.InitializeProperties();
+    }
+
+    void Awake()
+    {
+        // Access the SaveData instance.
+        SaveData saveData = SaveManager.Instance.SaveData;
+        
+        // Get current environment.
+        currentEnvironment = saveData.CurrentEnvironment;
+
+        // Retrieve the current car type (string) and index from SaveData.
+        currentCarType = saveData.LastOwnedCarType;
+        currentCarIndex = saveData.LastOwnedCarIndex;
+
+        // Build name -> index map once
+        carTypeIndexByName.Clear();
+        for (int i = 0; i < carCollection.carTypes.Count; i++)
+        {
+            var bucket = carCollection.carTypes[i];
+            if (bucket.items == null || bucket.items.Count == 0) continue;
+
+            // Preferred: Car ScriptableObject exposes a stable type name, e.g., public string TypeName
+            var firstCar = bucket.items[0] as Car;
+            if (firstCar == null)
+                throw new System.InvalidOperationException($"CarCollection.carTypes[{i}] contains a non-Car asset.");
+
+            string typeName = firstCar.car_name;      // if you have Car.TypeName
+            if (string.IsNullOrWhiteSpace(typeName))
+                typeName = firstCar.name;             // fallback to asset name if needed
+
+            if (carTypeIndexByName.ContainsKey(typeName))
+                throw new System.InvalidOperationException($"Duplicate car type name '{typeName}' in CarCollection.");
+
+            carTypeIndexByName[typeName] = i;
+        }
+
+        SetUpCar();
 
         // Set up camera type and sense of speed values from the gameplay options.
         cameraType = saveData.cameraType;
@@ -1386,7 +1394,7 @@ public class PlayerController : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
 
-        if (invincible || other.CompareTag("TrafficBoundingBox")) return;
+        if (invincible || isRecovering || other.CompareTag("TrafficBoundingBox")) return;
         if (other.gameObject.name.StartsWith("Powerup") && powerupsOnStandby) // Checks if we have collided with a powerup.
         {
             powerupCountdown = Time.time - startTime;
@@ -1535,6 +1543,43 @@ public class PlayerController : MonoBehaviour
 
         // Reset countdown/race timing
         startTime = Time.time - 3;
+
+        // Start car flashing animation
+        StartCoroutine(RecoverFlashAndGhost(recoverDuration, startFlashInterval, endFlashInterval));
+    }
+
+    private IEnumerator RecoverFlashAndGhost(float totalDuration, float intervalStart, float intervalEnd)
+    {
+        isRecovering = true;
+
+        // Ensure the visual starts visible
+        if (!carObject.activeSelf) carObject.SetActive(true);
+
+        float elapsed = 0f;
+        bool visible = true;
+
+        // Flip repeatedly; the wait interval decreases linearly from start -> end
+        while (elapsed < totalDuration)
+        {
+            // Compute current interval based on progress (higher frequency as time passes)
+            float t = Mathf.Clamp01(elapsed / totalDuration);
+            float currentInterval = Mathf.Lerp(intervalStart, intervalEnd, t);
+
+            // Toggle visibility of the rendered car only (not the controller/root)
+            visible = !visible;
+            carObject.SetActive(visible);
+
+            // Wait, advance time
+            yield return new WaitForSeconds(currentInterval);
+            elapsed += currentInterval;
+        }
+
+        // Guarantee we end visible and exit recovering state
+        if (!carObject.activeSelf) carObject.SetActive(true);
+        isRecovering = false;
+
+        Destroy(carObject);
+        SetUpCar();
     }
 
     // --- add inside PlayerController (e.g., under fields or at the end of the class) ---
