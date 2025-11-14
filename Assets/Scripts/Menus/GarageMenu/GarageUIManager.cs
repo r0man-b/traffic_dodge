@@ -1632,7 +1632,8 @@ public class GarageUIManager : MonoBehaviour
                     secondaryColor.color = Color.black;
                     secondaryColor.SetColor("_FresnelColor", Color.black);
                     secondaryColor.SetColor("_FresnelColor2", Color.black);
-                    secondaryColor.SetColor("_EmissionColor", buttonColor);
+                    Color emissionColor = new Color(buttonColor[0], buttonColor[1], buttonColor[2], buttonColor[3]);
+                    secondaryColor.SetColor("_EmissionColor", emissionColor);
                     secondaryColor.EnableKeyword("_EMISSION");
                     SetMaterialMetallic(secondaryColor, nonMetallicVal);    // emissive is non-metal
 
@@ -1682,7 +1683,8 @@ public class GarageUIManager : MonoBehaviour
                     rimColor.color = Color.black;
                     rimColor.SetColor("_FresnelColor", Color.black);
                     rimColor.SetColor("_FresnelColor2", Color.black);
-                    rimColor.SetColor("_EmissionColor", buttonColor);
+                    Color emissionColor = new Color(buttonColor[0], buttonColor[1], buttonColor[2], buttonColor[3]);
+                    rimColor.SetColor("_EmissionColor", emissionColor);
                     rimColor.EnableKeyword("_EMISSION");
                     SetMaterialMetallic(rimColor, rimNonMetallicVal);
 

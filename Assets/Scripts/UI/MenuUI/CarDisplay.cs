@@ -1680,10 +1680,8 @@ public class CarDisplay : MonoBehaviour
                 {
                     int idx = (_pendingLootboxIndex < 0) ? 0 : _pendingLootboxIndex;
 
-                    // Show it in lootbox mode again. This will:
-                    // - set currentCar/currentCarType/currentCarIndex to the AWARDED car
-                    // - randomize visuals (which is acceptable for preview)
-                    DisplayCar(awardAsset, _pendingLootboxType, idx, true);
+                    // Override the visuals with the pending lootbox snapshot
+                    ApplyCarDataToDisplayedModel(_pendingLootboxSnapshot);
                 }
             }
 
@@ -1696,6 +1694,7 @@ public class CarDisplay : MonoBehaviour
 
             // Keep the existing award message & sell price (already set by HandlePostSpin/EnsureLootboxSellPriceCached)
             EnsureLootboxSellPriceCached();
+            
             // No further text changes needed; addOrSellPopUpText was already set when the award appeared.
             return;
         }
@@ -2295,7 +2294,6 @@ public class CarDisplay : MonoBehaviour
         HandlePostSpin();
     }
 
-    // ------------------------------ PARTS FLOW HELPERS ------------------------------
     private static readonly string[] _partHolderNames =
         { "EXHAUSTS", "FRONT_SPLITTERS", "REAR_SPLITTERS", "SIDESKIRTS", "SPOILERS", "WHEELS" };
 
@@ -2398,8 +2396,7 @@ public class CarDisplay : MonoBehaviour
             _partName = arr[idx] != null ? arr[idx].name : "Part"; // keep for UI strings
         }
     }
-
-    // ------------------------------ QUICK-TAP HANDLER ------------------------------
+    
     private void HandleQuickTapRelease(float heldSeconds)
     {
         if (heldSeconds > tapMaxDuration) return;
@@ -2590,6 +2587,104 @@ public class CarDisplay : MonoBehaviour
 
         // Fallback: due to floating-point edge cases, return the last index.
         return cumulative.Length - 1;
+    }
+
+    /// <summary>
+    /// Applies a CarData snapshot (parts + colors) onto the currently displayed model
+    /// (the one controlled by currentCar / _spawnedModel).
+    /// </summary>
+    private void ApplyCarDataToDisplayedModel(SaveData.CarData data)
+    {
+        if (data == null || currentCar == null) return;
+
+        // Reuse existing helper to find BODY / PERFORMANCE_PARTS, etc.
+        if (!TryGetModelRoots(out var modelRoot, out var body, out var perfRoot))
+            return;
+
+        void ApplySlot(int slot, PartHolder holder)
+        {
+            if (holder == null) return;
+
+            var parts = holder.GetPartArray();
+            if (parts == null || parts.Length == 0) return;
+
+            int idx = Mathf.Clamp(data.CarParts[slot].CurrentInstalledPart, 0, parts.Length - 1);
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (parts[i] != null)
+                    parts[i].gameObject.SetActive(i == idx);
+            }
+        }
+
+        // Cosmetic + suspension (slots 0–7)
+        ApplySlot(0, body.Find("EXHAUSTS")?.GetComponent<PartHolder>());
+        ApplySlot(1, body.Find("FRONT_SPLITTERS")?.GetComponent<PartHolder>());
+        ApplySlot(2, modelRoot.Find("FRONT_WHEELS")?.GetComponent<PartHolder>());
+        ApplySlot(3, body.Find("REAR_SPLITTERS")?.GetComponent<PartHolder>());
+        ApplySlot(4, modelRoot.Find("REAR_WHEELS")?.GetComponent<PartHolder>());
+        ApplySlot(5, body.Find("SIDESKIRTS")?.GetComponent<PartHolder>());
+        ApplySlot(6, body.Find("SPOILERS")?.GetComponent<PartHolder>());
+        ApplySlot(7, body.GetComponent<PartHolder>()); // Suspensions holder is on BODY
+
+        // Performance (slots 8–10)
+        if (perfRoot != null)
+        {
+            ApplySlot(8, perfRoot.Find("ENGINE")?.GetComponent<PartHolder>());
+            ApplySlot(9, perfRoot.Find("TRANSMISSION")?.GetComponent<PartHolder>());
+            ApplySlot(10, perfRoot.Find("LIVES")?.GetComponent<PartHolder>());
+        }
+
+        // Decals & livery (slots 11–12)
+        ApplySlot(11, body.Find("DECALS")?.GetComponent<PartHolder>());
+        ApplySlot(12, body.Find("LIVERIES")?.GetComponent<PartHolder>());
+
+        // Finally, restore all paint/light colors from the snapshot
+        ApplyColorsToCarFromData(data, currentCar);
+    }
+
+    /// <summary>
+    /// Applies stored paint and light colors from CarData back to a Car's materials.
+    /// Mirrors CopyColorsFromCar but in reverse.
+    /// </summary>
+    private static void ApplyColorsToCarFromData(SaveData.CarData data, Car dest)
+    {
+        if (data == null || dest == null) return;
+
+        void PullColor(int idx, Material m, bool isLight)
+        {
+            if (m == null) return;
+            var cd = data.Colors[idx];
+
+            if (isLight)
+            {
+                // For lights, only emission is relevant.
+                var em = new Color(cd.EmissionColor[0], cd.EmissionColor[1], cd.EmissionColor[2], cd.EmissionColor[3]);
+                if (m.HasProperty("_EmissionColor"))
+                    m.SetColor("_EmissionColor", em);
+            }
+            else
+            {
+                var baseCol = new Color(cd.BaseColor[0], cd.BaseColor[1], cd.BaseColor[2], cd.BaseColor[3]);
+                var f1 = new Color(cd.FresnelColor[0], cd.FresnelColor[1], cd.FresnelColor[2], cd.FresnelColor[3]);
+                var f2 = new Color(cd.FresnelColor2[0], cd.FresnelColor2[1], cd.FresnelColor2[2], cd.FresnelColor2[3]);
+                var em = new Color(cd.EmissionColor[0], cd.EmissionColor[1], cd.EmissionColor[2], cd.EmissionColor[3]);
+                float met = cd.MetallicMap;
+
+                if (m.HasProperty("_Color")) m.color = baseCol;
+                if (m.HasProperty("_FresnelColor")) m.SetColor("_FresnelColor", f1);
+                if (m.HasProperty("_FresnelColor2")) m.SetColor("_FresnelColor2", f2);
+                if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", em);
+                if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", met);
+            }
+        }
+
+        PullColor((int)Car.ColorType.PRIMARY_COLOR, dest.primColor, false);
+        PullColor((int)Car.ColorType.SECONDARY_COLOR, dest.secondColor, false);
+        PullColor((int)Car.ColorType.RIM_COLOR, dest.rimColor, false);
+        PullColor((int)Car.ColorType.PRIMARY_LIGHT, dest.primLight, true);
+        PullColor((int)Car.ColorType.SECONDARY_LIGHT, dest.secondLight, true);
+        PullColor((int)Car.ColorType.TAIL_LIGHT, dest.tailLight, true);
     }
 
     /// <summary>
