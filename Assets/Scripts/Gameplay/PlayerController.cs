@@ -546,7 +546,7 @@ public class PlayerController : MonoBehaviour
                 minXPosition = Mathf.Clamp(minXPosition, this.transform.position.x - 3f, this.transform.position.x + 3f);
                 maxXPosition = Mathf.Clamp(maxXPosition, this.transform.position.x - 3f, this.transform.position.x + 3f);
             }
-            else if (explosionShakeIntensity > 1)
+            else if (explosionShakeIntensity > 2)
             {
                 if (shakeIntensity > 0.3f)
                 {
@@ -1483,6 +1483,7 @@ public class PlayerController : MonoBehaviour
             if ((Time.time - startTime) - timeSinceLastPowerup > 2)
                 numlives--;
             inTrafficExplosion = true;
+            inTornadoExplosion = false;
             StartCoroutine(prefabManager.ExplodeTraffic(explosionParent.transform, transform, false));
             other.gameObject.SetActive(false);
             explosionShakeIntensity = 100f * accel;
