@@ -18,6 +18,7 @@ public class SoundManager : MonoBehaviour
     public AudioSource explossource;
     public AudioSource songsource;
     public AudioSource beepsource;
+    public AudioSource boopsource;
     public AudioSource crashsource;
     public AudioSource trafficexplossource;
     public AudioSource livesource;
@@ -110,7 +111,8 @@ public class SoundManager : MonoBehaviour
             enginesounds[1],
             enginesounds[2],
             songs[currentSongIndex],
-            beepsource
+            beepsource,
+            boopsource
         };
         foreach (AudioSource audioSource in specificAudioSources)
         {
@@ -124,6 +126,7 @@ public class SoundManager : MonoBehaviour
             explossource.volume,
             songsource.volume,
             beepsource.volume,
+            boopsource.volume,
             crashsource.volume,
             trafficexplossource.volume,
             livesource.volume,
@@ -150,31 +153,33 @@ public class SoundManager : MonoBehaviour
         };
 
         // Add all audio sources and their initial states to the list.
-        RegisterAudioSource(idlesource,             0);
-        RegisterAudioSource(explossource,           1);
-        RegisterAudioSource(songsource,             2);
-        RegisterAudioSource(beepsource,             3);
-        RegisterAudioSource(crashsource,            4);
-        RegisterAudioSource(trafficexplossource,    5);
-        RegisterAudioSource(livesource,             6);
-        RegisterAudioSource(aggrosource,            7);
-        RegisterAudioSource(zoomoutsource,          8);
-        RegisterAudioSource(bulletsource,           9);
-        RegisterAudioSource(tornadoexplossource,    10);
-        RegisterAudioSource(leftwooshsource,        11);
-        RegisterAudioSource(rightwooshsource,       12);
-        RegisterAudioSource(windaccelsource,        13);
-        RegisterAudioSource(windscreamsource,       14);
-        RegisterAudioSource(numberincreasesource,   15);
-        RegisterAudioSource(newrecordsource,        16);
-        RegisterAudioSource(rainsource,             17);
-        RegisterAudioSource(tornadowindsource,      18);
-        RegisterAudioSource(tornadosirensource,     19);
-        RegisterAudioSource(lanesplitsteamsource1,  20);
-        RegisterAudioSource(lanesplitsteamsource2,  21);
-        RegisterAudioSource(lanesplitsmashsource1,  22);
-        RegisterAudioSource(lanesplitsmashsource2,  23);
-        int startingEngineIndex = 24;
+        int idx = 0;
+        RegisterAudioSource(idlesource,             idx++);
+        RegisterAudioSource(explossource,           idx++);
+        RegisterAudioSource(songsource,             idx++);
+        RegisterAudioSource(beepsource,             idx++);
+        RegisterAudioSource(boopsource,             idx++);
+        RegisterAudioSource(crashsource,            idx++);
+        RegisterAudioSource(trafficexplossource,    idx++);
+        RegisterAudioSource(livesource,             idx++);
+        RegisterAudioSource(aggrosource,            idx++);
+        RegisterAudioSource(zoomoutsource,          idx++);
+        RegisterAudioSource(bulletsource,           idx++);
+        RegisterAudioSource(tornadoexplossource,    idx++);
+        RegisterAudioSource(leftwooshsource,        idx++);
+        RegisterAudioSource(rightwooshsource,       idx++);
+        RegisterAudioSource(windaccelsource,        idx++);
+        RegisterAudioSource(windscreamsource,       idx++);
+        RegisterAudioSource(numberincreasesource,   idx++);
+        RegisterAudioSource(newrecordsource,        idx++);
+        RegisterAudioSource(rainsource,             idx++);
+        RegisterAudioSource(tornadowindsource,      idx++);
+        RegisterAudioSource(tornadosirensource,     idx++);
+        RegisterAudioSource(lanesplitsteamsource1,  idx++);
+        RegisterAudioSource(lanesplitsteamsource2,  idx++);
+        RegisterAudioSource(lanesplitsmashsource1,  idx++);
+        RegisterAudioSource(lanesplitsmashsource2,  idx++);
+        int startingEngineIndex = idx;
         foreach (AudioSource engineSource in enginesounds)
         {
             RegisterAudioSource(engineSource, startingEngineIndex);
@@ -226,7 +231,7 @@ public class SoundManager : MonoBehaviour
         // Reset volume modifier used by aggro
         volumeModifier = 2f;
 
-        // Restore pitches for the tracked audio sources (enginesounds[1], enginesounds[2], song, beep)
+        // Restore pitches for the tracked audio sources (enginesounds[1], enginesounds[2], song, beep, boop)
         foreach (var kvp in originalPitches)
         {
             if (kvp.Key != null)
@@ -342,7 +347,18 @@ public class SoundManager : MonoBehaviour
     /*------------------------------------- MISC. AUDIO FUNCTIONS -------------------------------------*/
     public void PlayBeep()
     {
-        beepsource.Play();
+        if (!playerController.gameEnd) beepsource.Play();
+    }
+    
+    public void PlayBoop()
+    {
+        boopsource.Play();
+        boopsource.pitch += 0.03f;
+    }
+
+    public void RestoreBoopPitch()
+    {
+        boopsource.pitch = originalPitches[boopsource];
     }
 
     public void PlayCrash()

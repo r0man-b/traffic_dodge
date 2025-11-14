@@ -1603,6 +1603,7 @@ public class PlayerController : MonoBehaviour
 
             // Toggle visibility of the rendered car only (not the controller/root)
             visible = !visible;
+            if (visible) soundManager.PlayBoop();
             carObject.SetActive(visible);
 
             // Wait, advance time
@@ -1619,6 +1620,10 @@ public class PlayerController : MonoBehaviour
 
         // Rebind and re-register lane split sounds as a new car object has been spawned
         soundManager.SetUpLaneSplitSounds(true);
+
+        // Restore boop bitch and play beep to indicate car is ready
+        soundManager.RestoreBoopPitch();
+        soundManager.PlayBeep();
     }
 
     // --- add inside PlayerController (e.g., under fields or at the end of the class) ---
