@@ -1323,12 +1323,6 @@ public class CarDisplay : MonoBehaviour
         _pendingLootboxSnapshot = null;
         _pendingLootboxType = null;
 
-        // Disable UI elements we enabled for replacing cars
-        leftButton.SetActive(false);
-        rightButton.SetActive(false);
-        buttonSet3.SetActive(false);
-        carName.gameObject.SetActive(false);
-
         // Re-enable loot crate popups
         lootCratePopUps.SetActive(true);
         addOrSellPopUp.SetActive(false);
@@ -1339,6 +1333,12 @@ public class CarDisplay : MonoBehaviour
 
         // Display the new replacement car
         garageUIManager.ChangeCar(0);
+
+        // Disable UI elements we enabled for replacing cars
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
+        buttonSet3.SetActive(false);
+        carName.gameObject.SetActive(false);
 
         // Exit replace state
         garageUIManager.inCarReplaceState = false;
