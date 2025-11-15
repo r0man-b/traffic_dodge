@@ -361,6 +361,9 @@ public class CarDisplay : MonoBehaviour
         popUps.SetActive(false);
         buttonSet1.SetActive(false);
         buttonSet2.SetActive(true);
+        goRaceButton.SetActive(true);
+
+        // Play purchase sound
         menuSounds.PlayChaChing();
 
         // Save the last owned car and update the saved data.

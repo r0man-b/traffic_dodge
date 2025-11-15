@@ -33,7 +33,7 @@ public class CreditManager : MonoBehaviour
         long currentCredits = SaveManager.Instance.SaveData.GlobalCredits;
         if (currentCredits < 0)
         {
-            currentCredits = 999_999_999;
+            currentCredits = 0;
             SaveManager.Instance.SaveData.GlobalCredits = currentCredits;
             SaveManager.Instance.SaveGame();
         }
