@@ -57,7 +57,6 @@ namespace Settings
             }
         }
 
-
         private void SaveMusicVolume()
         {
             SaveManager.Instance.SaveData.MusicVolume = musicVolumeSlider.value;

@@ -10,18 +10,11 @@ public class GarageMusic : MonoBehaviour
     public int currentSongIndex = 0;
     private bool songPlayed;
 
-    // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
         // Set up car song radio.
         songs = songsource.GetComponents<AudioSource>();
-        foreach (AudioSource song in songs)
-        {
-            if (song != null)
-            {
-                song.volume = SaveManager.Instance.SaveData.MusicVolume;
-            }
-        }
+        SetSongVolume();
 
         // Load the last song index from SaveData.
         SaveData saveData = SaveManager.Instance.SaveData;
@@ -33,6 +26,11 @@ public class GarageMusic : MonoBehaviour
         // Save the updated index to SaveData for the next time.
         saveData.LastGarageSongIndex = currentSongIndex;
         SaveManager.Instance.SaveGame();
+    }
+
+    private void OnEnable()
+    {
+        SetSongVolume();
     }
 
     // Update is called once per frame
@@ -56,6 +54,17 @@ public class GarageMusic : MonoBehaviour
             SaveManager.Instance.SaveGame();
 
             songs[currentSongIndex].Play(); // Play the next song.
+        }
+    }
+
+    public void SetSongVolume()
+    {
+        foreach (AudioSource song in songs)
+        {
+            if (song != null)
+            {
+                song.volume = SaveManager.Instance.SaveData.MusicVolume;
+            }
         }
     }
 }
