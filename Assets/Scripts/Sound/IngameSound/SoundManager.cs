@@ -270,12 +270,6 @@ public class SoundManager : MonoBehaviour
         if (lowPass) lowPass.enabled = false;
     }
 
-
-    public void PlayEngineSound()
-    {
-        enginesounds[1].Play();
-    }
-
     void Update()
     {
         windaccelsource.volume = Mathf.Min(playerController.accel / 4, 0.4f) * SaveManager.Instance.SaveData.EffectsVolumeMultiplier; ;
@@ -345,6 +339,11 @@ public class SoundManager : MonoBehaviour
 
 
     /*------------------------------------- MISC. AUDIO FUNCTIONS -------------------------------------*/
+    public void PlayEngineSound()
+    {
+        enginesounds[1].Play();
+    }
+
     public void PlayBeep()
     {
         if (!playerController.gameEnd) beepsource.Play();
@@ -404,11 +403,20 @@ public class SoundManager : MonoBehaviour
             // Pausing logic: Update states and pause currently playing audio.
             for (int i = 0; i < audioSources.Count; i++)
             {
-                if (audioSources[i].isPlaying) // TODO: Bug
+                var src = audioSources[i];
+
+                // Skip destroyed or missing sources.
+                if (src == null)
                 {
-                    Debug.Log(audioSources[i].name);
+                    audioSourceStates[i] = false;
+                    continue;
+                }
+
+                if (src.isPlaying) // <- previously could throw if src was destroyed
+                {
+                    Debug.Log(src.name);
                     audioSourceStates[i] = true; // Mark as playing.
-                    audioSources[i].Pause();
+                    src.Pause();
                 }
                 else
                 {
@@ -417,10 +425,8 @@ public class SoundManager : MonoBehaviour
             }
 
             // Pause current song.
-            songs[currentSongIndex].Pause();
-
-            // Pause current engine sound.
-            //enginesounds[currentEngineSoundIndex].Pause();
+            if (songs != null && songs.Length > 0 && currentSongIndex >= 0 && currentSongIndex < songs.Length)
+                songs[currentSongIndex].Pause();
 
             isPaused = true;
         }
@@ -429,21 +435,26 @@ public class SoundManager : MonoBehaviour
             // Unpausing logic: Resume audio sources that were playing before pausing.
             for (int i = 0; i < audioSources.Count; i++)
             {
+                var src = audioSources[i];
+
+                // Skip destroyed or missing sources.
+                if (src == null)
+                    continue;
+
                 if (audioSourceStates[i])
                 {
-                    audioSources[i].UnPause();
+                    src.UnPause();
                 }
             }
 
             // Unpause current song.
-            songs[currentSongIndex].UnPause();
-
-            // Unpause current engine sound.
-            //enginesounds[currentEngineSoundIndex].UnPause();
+            if (songs != null && songs.Length > 0 && currentSongIndex >= 0 && currentSongIndex < songs.Length)
+                songs[currentSongIndex].UnPause();
 
             isPaused = false;
         }
     }
+
 
 
     /*------------------------------------ POWERUP AUDIO MANAGEMENT -----------------------------------*/
@@ -613,10 +624,27 @@ public class SoundManager : MonoBehaviour
     // Add audio source to main list along with its state (false).
     public void RegisterAudioSource(AudioSource source, int index)
     {
-        audioSources.Add(source);
-        audioSourceStates.Add(false);
-        source.volume = originalSoundManagerAudioSourceVolumes[index] * SaveManager.Instance.SaveData.EffectsVolumeMultiplier;
+        if (source == null)
+            return;
+
+        // Ensure lists are large enough to hold this index.
+        while (audioSources.Count <= index)
+        {
+            audioSources.Add(null);
+            audioSourceStates.Add(false);
+        }
+
+        audioSources[index] = source;
+        audioSourceStates[index] = false;
+
+        // Apply volume from original snapshot if index is valid.
+        float fxMul = SaveManager.Instance.SaveData.EffectsVolumeMultiplier;
+        if (index >= 0 && index < originalSoundManagerAudioSourceVolumes.Length)
+        {
+            source.volume = originalSoundManagerAudioSourceVolumes[index] * fxMul;
+        }
     }
+
 
     public void UpdateSoundManagerMusicVolumes(float value)
     {
