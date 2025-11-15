@@ -39,7 +39,13 @@ public class CreditManager : MonoBehaviour
         }
 
         _displayedCredits = currentCredits;
-        creditsText.text = $"{_displayedCredits:N0} cr";
+
+        string formatted = $"{_displayedCredits:N0} cr";
+        _lastDigitCount = currentCredits.ToString().Length;
+
+        // Apply the adjusted autosize logic on startup
+        ApplyAdjustedAutosize(formatted);
+
         _initialized = true;
     }
 
@@ -104,19 +110,34 @@ public class CreditManager : MonoBehaviour
         bool digitCountChanged = digitCount != _lastDigitCount;
         _lastDigitCount = digitCount;
 
-        // Enable autosize only when necessary.
         if (digitCountChanged)
         {
-            creditsText.enableAutoSizing = true;
-            creditsText.text = formatted;
-            creditsText.ForceMeshUpdate();  // Allow TMP to resize once
-            creditsText.enableAutoSizing = false;
+            ApplyAdjustedAutosize(formatted);
         }
         else
         {
             creditsText.enableAutoSizing = false;
             creditsText.text = formatted;
         }
+    }
+
+    private void ApplyAdjustedAutosize(string formatted)
+    {
+        if (creditsText == null) return;
+
+        // Step 1 — Let TMP autosize temporarily
+        creditsText.enableAutoSizing = true;
+        creditsText.text = formatted;
+        creditsText.ForceMeshUpdate();
+
+        // Read the autosized result
+        float autoSizeFont = creditsText.fontSize;
+
+        // Step 2 — Lock autosizing off and apply minus-2 font size
+        creditsText.enableAutoSizing = false;
+
+        float adjustedSize = Mathf.Max(autoSizeFont - 5f, creditsText.fontSizeMin);
+        creditsText.fontSize = adjustedSize;
     }
 
     /// <summary>
