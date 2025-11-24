@@ -2,7 +2,6 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.Purchasing;
 using UnityEngine.UI;
 // using UnityEngine.Purchasing;
 
