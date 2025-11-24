@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 using CarPaintNew = AkilliMum.SRP.CarPaint.CarsPaint;
 using CarPaintOld = AkilliMum.SRP.CarPaintOld.CarsPaint;
 using BoundingBox_Old = AkilliMum.SRP.CarPaintOld.BoundingBox;
-using TextureSize_Old = AkilliMum.SRP.CarPaintOld.TextureSizeType;
+using TextureSize = AkilliMum.SRP.CarPaint.TextureSizeType;
 
 public class PlayerController : MonoBehaviour
 {
@@ -125,6 +125,7 @@ public class PlayerController : MonoBehaviour
     public PauseMenu pauseMenu;
     private PrefabManager prefabManager;
     private PostProcessManager postProcessManager;
+    private SaveData saveData;
 
     // Car collection.
     [SerializeField] private CarCollection carCollection;
@@ -231,44 +232,44 @@ public class PlayerController : MonoBehaviour
         var newCp = carObject.GetComponent<CarPaintNew>();
 
         // Ensure we have an old component
-        var oldCp = carObject.GetComponent<CarPaintOld>();
-        if (oldCp == null)
-        {
-            oldCp = carObject.AddComponent<CarPaintOld>();
-        }
-
-        // If the new component exists, copy matching settings over to old (except TextureSize and RunForEveryXthFrame)
-        if (newCp != null)
-        {
-            // Core toggles
-            oldCp.IsEnabled = newCp.IsEnabled;
-            oldCp.IsDebug = newCp.IsDebug;
-
-            // Bounding box (enum values match; cast via int)
-            oldCp.BoundingBox = (BoundingBox_Old)(int)newCp.BoundingBox;
-
-            // Performance / quality (exclude RunForEveryXthFrame and TextureSize here by requirement)
-            oldCp.UseOcclusionCulling = newCp.UseOcclusionCulling;
-            oldCp.HDR = newCp.HDR;
-            oldCp.CameraLODLevel = newCp.CameraLODLevel;
-            oldCp.DisablePixelLights = newCp.DisablePixelLights;
-            oldCp.ShadowDistance = newCp.ShadowDistance;
-
-            // Culling & clipping
-            oldCp.ReflectLayers = newCp.ReflectLayers;
-            oldCp.ClippingPlaneNear = newCp.ClippingPlaneNear;
-            oldCp.ClippingPlaneFar = newCp.ClippingPlaneFar;
-
-            // Material mixing
-            oldCp._MixMultiplier = newCp._MixMultiplier;
-
-            // Remove or disable the new component
-            Destroy(newCp); // avoids SRP callbacks and cost
-        }
-
-        // Set TextureSize and Xth frame explicitly for the old component
-        oldCp.TextureSize = TextureSize_Old.x256;  // per your requirement
-        oldCp.RunForEveryXthFrame = 2;             // per your requirement
+        //var oldCp = carObject.GetComponent<CarPaintOld>();
+        //if (oldCp == null)
+        //{
+        //    oldCp = carObject.AddComponent<CarPaintOld>();
+        //}
+        //
+        //// If the new component exists, copy matching settings over to old (except TextureSize and RunForEveryXthFrame)
+        //if (newCp != null)
+        //{
+        //    // Core toggles
+        //    oldCp.IsEnabled = newCp.IsEnabled;
+        //    oldCp.IsDebug = newCp.IsDebug;
+        //
+        //    // Bounding box (enum values match; cast via int)
+        //    oldCp.BoundingBox = (BoundingBox_Old)(int)newCp.BoundingBox;
+        //
+        //    // Performance / quality (exclude RunForEveryXthFrame and TextureSize here by requirement)
+        //    oldCp.UseOcclusionCulling = newCp.UseOcclusionCulling;
+        //    oldCp.HDR = newCp.HDR;
+        //    oldCp.CameraLODLevel = newCp.CameraLODLevel;
+        //    oldCp.DisablePixelLights = newCp.DisablePixelLights;
+        //    oldCp.ShadowDistance = newCp.ShadowDistance;
+        //
+        //    // Culling & clipping
+        //    oldCp.ReflectLayers = newCp.ReflectLayers;
+        //    oldCp.ClippingPlaneNear = newCp.ClippingPlaneNear;
+        //    oldCp.ClippingPlaneFar = newCp.ClippingPlaneFar;
+        //
+        //    // Material mixing
+        //    oldCp._MixMultiplier = newCp._MixMultiplier;
+        //
+        //    // Remove or disable the new component
+        //    Destroy(newCp); // avoids SRP callbacks and cost
+        //}
+        //
+        //// Set TextureSize and Xth frame explicitly for the old component
+        //oldCp.TextureSize = TextureSize_Old.x256;  // per your requirement
+        //oldCp.RunForEveryXthFrame = 2;             // per your requirement
 
         // Optional brightness boost logic (your existing helper)
         BoostBrightnessIfMetallic(currentCar.primColor, 3f);
@@ -276,13 +277,13 @@ public class PlayerController : MonoBehaviour
         BoostBrightnessIfMetallic(currentCar.rimColor, 3f);
 
         // Initialize probe/renderers so it is ready on first frame
-        oldCp.InitializeProperties();
+        newCp.InitializeProperties();
     }
 
-    void Start()
+    private void Awake()
     {
         // Access the SaveData instance.
-        SaveData saveData = SaveManager.Instance.SaveData;
+        saveData = SaveManager.Instance.SaveData;
 
         // Get current environment.
         currentEnvironment = saveData.CurrentEnvironment;
@@ -312,7 +313,10 @@ public class PlayerController : MonoBehaviour
 
             carTypeIndexByName[typeName] = i;
         }
+    }
 
+    void Start()
+    {
         SetUpCar();
 
         // Set up camera type and sense of speed values from the gameplay options.
@@ -700,7 +704,7 @@ public class PlayerController : MonoBehaviour
         }
 
         // Update movement value that determines how quickly we change lanes.
-        float movement_val = Time.deltaTime * accel / 3f;
+        float movement_val = Time.deltaTime * accel / 5f;
 
         // If the bullet powerup is enabled, auto lane change the player.
         if ((bullet) && (raceStarted))

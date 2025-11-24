@@ -62,6 +62,7 @@ public class SoundManager : MonoBehaviour
     private bool explosplayed = false;
     private bool inAggro = false;
     private bool inBullet = false;
+    private bool soundsSetup = false;
 
     // Misc. variables.
     public float drop = 3f;
@@ -96,6 +97,17 @@ public class SoundManager : MonoBehaviour
         }
         SaveManager.Instance.SaveGame();
 
+
+    }
+
+    public void SetUpCarSounds()
+    {
+        // Set up engine sounds from the current car
+        enginesounds = playerController.carObject.GetComponents<AudioSource>();
+    }
+    
+    public void SetUpSounds()
+    {
         SetUpCarSounds();
         SetUpLaneSplitSounds();
         EnsurePersistentEngineAudio();
@@ -154,31 +166,31 @@ public class SoundManager : MonoBehaviour
 
         // Add all audio sources and their initial states to the list.
         int idx = 0;
-        RegisterAudioSource(idlesource,             idx++);
-        RegisterAudioSource(explossource,           idx++);
-        RegisterAudioSource(songsource,             idx++);
-        RegisterAudioSource(beepsource,             idx++);
-        RegisterAudioSource(boopsource,             idx++);
-        RegisterAudioSource(crashsource,            idx++);
-        RegisterAudioSource(trafficexplossource,    idx++);
-        RegisterAudioSource(livesource,             idx++);
-        RegisterAudioSource(aggrosource,            idx++);
-        RegisterAudioSource(zoomoutsource,          idx++);
-        RegisterAudioSource(bulletsource,           idx++);
-        RegisterAudioSource(tornadoexplossource,    idx++);
-        RegisterAudioSource(leftwooshsource,        idx++);
-        RegisterAudioSource(rightwooshsource,       idx++);
-        RegisterAudioSource(windaccelsource,        idx++);
-        RegisterAudioSource(windscreamsource,       idx++);
-        RegisterAudioSource(numberincreasesource,   idx++);
-        RegisterAudioSource(newrecordsource,        idx++);
-        RegisterAudioSource(rainsource,             idx++);
-        RegisterAudioSource(tornadowindsource,      idx++);
-        RegisterAudioSource(tornadosirensource,     idx++);
-        RegisterAudioSource(lanesplitsteamsource1,  idx++);
-        RegisterAudioSource(lanesplitsteamsource2,  idx++);
-        RegisterAudioSource(lanesplitsmashsource1,  idx++);
-        RegisterAudioSource(lanesplitsmashsource2,  idx++);
+        RegisterAudioSource(idlesource, idx++);
+        RegisterAudioSource(explossource, idx++);
+        RegisterAudioSource(songsource, idx++);
+        RegisterAudioSource(beepsource, idx++);
+        RegisterAudioSource(boopsource, idx++);
+        RegisterAudioSource(crashsource, idx++);
+        RegisterAudioSource(trafficexplossource, idx++);
+        RegisterAudioSource(livesource, idx++);
+        RegisterAudioSource(aggrosource, idx++);
+        RegisterAudioSource(zoomoutsource, idx++);
+        RegisterAudioSource(bulletsource, idx++);
+        RegisterAudioSource(tornadoexplossource, idx++);
+        RegisterAudioSource(leftwooshsource, idx++);
+        RegisterAudioSource(rightwooshsource, idx++);
+        RegisterAudioSource(windaccelsource, idx++);
+        RegisterAudioSource(windscreamsource, idx++);
+        RegisterAudioSource(numberincreasesource, idx++);
+        RegisterAudioSource(newrecordsource, idx++);
+        RegisterAudioSource(rainsource, idx++);
+        RegisterAudioSource(tornadowindsource, idx++);
+        RegisterAudioSource(tornadosirensource, idx++);
+        RegisterAudioSource(lanesplitsteamsource1, idx++);
+        RegisterAudioSource(lanesplitsteamsource2, idx++);
+        RegisterAudioSource(lanesplitsmashsource1, idx++);
+        RegisterAudioSource(lanesplitsmashsource2, idx++);
         int startingEngineIndex = idx;
         foreach (AudioSource engineSource in enginesounds)
         {
@@ -188,12 +200,6 @@ public class SoundManager : MonoBehaviour
 
         // Start clock.
         startTime = Time.time;
-    }
-
-    public void SetUpCarSounds()
-    {
-        // Set up engine sounds from the current car
-        enginesounds = playerController.carObject.GetComponents<AudioSource>();
     }
 
     public void SetUpLaneSplitSounds(bool restarting = false)
@@ -272,6 +278,12 @@ public class SoundManager : MonoBehaviour
 
     void Update()
     {
+        if (!soundsSetup)
+        {
+            SetUpSounds();
+            soundsSetup = true;
+        }
+
         windaccelsource.volume = Mathf.Min(playerController.accel / 4, 0.4f) * SaveManager.Instance.SaveData.EffectsVolumeMultiplier; ;
         windscreamsource.volume = Mathf.Min(playerController.accel / 4, 0.25f) * SaveManager.Instance.SaveData.EffectsVolumeMultiplier; ;
         // Ensure song pitches return to normal after aggro or bullet powerups expire.
