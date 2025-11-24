@@ -279,11 +279,11 @@ public class PlayerController : MonoBehaviour
         oldCp.InitializeProperties();
     }
 
-    void Awake()
+    void Start()
     {
         // Access the SaveData instance.
         SaveData saveData = SaveManager.Instance.SaveData;
-        
+
         // Get current environment.
         currentEnvironment = saveData.CurrentEnvironment;
 
@@ -346,12 +346,6 @@ public class PlayerController : MonoBehaviour
 
         // Set up FPS modifier
         fpsModifier = 120.0f / saveData.frameRate;
-    }
-
-    void Start()
-    {
-        // Start clock.
-        startTime = Time.time;
 
         // Set camera variables.
         defaultCamPosition = currentCar.defaultCameraPosition;
@@ -389,8 +383,8 @@ public class PlayerController : MonoBehaviour
         GameObject PostProcessingObject = GameObject.Find("PostProcessing");
         postProcessManager = PostProcessingObject.GetComponent<PostProcessManager>();
 
-        // FOR TRAILER ONLY
-        //if (autoSplit) invincible = true;
+        // Start clock.
+        startTime = Time.time;
     }
 
     private void Update()
