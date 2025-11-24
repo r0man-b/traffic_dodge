@@ -50,6 +50,7 @@ public class PlayerController : MonoBehaviour
     private float startFlashInterval = 0.25f; // Slowest interval at start (seconds)
     private float endFlashInterval = 0.02f; // Fastest interval at end (seconds)
     private bool isRecovering = false;
+    private float fpsModifier;
 
     // Camera variables.
     public GameObject cameraObject;
@@ -342,6 +343,9 @@ public class PlayerController : MonoBehaviour
         {
             rain.gameObject.SetActive(false);
         }
+
+        // Set up FPS modifier
+        fpsModifier = 120.0f / saveData.frameRate;
     }
 
     void Start()
@@ -413,6 +417,11 @@ public class PlayerController : MonoBehaviour
         {
             Cursor.visible = !Cursor.visible;
         }
+
+
+        Vector3 camPos = cameraObject.transform.position;
+        camPos.x = transform.position.x;
+        cameraObject.transform.position = camPos;
 
         // Move the player, camera, and tornadoObject forward.
         this.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
@@ -659,7 +668,7 @@ public class PlayerController : MonoBehaviour
                     camPosZ = this.transform.position.z + 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f + cameraZMultiplier;
                 else
                     camPosZ = this.transform.position.z + 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f - (cam.fieldOfView - oldFov) / 20 + cameraZMultiplier;
-                cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(cameraObject.transform.position.x, cameraObject.transform.position.y, camPosZ), 0.001f * Time.deltaTime);
+                cameraObject.transform.position = new Vector3(cameraObject.transform.position.x, cameraObject.transform.position.y, camPosZ);
             }
 
             // If the game has ended or player is in an explosion, apply explosion shake to the camera.
@@ -697,7 +706,7 @@ public class PlayerController : MonoBehaviour
         }
 
         // Update movement value that determines how quickly we change lanes.
-        float movement_val = Time.deltaTime * accel / 5;
+        float movement_val = Time.deltaTime * accel / 3f;
 
         // If the bullet powerup is enabled, auto lane change the player.
         if ((bullet) && (raceStarted))
@@ -801,7 +810,52 @@ public class PlayerController : MonoBehaviour
 
         // If there are no player inputs, snap the player to the closest lane.
         else SnapToClosestLane(movement_val);
+
     }
+
+    //[SerializeField] private float cameraFollowSmooth = 0.08f;  // tweak to match your current “tightness”
+    //private Vector3 camVelocity;
+    //
+    //void LateUpdate()
+    //{
+    //    if (!raceStarted) return;
+    //
+    //    // 1. Target center above the player
+    //    Vector3 targetBase = new Vector3(
+    //        transform.position.x,              // always lock X to player
+    //        defaultCamPosY,                    // base height
+    //        camPosZ                            // current Z logic you already compute
+    //    );
+    //
+    //    // 2. Compute shake offset in local space
+    //    Vector3 shakeOffset = ComputeShakeOffset(); // only returns a small +/- X/Y offset
+    //
+    //    // 3. Apply shake to base
+    //    Vector3 target = targetBase + shakeOffset;
+    //
+    //    // 4. SmoothDamp to target - frame-rate independent smoothing
+    //    cameraObject.transform.position = Vector3.SmoothDamp(
+    //        cameraObject.transform.position,
+    //        target,
+    //        ref camVelocity,
+    //        cameraFollowSmooth
+    //    );
+    //
+    //    // cache if you still need it
+    //    defaultCamPosition = cameraObject.transform.position;
+    //}
+    //
+    //private Vector3 ComputeShakeOffset()
+    //{
+    //    if (!raceStarted || explosionShakeIntensity <= 1f)
+    //        return Vector3.zero;
+    //
+    //    float sx = Random.Range(-shakeIntensity, shakeIntensity);
+    //    float sy = Random.Range(-shakeIntensity, shakeIntensity);
+    //
+    //    // Optionally clamp further or scale down
+    //    return new Vector3(sx, sy, 0f);
+    //}
 
 
     /*----------------------------------- PLAYER MOVEMENT FUNCTIONS -----------------------------------*/
@@ -819,8 +873,11 @@ public class PlayerController : MonoBehaviour
             isTouchDown = false;
         }
 
+        // Get tapDuration
+        float tapDuration = touchUpTime - touchDownTime;
+
         // If the touch release & touch press was very close, move over one lane.
-        if (Mathf.Abs(transform.position.x - lastXPosition) <= 3)
+        if (tapDuration <= 0.2f)
         {
             SetCurrentLane(currentLane + whichWay, speed / 2);
         }
@@ -865,7 +922,7 @@ public class PlayerController : MonoBehaviour
         if (lane == 0)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-11.5f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-11.5f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-11.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 0;
         }
 
@@ -873,7 +930,7 @@ public class PlayerController : MonoBehaviour
         else if (lane == 1)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-8.5f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-8.5f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-8.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 1;
         }
 
@@ -881,7 +938,7 @@ public class PlayerController : MonoBehaviour
         else if (lane == 2)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-5.5f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-5.5f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-5.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 2;
         }
 
@@ -889,7 +946,7 @@ public class PlayerController : MonoBehaviour
         else if (lane == 3)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-2.5f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-2.5f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-2.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 3;
         }
 
@@ -899,10 +956,10 @@ public class PlayerController : MonoBehaviour
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(1f, transform.position.y, transform.position.z), 10 * speed);
 
-            if (Time.time - startTime > soundManager.drop + 0.1f)
-                cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(1f, defaultCamPosition.y, camPosZ), 10 * speed);
-            else
-                cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(1f, defaultCamPosition.y, camPosZ), 20 * Time.deltaTime);
+            //if (Time.time - startTime > soundManager.drop + 0.1f)
+                //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(1f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //else
+                //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(1f, defaultCamPosition.y, camPosZ), 20 * Time.deltaTime);
 
             currentLane = 4;
         }
@@ -911,7 +968,7 @@ public class PlayerController : MonoBehaviour
         else if (lane == 5)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(4f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(4f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(4f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 5;
         }
 
@@ -919,7 +976,7 @@ public class PlayerController : MonoBehaviour
         else if (lane == 6)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(7f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(7f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(7f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 6;
         }
 
@@ -927,7 +984,7 @@ public class PlayerController : MonoBehaviour
         else if (lane == 7)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(10f, transform.position.y, transform.position.z), 10 * speed);
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(10f, defaultCamPosition.y, camPosZ), 10 * speed);
+            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(10f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 7;
         }
     }
