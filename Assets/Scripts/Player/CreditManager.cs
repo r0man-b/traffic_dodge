@@ -133,10 +133,10 @@ public class CreditManager : MonoBehaviour
         // Read the autosized result
         float autoSizeFont = creditsText.fontSize;
 
-        // Step 2 — Lock autosizing off and apply minus-2 font size
+        // Step 2 — Lock autosizing off and apply smaller font size
         creditsText.enableAutoSizing = false;
 
-        float adjustedSize = Mathf.Max(autoSizeFont - 5f, creditsText.fontSizeMin);
+        float adjustedSize = Mathf.Max(autoSizeFont - 7f, creditsText.fontSizeMin);
         creditsText.fontSize = adjustedSize;
     }
 
