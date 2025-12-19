@@ -31,7 +31,6 @@ public class ShopItem : MonoBehaviour
     [Header("UI References")]
     public TextMeshProUGUI quantityText;
     public TextMeshProUGUI buttonText;
-    public TextMeshProUGUI buttonTextOutline;
 
     private void Awake()
     {
@@ -44,7 +43,6 @@ public class ShopItem : MonoBehaviour
                 // Button formatting
                 string nitroPrice = "BUY: $" + priceOfItem.ToString("F2");
                 buttonText.text = nitroPrice;
-                buttonTextOutline.text = nitroPrice;
                 break;
 
             case ItemType.Credits:
@@ -52,9 +50,8 @@ public class ShopItem : MonoBehaviour
                 quantityText.text = quantityOfItem.ToString("N0") + " CR:";
 
                 // Button formatting
-                string creditPrice = "  BUY: " + ((int)priceOfItem).ToString("N0");
+                string creditPrice = "BUY: " + ((int)priceOfItem).ToString("N0");
                 buttonText.text = creditPrice;
-                buttonTextOutline.text = creditPrice;
                 break;
 
             case ItemType.LootCrate:
@@ -62,9 +59,8 @@ public class ShopItem : MonoBehaviour
                 quantityText.text = itemDescription;
 
                 // Button formatting
-                string lootCratePrice = "     OPEN: " + ((int)priceOfItem).ToString("N0");
+                string lootCratePrice = "OPEN: " + ((int)priceOfItem).ToString("N0");
                 buttonText.text = lootCratePrice;
-                buttonTextOutline.text = lootCratePrice;
                 break;
         }
     }

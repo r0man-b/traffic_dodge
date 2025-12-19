@@ -333,7 +333,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
             }
             else
             {
-                AdjustAlpha(buttonImages[i], buttonNames[i], buttonPrices[i], 10f);
+                AdjustAlpha(buttonImages[i], buttonNames[i], buttonPrices[i], 25f);
                 buttonTransforms[i].localScale = new Vector2(1f, 1f);
                 buttons[i].interactable = false;
             }
@@ -369,7 +369,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
             AdjustAlpha(buttonImages[i - 1], buttonNames[i - 1], buttonPrices[i - 1], 100f);
             if (i - 2 >= 0)
             {
-                AdjustAlpha(buttonImages[i - 2], buttonNames[i - 2], buttonPrices[i - 2], 10f);
+                AdjustAlpha(buttonImages[i - 2], buttonNames[i - 2], buttonPrices[i - 2], 25f);
             }
         }
 
@@ -378,7 +378,7 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
             AdjustAlpha(buttonImages[i + 1], buttonNames[i + 1], buttonPrices[i + 1], 100f);
             if (i + 2 < buttonTransforms.Count)
             {
-                AdjustAlpha(buttonImages[i + 2], buttonNames[i + 2], buttonPrices[i + 2], 10f);
+                AdjustAlpha(buttonImages[i + 2], buttonNames[i + 2], buttonPrices[i + 2], 25f);
             }
         }
     }
@@ -423,16 +423,18 @@ public class ScrollViewControllerBottomLayer : MonoBehaviour
         if (image)
         {
             Color newColor = image.color;
-            newColor.a = alpha / 255f;
+            newColor.a = 2 * alpha / 255f;
             image.color = newColor;
         }
         if (name)
         {
             Color newColor = name.color;
-            newColor.a = alpha / 255f;
+            if (alpha != 255f)
+                newColor.a = alpha / 4 / 255f;
+            else
+                newColor.a = alpha / 255f;
             name.color = newColor;
         }
-
         if (price)
         {
             Color newColor = price.color;

@@ -414,7 +414,7 @@ public class ScrollViewController : MonoBehaviour
             AdjustAlpha(buttonImages[i - 1], buttonRawImages[i - 1], buttonTexts[i - 1], 100f);
             if (i - 2 >= 0)
             {
-                AdjustAlpha(buttonImages[i - 2], buttonRawImages[i - 2], buttonTexts[i - 2], 10f);
+                AdjustAlpha(buttonImages[i - 2], buttonRawImages[i - 2], buttonTexts[i - 2], 25f);
             }
         }
 
@@ -423,7 +423,7 @@ public class ScrollViewController : MonoBehaviour
             AdjustAlpha(buttonImages[i + 1], buttonRawImages[i + 1], buttonTexts[i + 1], 100f);
             if (i + 2 < buttonTransforms.Length)
             {
-                AdjustAlpha(buttonImages[i + 2], buttonRawImages[i + 2], buttonTexts[i + 2], 10f);
+                AdjustAlpha(buttonImages[i + 2], buttonRawImages[i + 2], buttonTexts[i + 2], 25f);
             }
         }
     }
@@ -462,13 +462,16 @@ public class ScrollViewController : MonoBehaviour
         if (textMesh)
         {
             Color newColor = textMesh.color;
-            newColor.a = alpha / 255f;
+            if (alpha != 255f)
+                newColor.a = alpha / 4 / 255f;
+            else
+                newColor.a = alpha / 255f;
             textMesh.color = newColor;
         }
         if (image)
         {
             Color newColor = image.color;
-            newColor.a = alpha / 255f;
+            newColor.a = 2 * alpha / 255f;
             image.color = newColor;
         }
         if (rawImage)

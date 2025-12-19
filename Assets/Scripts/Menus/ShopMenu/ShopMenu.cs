@@ -30,7 +30,6 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private TMP_Text quantityValueText;   // number between +/- buttons
     [SerializeField] private TMP_Text totalText;           // e.g., "TOTAL: X NITROS" or "TOTAL: X CR"
     [SerializeField] private TMP_Text buyButtonText;       // main buy label
-    [SerializeField] private TMP_Text buyButtonTextOutline;// outline label (mirrors main)
     [SerializeField] private Button minusButton;
     [SerializeField] private Button plusButton;
     [SerializeField] private Button buyButton;
@@ -41,7 +40,6 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private TMP_Text leftInfoText;
     [SerializeField] private TMP_Text rightInfoText;
     [SerializeField] private TMP_Text openButtonText;       // main buy label
-    [SerializeField] private TMP_Text openButtonTextOutline;// outline label (mirrors main)
     [SerializeField] private RawImage crateImage;
 
     [Header("Hold-to-Repeat")]
@@ -145,7 +143,6 @@ public class ShopMenu : MonoBehaviour
         // Set the open button texts
         string priceLabel = $"OPEN: {(int)lootCrate.priceOfItem}";
         openButtonText.text = priceLabel;
-        openButtonTextOutline.text = priceLabel;
 
         // Store the current item reference
         _currentItem = lootCrate;
@@ -199,8 +196,8 @@ public class ShopMenu : MonoBehaviour
         if (packTitleText != null)
             packTitleText.text = $"{_currentItem.quantityOfItem:N0} CR";
 
-        // Left alignment and smaller auto-size cap for Credits buy text
-        ApplyBuyTextStyle(TextAlignmentOptions.Center, 45f);
+        // Right alignment and smaller auto-size cap for Credits buy text
+        ApplyBuyTextStyle(TextAlignmentOptions.Right, 45f);
     }
 
     private void ApplyBuyTextStyle(TextAlignmentOptions alignment, float maxAutoSize)
@@ -210,12 +207,6 @@ public class ShopMenu : MonoBehaviour
             buyButtonText.enableAutoSizing = true;
             buyButtonText.fontSizeMax = maxAutoSize;
             buyButtonText.alignment = alignment;
-        }
-        if (buyButtonTextOutline != null)
-        {
-            buyButtonTextOutline.enableAutoSizing = true;
-            buyButtonTextOutline.fontSizeMax = maxAutoSize;
-            buyButtonTextOutline.alignment = alignment;
         }
     }
     #endregion
@@ -303,7 +294,6 @@ public class ShopMenu : MonoBehaviour
     private void SetBuyTexts(string value)
     {
         if (buyButtonText != null) buyButtonText.text = value;
-        if (buyButtonTextOutline != null) buyButtonTextOutline.text = value;
     }
     #endregion
 

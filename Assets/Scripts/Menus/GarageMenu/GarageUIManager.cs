@@ -881,7 +881,7 @@ public class GarageUIManager : MonoBehaviour
 
         for (int i = 0; i < numOfParts; i++)
         {
-            float alphaValue = 10;
+            float alphaValue = 255;
             bool interactable = false;
             Button newButton = Instantiate(buttonTemplate, Vector3.zero, Quaternion.identity, spawnTransform);
 
@@ -891,7 +891,7 @@ public class GarageUIManager : MonoBehaviour
             newButton.onClick.AddListener(() => ConfirmBuyPart(tempIndex, partIndex));
 
             TextMeshProUGUI[] texts = newButton.GetComponentsInChildren<TextMeshProUGUI>();
-            Image image = newButton.GetComponent<Image>();
+            Image image = newButton.GetComponentsInChildren<Image>()[0];
             texts[0].color = new Color(texts[0].color.r, texts[0].color.g, texts[0].color.b, alphaValue / 255f);
             texts[1].color = new Color(texts[0].color.r, texts[0].color.g, texts[0].color.b, alphaValue / 255f);
             image.color = new Color(image.color.r, image.color.g, image.color.b, alphaValue / 255f);
@@ -2033,7 +2033,18 @@ public class GarageUIManager : MonoBehaviour
     }
 
     // Get the palette "slot index" within the active bucket.
-    private static int GetPresetIndexInBucket(Button b) => b.transform.GetSiblingIndex();
+    private static int GetPresetIndexInBucket(Button b)
+    {
+        var t = b.transform;
+
+        // Metals: slot buttons live under a single container child.
+        var bucket = t.parent;
+        if (bucket != null && bucket.parent != null && bucket.childCount == 0)
+            return t.GetSiblingIndex();
+
+        // If the parent itself is the container, return index within it.
+        return t.GetSiblingIndex();
+    }
 
     // Turn on a single child named "Checkmark" under the selected slot; turn off others.
     private void ApplyCheckmarkForBucket(int paintType, int presetIndex)
@@ -2041,10 +2052,25 @@ public class GarageUIManager : MonoBehaviour
         if (paintType < 0 || paintType >= colorBuckets.Count) return;
         var bucket = colorBuckets[paintType].transform;
 
-        for (int i = 0; i < bucket.childCount; i++)
+        if (paintType < 4) // All paint types except for Metals have their Checkmark objects in the first child layer.
         {
-            var mark = bucket.GetChild(i).Find("Checkmark");
-            if (mark != null) mark.gameObject.SetActive(i == presetIndex);
+            for (int i = 0; i < bucket.childCount; i++)
+            {
+                var mark = bucket.GetChild(i).Find("Checkmark");
+                if (mark != null) mark.gameObject.SetActive(i == presetIndex);
+            }
+        }
+        else // Metals: bucket has a single container child that holds all preset items.
+        {
+            if (bucket.childCount == 0) return;
+
+            var container = bucket.GetChild(0);
+
+            for (int i = 0; i < container.childCount; i++)
+            {
+                var mark = container.GetChild(i).Find("Checkmark");
+                if (mark != null) mark.gameObject.SetActive(i == presetIndex);
+            }
         }
     }
 
@@ -2054,10 +2080,25 @@ public class GarageUIManager : MonoBehaviour
         if (paintType < 0 || paintType >= colorBuckets.Count) return;
         var bucket = colorBuckets[paintType].transform;
 
-        for (int i = 0; i < bucket.childCount; i++)
+        if (paintType < 4) // All paint types except for Metals have their Checkmark objects in the first child layer.
         {
-            var mark = bucket.GetChild(i).Find("Checkmark");
-            if (mark != null) mark.gameObject.SetActive(false);
+            for (int i = 0; i < bucket.childCount; i++)
+            {
+                var mark = bucket.GetChild(i).Find("Checkmark");
+                if (mark != null) mark.gameObject.SetActive(false);
+            }
+        }
+        else // Metals: bucket has a single container child that holds all preset items.
+        {
+            if (bucket.childCount == 0) return;
+
+            var container = bucket.GetChild(0);
+
+            for (int i = 0; i < container.childCount; i++)
+            {
+                var mark = container.GetChild(i).Find("Checkmark");
+                if (mark != null) mark.gameObject.SetActive(false);
+            }
         }
     }
 
@@ -2090,10 +2131,25 @@ public class GarageUIManager : MonoBehaviour
         if (paintType < 0 || paintType >= colorBuckets.Count) return;
         var bucket = colorBuckets[paintType].transform;
 
-        for (int i = 0; i < bucket.childCount; i++)
+        if (paintType < 4) // All paint types except for Metals have their Border objects in the first child layer.
         {
-            var border = bucket.GetChild(i).Find("Border");
-            if (border != null) border.gameObject.SetActive(i == presetIndex);
+            for (int i = 0; i < bucket.childCount; i++)
+            {
+                var border = bucket.GetChild(i).Find("Border");
+                if (border != null) border.gameObject.SetActive(i == presetIndex);
+            }
+        }
+        else // Metals: bucket has a single container child that holds all preset items.
+        {
+            if (bucket.childCount == 0) return;
+
+            var container = bucket.GetChild(0);
+
+            for (int i = 0; i < container.childCount; i++)
+            {
+                var border = container.GetChild(i).Find("Border");
+                if (border != null) border.gameObject.SetActive(i == presetIndex);
+            }
         }
     }
 
@@ -2103,12 +2159,28 @@ public class GarageUIManager : MonoBehaviour
         if (paintType < 0 || paintType >= colorBuckets.Count) return;
         var bucket = colorBuckets[paintType].transform;
 
-        for (int i = 0; i < bucket.childCount; i++)
+        if (paintType < 4) // All paint types except for Metals have their Border objects in the first child layer.
         {
-            var border = bucket.GetChild(i).Find("Border");
-            if (border != null) border.gameObject.SetActive(false);
+            for (int i = 0; i < bucket.childCount; i++)
+            {
+                var border = bucket.GetChild(i).Find("Border");
+                if (border != null) border.gameObject.SetActive(false);
+            }
+        }
+        else // Metals: bucket has a single container child that holds all preset items.
+        {
+            if (bucket.childCount == 0) return;
+
+            var container = bucket.GetChild(0);
+
+            for (int i = 0; i < container.childCount; i++)
+            {
+                var border = container.GetChild(i).Find("Border");
+                if (border != null) border.gameObject.SetActive(false);
+            }
         }
     }
+
 
 
     // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard. (DEPRECATED)
