@@ -137,6 +137,7 @@ public class GarageUIManager : MonoBehaviour
     public Button buttonSwitchPaintTypeRight;
     public TextMeshProUGUI paintType;
     public TextMeshProUGUI uniquePaintText;
+    public GameObject warnUniquePaintRemoval;
     public List<GameObject> colorBuckets;
     public Shader matteShader;
     public Shader glossShader;
@@ -1554,7 +1555,24 @@ public class GarageUIManager : MonoBehaviour
             if (saved.SelectedPaintType == currentPaintType &&
                 saved.SelectedPresetIndex == presetIndex)
             {
-                return; // do nothing
+                // Ensure border/checkmark remain on the installed preset.
+                ApplyBorderForBucket(currentPaintType, presetIndex);
+                ApplyCheckmarkForBucket(currentPaintType, presetIndex);
+
+                // Force materials to the saved state (no-op visually if already correct, but guarantees correctness).
+                RevertColor();
+
+                // Clear any pending preview selection for this part.
+                var ct = (Car.ColorType)whichPartToPaint;
+                _pendingColors.Remove(ct);
+                _pendingPreset.Remove(ct);
+
+                // Do not show any purchase / insufficient credits popups.
+                paintNotEnoughCreditsPopUp.SetActive(false);
+                paintBuyConfirmationPopUp.SetActive(false);
+                paintPopUps.SetActive(false);
+
+                return;
             }
         }
 
@@ -1784,10 +1802,10 @@ public class GarageUIManager : MonoBehaviour
 
         // Build confirmation text
         string baseMsg = $"Buy {typeOfPaint} for <u>{paintPrice:N0} CR?</u>";
-        if (warnUnique)
-        {
-            baseMsg += " Warning: purchasing this paint will overwrite the unique color you have installed";
-        }
+
+        // Display warning of unique paint removal if applicable
+        if (warnUnique) warnUniquePaintRemoval.SetActive(true);
+        else warnUniquePaintRemoval.SetActive(false);
 
         paintBuyConfirmationPopUpText.text = baseMsg;
         paintBuyConfirmationPopUp.SetActive(true);
@@ -1888,6 +1906,7 @@ public class GarageUIManager : MonoBehaviour
             // TODO: Might need to set more popups to false here.
             paintPopUps.SetActive(false);
             paintBuyConfirmationPopUp.SetActive(false);
+            warnUniquePaintRemoval.SetActive(false);
         }
     }
 
