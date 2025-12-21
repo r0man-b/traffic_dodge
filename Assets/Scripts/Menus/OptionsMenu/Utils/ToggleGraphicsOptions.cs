@@ -18,6 +18,9 @@ public class ToggleGraphicsOptions : MonoBehaviour
     public Button BasicGraphicsOptionsModeButtonLeft;
     public Button BasicGraphicsOptionsModeButtonRight;
 
+    public RectTransform revertChangesButtonTransform;
+    public RectTransform acceptChangesButtonTransform;
+
     private int currentPresetIndex;
     private const int maxPresetIndex = 4; // 0 to 4 (Trash to Insane)
 
@@ -66,6 +69,11 @@ public class ToggleGraphicsOptions : MonoBehaviour
             optionsText.fontSize = 50; // Set font size for Advanced
 
             isAdvanced = true;
+
+            revertChangesButtonTransform.anchorMin = new Vector2(0.05f, 0.83f);
+            revertChangesButtonTransform.anchorMax = new Vector2(0.205f, 0.94f);
+            acceptChangesButtonTransform.anchorMin = new Vector2(0.795f, 0.83f);
+            acceptChangesButtonTransform.anchorMax = new Vector2(0.95f, 0.94f);
         }
     }
 
@@ -83,6 +91,11 @@ public class ToggleGraphicsOptions : MonoBehaviour
             optionsText.fontSize = 60;
 
             isAdvanced = false;
+
+            revertChangesButtonTransform.anchorMin = new Vector2(0.075f, 0.2f);
+            revertChangesButtonTransform.anchorMax = new Vector2(0.35f, 0.4f);
+            acceptChangesButtonTransform.anchorMin = new Vector2(0.65f, 0.2f);
+            acceptChangesButtonTransform.anchorMax = new Vector2(0.925f, 0.4f);
 
             // Check if current settings match any preset
             bool matched = false;

@@ -57,6 +57,11 @@ namespace Settings
 
 		private void Awake()
 		{
+		}
+
+
+		private void Start()
+		{
 			// Load and store original settings
 			originalRenderScale = SaveManager.Instance.SaveData.renderScale;
 			originalAASetting = SaveManager.Instance.SaveData.aaSettings;
@@ -82,24 +87,31 @@ namespace Settings
 			}
 
 			ApplyChanges();
-		}
 
+			renderScaleSlider
+				.GetComponent<SliderReleaseListener>()
+				.OnReleased += _ => OnSliderReleased();
 
-		private void Start()
-		{
-			// Add listeners
-			renderScaleSlider.onValueChanged.AddListener(delegate { OnSliderChanged(); });
-			aaSlider.onValueChanged.AddListener(delegate { OnSliderChanged(); });
-			trafficQualitySlider.onValueChanged.AddListener(delegate { OnSliderChanged(); });
-			shadowsEnabledToggle.onValueChanged.AddListener(delegate { OnSliderChanged(); });
-			fpsSlider.onValueChanged.AddListener(delegate { OnSliderChanged(); });
+			aaSlider
+				.GetComponent<SliderReleaseListener>()
+				.OnReleased += _ => OnSliderReleased();
+
+			trafficQualitySlider
+				.GetComponent<SliderReleaseListener>()
+				.OnReleased += _ => OnSliderReleased();
+
+			fpsSlider
+				.GetComponent<SliderReleaseListener>()
+				.OnReleased += _ => OnSliderReleased();
+
+			shadowsEnabledToggle.onValueChanged.AddListener(_ => OnSliderReleased());
 
 			revertChangesButton.onClick.AddListener(RevertChanges);
 			acceptChangesButton.onClick.AddListener(ApplyChanges);
 		}
 
 
-		private void OnSliderChanged()
+		private void OnSliderReleased()
 		{
 			hasChanged =
 				renderScaleValues[(int)renderScaleSlider.value] != originalRenderScale ||
@@ -226,7 +238,7 @@ namespace Settings
 			shadowsEnabledToggle.isOn = selected.shadowsEnabled;
 
 			// Mark UI as changed
-			OnSliderChanged();
+			OnSliderReleased();
 
 			// Signal that the preset was loaded (but not saved/applied yet)
 			onChoiceMade?.Invoke(true);

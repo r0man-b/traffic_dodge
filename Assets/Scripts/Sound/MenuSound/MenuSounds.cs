@@ -78,6 +78,7 @@ public class MenuSounds : MonoBehaviour
     public void PlayLootcrateTick() { menuSourceSounds[9].Play(); }
     public void PlayPartRouletteSpin() { menuSourceSounds[10].Play(); }
     public void StopPartRouletteSpin() { menuSourceSounds[10].Stop(); }
+    public void PlaySliderChange() { menuSourceSounds[12].Play(); }
 
     public void PlayWoosh()
     {
