@@ -9,7 +9,7 @@ public class GoRaceMenu : MonoBehaviour
 
     private List<Transform> environmentButtons = new List<Transform>();
     private int currentSelectedIndex = -1;
-    private int environmentToBuyIndex = -1;
+    public int environmentToBuyIndex = -1;
 
     public CreditManager creditManager;
     public GameObject popUps;

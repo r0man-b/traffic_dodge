@@ -23,6 +23,9 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private GarageUIManager garageUIManager;
     [SerializeField] private GameObject mainMenuUI;
     [SerializeField] private CarDisplay carDisplay;
+    [SerializeField] private GameObject goRaceUI;
+    [SerializeField] private GoRaceMenu goRaceMenu;
+    [SerializeField] private Button[] goRaceUIEnvironmentPurcahseButtons;
 
     [Header("Popup UI")]
     [SerializeField] private TMP_Text packTitleText;       // e.g., "NITRO PACK OF X" or "X CR"
@@ -61,6 +64,8 @@ public class ShopMenu : MonoBehaviour
     }
     private bool cameFromGarageMenu;
     private MenuType previousMenuType = MenuType.DEFAULT;
+
+    private bool cameFromGoRaceMenu;
 
     private ShopItem _currentItem;
     private int _selectedQuantity = 1;                       // starts at 1
@@ -370,7 +375,7 @@ public class ShopMenu : MonoBehaviour
     #region Back navigation
     public void HandleBackButton()
     {
-        if((popups != null && popups.activeSelf) || (openLootCratePopup != null && openLootCratePopup.activeSelf))
+        if ((popups != null && popups.activeSelf) || (openLootCratePopup != null && openLootCratePopup.activeSelf))
         {
             notEnoughNitroPopUp.SetActive(false);
             popups.SetActive(false);
@@ -402,6 +407,13 @@ public class ShopMenu : MonoBehaviour
             }
             previousMenuType = MenuType.DEFAULT;
         }
+        else if (cameFromGoRaceMenu)
+        {
+            gameObject.SetActive(false);
+            goRaceUI.SetActive(true);
+            cameFromGoRaceMenu = false;
+            goRaceUIEnvironmentPurcahseButtons[goRaceMenu.environmentToBuyIndex].onClick.Invoke();
+        }
         else
         {
             gameObject.SetActive(false);
@@ -415,6 +427,11 @@ public class ShopMenu : MonoBehaviour
         cameFromGarageMenu = true;
         mainMenuScript.inGarage = false;
         previousMenuType = (MenuType) previousMenu;
+    }
+
+    public void HandleEntranceFromGoRaceMenu()
+    {
+        cameFromGoRaceMenu = true;
     }
 
     #region Utility: attach hold handlers to buttons

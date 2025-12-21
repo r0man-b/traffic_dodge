@@ -56,7 +56,7 @@ public class ShopItem : MonoBehaviour
 
             case ItemType.LootCrate:
                 // Quantity text turns into item description for loot crates
-                quantityText.text = itemDescription;
+                quantityText.text = itemDescription + " LOOTCRATE";
 
                 // Button formatting
                 string lootCratePrice = "OPEN: " + ((int)priceOfItem).ToString("N0");
