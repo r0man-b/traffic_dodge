@@ -1508,16 +1508,7 @@ public class GarageUIManager : MonoBehaviour
         }
 
         RestoreCheckmarkFromSave(whichPartToPaint, currentPaintType);
-    }
-
-    private bool SupportsEmissiveSecondary(string typeName)
-    {
-        return !noEmissiveSecondaryTypes.Contains(typeName);
-    }
-
-    public void UseSavedPaintButton()
-    {
-        useSavedPaintButton = true;
+        if (currentPaintType == 4) RefreshOwnedMarkersForMetals(whichPartToPaint);
     }
 
     // Called when user clicks on a paint button. PREVIEWS the colour only.
@@ -1781,6 +1772,57 @@ public class GarageUIManager : MonoBehaviour
         _pendingColors[(Car.ColorType)whichPartToPaint] = pending;
         _pendingPreset[(Car.ColorType)whichPartToPaint] = (currentPaintType, presetIndex);
 
+        // ----- NEW: Owned metal paints install instantly (save + UI), no popups -----
+        if (currentPaintType == 4) // metal bucket
+        {
+            var saved = carData.Colors[whichPartToPaint];
+            EnsureOwnedMetalList(saved);
+
+            if (IsOwnedMetal(saved, presetIndex))
+            {
+                // Persist the pending selection that was just preview-applied.
+                // (No duplicated material code; we reuse 'pending'.)
+                if (pending.BaseColor != null) saved.BaseColor = pending.BaseColor;
+                if (pending.FresnelColor != null) saved.FresnelColor = pending.FresnelColor;
+                if (pending.FresnelColor2 != null) saved.FresnelColor2 = pending.FresnelColor2;
+                if (pending.EmissionColor != null) saved.EmissionColor = pending.EmissionColor;
+                saved.MetallicMap = pending.MetallicMap;
+
+                saved.SelectedPaintType = 4;
+                saved.SelectedPresetIndex = presetIndex;
+
+                // Ensure UI selection visuals remain unchanged for metals (border/checkmark behavior as-is).
+                ApplyCheckmarkForBucket(4, presetIndex);
+                ApplyBorderForBucket(4, presetIndex);
+
+                // Owned marker stays on (and refresh all owned markers).
+                RefreshOwnedMarkersForMetals(whichPartToPaint);
+
+                // Clear any unique flags, consistent with "installing paint overwrites unique".
+                switch (whichPartToPaint)
+                {
+                    case 0: carData.hasUniquePearlescentPrimary = false; carData.hasUniqueMetalPrimary = false; break;
+                    case 1: carData.hasUniquePearlescentSecondary = false; carData.hasUniqueMetalSecondary = false; break;
+                    case 2: carData.hasUniquePearlescentRims = false; carData.hasUniqueMetalRims = false; break;
+                }
+
+                SaveManager.Instance.SaveGame();
+
+                // Cancel purchase flow (no popups).
+                var ct = (Car.ColorType)whichPartToPaint;
+                _pendingColors.Remove(ct);
+                _pendingPreset.Remove(ct);
+
+                paintNotEnoughCreditsPopUp.SetActive(false);
+                paintBuyConfirmationPopUp.SetActive(false);
+                paintPopUps.SetActive(false);
+                warnUniquePaintRemoval.SetActive(false);
+
+                return;
+            }
+        }
+
+
         // UI popup elements.
         paintNotEnoughCreditsPopUp.SetActive(false);
         paintBuyConfirmationPopUp.SetActive(false);
@@ -1868,6 +1910,13 @@ public class GarageUIManager : MonoBehaviour
 
                 // Keep the border on the purchased/installed preset as well.
                 ApplyBorderForBucket(sel.paintType, sel.presetIndex);
+
+                // Special handling for metal paints
+                if (sel.paintType == 4)
+                {
+                    AddOwnedMetal(colorData, sel.presetIndex);
+                    RefreshOwnedMarkersForMetals(whichPartToPaint);
+                }
             }
 
             // Any purchased paint replaces uniqueness for that part.
@@ -1998,6 +2047,9 @@ public class GarageUIManager : MonoBehaviour
         _pendingColors.Remove(colorType);
     }
 
+
+    /* -- PAINT HELPER FUNCTIONS -- */
+
     // Helper function for retrieving metallic colors from button name.
     private static void GetMetallicPreset(string buttonName, out Color baseColor, out Color fresnel1, out Color fresnel2)
     {
@@ -2012,7 +2064,7 @@ public class GarageUIManager : MonoBehaviour
             case "Bronze":
                 baseColor = new Color(0.98f, 0.61f, 0.33f, 1f);
                 fresnel1 = new Color(1.000f, 0.820f, 0.640f, 1f);
-                fresnel2 = new Color(0.353f, 0.176f, 0.047f, 1f); 
+                fresnel2 = new Color(0.353f, 0.176f, 0.047f, 1f);
                 break;
 
             case "Silver":
@@ -2023,7 +2075,6 @@ public class GarageUIManager : MonoBehaviour
                 break;
         }
     }
-
 
     // Set the metallic property of a material.
     private void SetMaterialMetallic(Material m, float value, bool useTexture = false)
@@ -2044,12 +2095,26 @@ public class GarageUIManager : MonoBehaviour
         m.SetFloat(ID_Metallic, value);
     }
 
+    private bool SupportsEmissiveSecondary(string typeName)
+    {
+        return !noEmissiveSecondaryTypes.Contains(typeName);
+    }
+
     private static float[] ToArray(Color c) => new[] { c.r, c.g, c.b, c.a };
+    
     private static Color FromArray(float[] arr)
     {
         if (arr == null || arr.Length < 4) return Color.black;
         return new Color(arr[0], arr[1], arr[2], arr[3]);
     }
+
+    public void UseSavedPaintButton()
+    {
+        useSavedPaintButton = true;
+    }
+
+
+    /* -- PAINT UI FUNCTIONS -- */
 
     // Get the palette "slot index" within the active bucket.
     private static int GetPresetIndexInBucket(Button b)
@@ -2201,6 +2266,49 @@ public class GarageUIManager : MonoBehaviour
     }
 
 
+    /* -- PAINT UI FUNCTIONS FOR METAL PAINTS -- */
+
+    private void RefreshOwnedMarkersForMetals(int partIndex)
+    {
+        if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
+            return;
+
+        var cd = carData.Colors[partIndex];
+        EnsureOwnedMetalList(cd);
+
+        // Only metals bucket uses Owned markers
+        var bucket = colorBuckets[4].transform;
+        if (bucket.childCount == 0) return;
+
+        var container = bucket.GetChild(0);
+
+        for (int i = 0; i < container.childCount; i++)
+        {
+            var owned = container.GetChild(i).Find("Owned");
+            if (owned != null)
+                owned.gameObject.SetActive(cd.OwnedMetalPresetIndices.Contains(i));
+        }
+    }
+
+    private static void EnsureOwnedMetalList(SaveData.ColorData cd)
+    {
+        if (cd.OwnedMetalPresetIndices == null)
+            cd.OwnedMetalPresetIndices = new List<int>();
+    }
+
+    private static bool IsOwnedMetal(SaveData.ColorData cd, int presetIndex)
+    {
+        if (cd == null) return false;
+        EnsureOwnedMetalList(cd);
+        return cd.OwnedMetalPresetIndices.Contains(presetIndex);
+    }
+
+    private static void AddOwnedMetal(SaveData.ColorData cd, int presetIndex)
+    {
+        EnsureOwnedMetalList(cd);
+        if (!cd.OwnedMetalPresetIndices.Contains(presetIndex))
+            cd.OwnedMetalPresetIndices.Add(presetIndex);
+    }
 
     // Overloaded DEBUG version of SetColor() that uses a button as input. Only called when pressing Return on a paint button while using a PC keyboard. (DEPRECATED)
     public void SetColor(Button clickedButton)

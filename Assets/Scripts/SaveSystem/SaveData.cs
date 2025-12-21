@@ -104,6 +104,8 @@ public class SaveData
 
         public int SelectedPaintType = -1;    // 0=Matte, 1=Gloss, 2=Pearl, 3=Emissive, 4=Metal
         public int SelectedPresetIndex = -1;  // palette button index within that bucket
+
+        public List<int> OwnedMetalPresetIndices = new List<int>(); // Store metal paint preset indices that have been purchased
     }
 
     // Menu/GarageMusic.cs
