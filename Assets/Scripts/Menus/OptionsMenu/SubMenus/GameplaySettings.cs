@@ -10,13 +10,15 @@ namespace Settings
 
         private void Awake()
         {
-            // Initialize sliders from saved values
-            cameraTypeSlider.value = SaveManager.Instance.SaveData.cameraType;
-            senseOfSpeedSlider.value = SaveManager.Instance.SaveData.senseOfSpeedModifier;
+
         }
 
         private void Start()
         {
+            // Initialize sliders from saved values
+            cameraTypeSlider.value = SaveManager.Instance.SaveData.cameraType;
+            senseOfSpeedSlider.value = SaveManager.Instance.SaveData.senseOfSpeedModifier;
+
             // Real-time updates (optional preview logic can go here)
             cameraTypeSlider.onValueChanged.AddListener(delegate { CancelInvoke(nameof(SaveCameraType)); });
             cameraTypeSlider.onValueChanged.AddListener(delegate { Invoke(nameof(SaveCameraType), 0.2f); });

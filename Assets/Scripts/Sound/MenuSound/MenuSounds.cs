@@ -28,7 +28,7 @@ public class MenuSounds : MonoBehaviour
     private int _wooshCalls = 0; // how many times we've reduced (0..26)
 
     // Start is called before the first frame update.
-    void Start()
+    void Awake()
     {
         menuSourceSounds = menuSoundObject.GetComponents<AudioSource>();
 

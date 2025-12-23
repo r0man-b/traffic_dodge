@@ -92,10 +92,10 @@ public class ToggleGraphicsOptions : MonoBehaviour
 
             isAdvanced = false;
 
-            revertChangesButtonTransform.anchorMin = new Vector2(0.075f, 0.2f);
-            revertChangesButtonTransform.anchorMax = new Vector2(0.35f, 0.4f);
-            acceptChangesButtonTransform.anchorMin = new Vector2(0.65f, 0.2f);
-            acceptChangesButtonTransform.anchorMax = new Vector2(0.925f, 0.4f);
+            revertChangesButtonTransform.anchorMin = new Vector2(0.095f, 0.22f);
+            revertChangesButtonTransform.anchorMax = new Vector2(0.335f, 0.38f);
+            acceptChangesButtonTransform.anchorMin = new Vector2(0.67f, 0.22f);
+            acceptChangesButtonTransform.anchorMax = new Vector2(0.91f, 0.38f);
 
             // Check if current settings match any preset
             bool matched = false;
