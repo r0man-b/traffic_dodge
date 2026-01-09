@@ -422,13 +422,21 @@ public class PlayerController : MonoBehaviour
         cameraObject.transform.position = camPos;
 
         // Move the player, camera, and tornadoObject forward.
-        this.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
-        cameraObject.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
+        if (raceStarted)
+        {
+            this.transform.position += 50 * Time.deltaTime * accel * 1.25f * this.transform.forward;
+            cameraObject.transform.position += 50 * Time.deltaTime * accel * 1.25f * this.transform.forward;
+        }
+        else
+        {
+            this.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
+            cameraObject.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
+        }
 
         tornadoPosZ = this.transform.position.z + (-0.2028745f * cam.fieldOfView + 40.61494f);
         tornadoObject.transform.position = new Vector3(tornadoObject.transform.position.x, tornadoObject.transform.position.y, tornadoPosZ);
 
-        camPosZ = cameraObject.transform.position.z; // TODO: WTF is the point of this if it gets overwritten below?
+        camPosZ = cameraObject.transform.position.z;
 
         // Rotation speed for tornado.
         float rotationSpeed = 50000 * Time.deltaTime * accel;
@@ -658,14 +666,9 @@ public class PlayerController : MonoBehaviour
                     accel = (float)System.Math.Log10(timeThreshold * 0.22f + 1) * currentCar.accelIncreaseRate + 0.5f;
                 }
 
+                // TODO: The two below lines of code may not be doing anything
                 // Increase camera FOV with acceleration.
                 if (accel < 2.38f /*215 mph is the hard cap on FOV*/ && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f) cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
-
-                // Move camera closer to player as he speeds up.
-                if (!bullet)
-                    camPosZ = this.transform.position.z + 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f + cameraZMultiplier;
-                else
-                    camPosZ = this.transform.position.z + 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f - (cam.fieldOfView - oldFov) / 20 + cameraZMultiplier;
                 cameraObject.transform.position = new Vector3(cameraObject.transform.position.x, cameraObject.transform.position.y, camPosZ);
             }
 
@@ -928,7 +931,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 1)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-8.5f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-8.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 1;
         }
 
@@ -936,7 +938,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 2)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-5.5f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-5.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 2;
         }
 
@@ -944,7 +945,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 3)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(-2.5f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-2.5f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 3;
         }
 
@@ -953,12 +953,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 4)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(1f, transform.position.y, transform.position.z), 10 * speed);
-
-            //if (Time.time - startTime > soundManager.drop + 0.1f)
-                //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(1f, defaultCamPosition.y, camPosZ), 10 * speed);
-            //else
-                //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(1f, defaultCamPosition.y, camPosZ), 20 * Time.deltaTime);
-
             currentLane = 4;
         }
 
@@ -966,7 +960,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 5)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(4f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(4f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 5;
         }
 
@@ -974,7 +967,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 6)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(7f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(7f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 6;
         }
 
@@ -982,7 +974,6 @@ public class PlayerController : MonoBehaviour
         else if (lane == 7)
         {
             transform.position = Vector3.Lerp(transform.position, new Vector3(10f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(10f, defaultCamPosition.y, camPosZ), 10 * speed);
             currentLane = 7;
         }
     }
@@ -1356,11 +1347,11 @@ public class PlayerController : MonoBehaviour
             {
                 //float fov = cam.fieldOfView;
                 //float adjustmentFactor = Mathf.Lerp(0, 0.4f, Mathf.InverseLerp(136f, 35f, fov));
-                float targetZ = this.transform.position.z + 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f;
+                float targetZ = this.transform.position.z - 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f;
 
                 // Adjust Z position towards the target position.
                 float deltaZ = targetZ - cameraObject.transform.position.z;
-                cameraObject.transform.position += new Vector3(0, 0, deltaZ);
+                //cameraObject.transform.position += new Vector3(0, 0, deltaZ);
             }
 
             yield return null;

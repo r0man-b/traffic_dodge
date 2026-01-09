@@ -418,7 +418,7 @@ public class PrefabManager : MonoBehaviour
         else playerController.tornadoExplodeCars = false;
 
         // Play the soundManager's 'woosh' sound if the player is passing a traffic car.
-        if (playerController.currentLane != 0 && playerController.currentLane != 4)
+        if (playerController.raceStarted && playerController.currentLane != 0)
         {
             if (allLaneTraffic[playerController.currentLane - 1][0] != leftCar && allLaneTraffic[playerController.currentLane - 1][0].transform.position.z < playerPosZ + 1.5f)
             {
@@ -426,7 +426,7 @@ public class PrefabManager : MonoBehaviour
                 leftCar = allLaneTraffic[playerController.currentLane - 1][0];
             }
         }
-        if (playerController.currentLane != 7 && playerController.currentLane != 3)
+        if (playerController.raceStarted && playerController.currentLane != 7)
         {
             if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
             {
