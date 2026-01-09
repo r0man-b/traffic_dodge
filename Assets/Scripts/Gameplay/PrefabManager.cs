@@ -456,8 +456,8 @@ public class PrefabManager : MonoBehaviour
                 if (activeRightBuildings.Count < maxBuildingPairs) SpawnSciFiBuilding(1);
                 
                 // If any building is behind the player, move it to the object pool.
-                if (activeLeftBuildings[0].transform.position.z < playerPosZ - 100) ReturnSciFiBuilding(0);
-                if (activeRightBuildings[0].transform.position.z < playerPosZ - 100) ReturnSciFiBuilding(1);
+                if (activeLeftBuildings[0].transform.position.z < playerPosZ - 150) ReturnSciFiBuilding(0);
+                if (activeRightBuildings[0].transform.position.z < playerPosZ - 150) ReturnSciFiBuilding(1);
                 break;
             
             case 1: // Spawn & return wasteland buildings (Nuclear Wasteland)
