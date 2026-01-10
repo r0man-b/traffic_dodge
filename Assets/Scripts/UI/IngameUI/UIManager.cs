@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 public class UIManager : MonoBehaviour
 {
     // UI variables.
+    public GameObject distanceObject;
     public TextMeshProUGUI distance;
     public TextMeshProUGUI speedo;
     public TextMeshProUGUI countdown;
@@ -74,6 +75,7 @@ public class UIManager : MonoBehaviour
     private NitroManager nitroManager;
     private PlayerController playerController;
     private SoundManager soundManager;
+    private PrefabManager prefabManager;
 
     void Awake()
     {
@@ -90,6 +92,10 @@ public class UIManager : MonoBehaviour
 
         // Find 'NitroManager' script.
         nitroManager = nitrocount.GetComponent<NitroManager>();
+
+        // Find 'SoundManager' script.
+        GameObject PrefabManagerObject = GameObject.Find("PrefabManager");
+        prefabManager = PrefabManagerObject.GetComponent<PrefabManager>();
     }
 
     void Start()
@@ -321,6 +327,7 @@ public class UIManager : MonoBehaviour
         // Display game end widgets and disable in-race widgets.
         game_end_widgets.SetActive(true);
         distance.color = new Color(0, 0, 0, 0);
+        distanceObject.SetActive(false);
         speedo.color = new Color(0, 0, 0, 0);
         lives.SetActive(false);
         lanesplit.SetActive(false);
@@ -357,6 +364,25 @@ public class UIManager : MonoBehaviour
         oncomingDistanceText.text = isImperial ? System.Math.Round(oncomingDistance, 1).ToString("F1") + " mi" : System.Math.Round(oncomingDistance * metricMultiplier, 1).ToString("F1") + " km";
         TextMeshProUGUI topSpeedText = distance_speed_stats.transform.Find("TopSpeed/TopSpeedValue").GetComponent<TextMeshProUGUI>();
         topSpeedText.text = isImperial ? topSpeed + " mph" : System.Math.Round(topSpeed * metricMultiplier)  + " kph";
+        
+        // Traffic passed stats (set BEFORE the stats panel animates in so it moves up with the panel)
+        int trafficsPassedThisRun = 0;
+        int trafficPassCreditsThisRun = 0;
+
+        if (prefabManager != null)
+        {
+            trafficsPassedThisRun = prefabManager.trafficsPassedTotal;
+            trafficPassCreditsThisRun = prefabManager.trafficPassCreditsTotal;
+        }
+
+        // Update "Traffics Passed" row if present
+        Transform trafficPassedValueT = distance_speed_stats.transform.Find("TrafficsPassed/TrafficsPassedValue");
+        if (trafficPassedValueT != null)
+        {
+            var trafficPassedValue = trafficPassedValueT.GetComponent<TextMeshProUGUI>();
+            if (trafficPassedValue != null)
+                trafficPassedValue.text = trafficsPassedThisRun.ToString("n0");
+        }
 
         // Animate Game Over off screen and bring up distance & top speed statistics.
         float animationDuration = 1f;
@@ -586,7 +612,111 @@ public class UIManager : MonoBehaviour
                 creditManager.changeDone = false;
             }
         }
-        
+
+        // ---------------- TRAFFIC PASS STATS + REWARD (AFTER DISTANCE/ONCOMING) ----------------
+        // Animate + award traffic pass credits (only if > 0)
+        if (trafficPassCreditsThisRun > 0)
+        {
+            // Try to anchor the animated text beside the TrafficPassCreditsValue row if present;
+            // otherwise fall back to the distance credits row.
+            TextMeshProUGUI anchorText = null;
+
+            Transform trafficPassCreditsValueT = distance_speed_stats.transform.Find("TrafficsPassed/TrafficsPassedValue");
+            if (trafficPassCreditsValueT != null)
+                anchorText = trafficPassCreditsValueT.GetComponent<TextMeshProUGUI>();
+
+            if (anchorText == null)
+            {
+                // Fallback: reuse totalDistanceText row anchor (already exists above in your coroutine)
+                anchorText = totalDistanceText;
+            }
+
+            TextMeshProUGUI trafficPassCreditsText = Instantiate(anchorText, anchorText.transform.parent);
+            trafficPassCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(200f, 0f);
+            trafficPassCreditsText.text = "+0 CR";
+            trafficPassCreditsText.gameObject.SetActive(true);
+
+            TextMeshProUGUI staticTrafficPassCreditsText = Instantiate(trafficPassCreditsText, anchorText.transform.parent);
+            staticTrafficPassCreditsText.gameObject.SetActive(false);
+
+            // Copy position/size/etc so the static copy matches exactly
+            RectTransform originalRectTP = trafficPassCreditsText.GetComponent<RectTransform>();
+            RectTransform duplicateRectTP = staticTrafficPassCreditsText.GetComponent<RectTransform>();
+            duplicateRectTP.anchoredPosition = originalRectTP.anchoredPosition;
+            duplicateRectTP.sizeDelta = originalRectTP.sizeDelta;
+            staticTrafficPassCreditsText.color = trafficPassCreditsText.color;
+            staticTrafficPassCreditsText.text = trafficPassCreditsText.text;
+            staticTrafficPassCreditsText.fontSize = trafficPassCreditsText.fontSize;
+            staticTrafficPassCreditsText.alignment = trafficPassCreditsText.alignment;
+
+            long trafficCreditsStart = saveData.GlobalCredits;
+
+            // Animate number increase (same style as other credits)
+            yield return StartCoroutine(AnimateNumberIncrease(trafficPassCreditsText, trafficPassCreditsThisRun, 1f, "credits"));
+
+            // Activate the stationary copy
+            staticTrafficPassCreditsText.text = $"+{trafficPassCreditsThisRun:n0} CR";
+            staticTrafficPassCreditsText.gameObject.SetActive(true);
+
+            if (skip)
+            {
+                Destroy(trafficPassCreditsText.gameObject);
+                saveData.GlobalCredits = trafficCreditsStart + trafficPassCreditsThisRun;
+                credits.text = $"{saveData.GlobalCredits:n0} cr";
+            }
+            else
+            {
+                LeanTween.move(trafficPassCreditsText.gameObject, credits.transform.position + new Vector3(200, 0, 0), 1f)
+                    .setEase(LeanTweenType.easeInOutQuad)
+                    .setOnComplete(() =>
+                    {
+                        trafficPassCreditsText.gameObject.SetActive(false);
+                        creditManager.ChangeCredits(trafficPassCreditsThisRun);
+                    });
+
+                // Wait for credits to update or skip
+                while (!creditManager.changeDone && !skip)
+                {
+                    if (Input.GetMouseButtonUp(0) || Input.touchCount > 0)
+                    {
+                        skip = true;
+
+                        LeanTween.cancel(trafficPassCreditsText.gameObject);
+                        Destroy(trafficPassCreditsText.gameObject);
+
+                        creditManager.ChangeCredits(0, true);
+                        creditManager.changeDone = true;
+
+                        saveData.GlobalCredits = trafficCreditsStart + trafficPassCreditsThisRun;
+                        credits.text = $"{saveData.GlobalCredits:n0} cr";
+                        break;
+                    }
+                    yield return null;
+                }
+
+                // Small pause, consistent with your other reward steps
+                if (!skip)
+                {
+                    creditManager.changeDone = false;
+                    float elapsed = 0f;
+                    while (elapsed < 0.5f)
+                    {
+                        if (Input.GetMouseButtonUp(0) || Input.touchCount > 0)
+                        {
+                            skip = true;
+                            break;
+                        }
+                        yield return null;
+                        elapsed += Time.deltaTime;
+                    }
+                }
+
+                creditManager.changeDone = false;
+            }
+        }
+        // ---------------- END TRAFFIC PASS STATS + REWARD ----------------
+
+
         SaveManager.Instance.SaveGame();
 
         // Wait for 0.5 seconds.
@@ -808,6 +938,7 @@ public class UIManager : MonoBehaviour
         // Re-enable in-race HUD
         distance.color = teal;
         speedo.color = teal;
+        distanceObject.SetActive(true);
         lives.SetActive(true);
         lanesplit.SetActive(false);
         inLaneSplitCooldown = false;

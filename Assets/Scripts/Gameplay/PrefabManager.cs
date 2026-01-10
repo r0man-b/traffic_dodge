@@ -154,6 +154,9 @@ public class PrefabManager : MonoBehaviour
     private List<List<GameObject>> allLaneTraffic = new List<List<GameObject>>();
     private List<GameObject> tornadoTraffic = new List<GameObject>();
 
+    // Side table to track whether a traffic object is a big rig
+    private readonly Dictionary<GameObject, bool> isBigrigByCar = new Dictionary<GameObject, bool>(256);
+
     // Lists to keep track of oncoming traffic.
     private List<GameObject> lane0traffic = new List<GameObject>();
     private List<GameObject> lane1traffic = new List<GameObject>();
@@ -464,7 +467,7 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane - 1][0] != leftCar && allLaneTraffic[playerController.currentLane - 1][0].transform.position.z < playerPosZ + 1.5f)
             {
                 soundManager.PlayWoosh(true);
-                AwardTrafficPassCredits(true);  // LEFT side popup
+                if (!playerController.gameEnd) AwardTrafficPassCredits(true, allLaneTraffic[playerController.currentLane - 1][0]);  // LEFT side popup
                 leftCar = allLaneTraffic[playerController.currentLane - 1][0];
             }
         }
@@ -473,7 +476,7 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
             {
                 soundManager.PlayWoosh(false);
-                AwardTrafficPassCredits(false); ; // RIGHT side popup
+                if (!playerController.gameEnd) AwardTrafficPassCredits(false, allLaneTraffic[playerController.currentLane + 1][0]); ; // RIGHT side popup
                 rightCar = allLaneTraffic[playerController.currentLane + 1][0];
             }
         }
@@ -485,6 +488,14 @@ public class PrefabManager : MonoBehaviour
         if (!gameEndSet)
         {
             isGameEnded = -1f;
+            foreach (var popup in leftPassPopups)
+            {
+                popup.gameObject.SetActive(false);
+            }
+            foreach (var popup in rightPassPopups)
+            {
+                popup.gameObject.SetActive(false);
+            }
             gameEndSet = true;
         }
 
@@ -1117,6 +1128,9 @@ public class PrefabManager : MonoBehaviour
         int vehicle_variation = Random.Range(0, currentTrafficPrefabList[vehicle_id].trafficVariations.Count);
         vehicle = currentTrafficPrefabList[vehicle_id].trafficVariations[vehicle_variation];
 
+        // Record bigrig state for this traffic object
+        isBigrigByCar[vehicle] = (vehicle_id == 0);
+
         float x = lane switch
         {
             0 => -11.5f,
@@ -1458,25 +1472,30 @@ public class PrefabManager : MonoBehaviour
         }
     }
 
-    private void AwardTrafficPassCredits(bool isLeftSide)
+    private void AwardTrafficPassCredits(bool isLeftSide, GameObject passedCar)
     {
         // 1) Count the pass
         trafficsPassedTotal++;
 
-        // 2) Determine credits based on player's CURRENT lane
-        // Oncoming lanes: 0-3, Same-way lanes: 4-7
+        // 2) Base credits by lane direction
         int earned = (playerController.currentLane >= 0 && playerController.currentLane <= 3)
-            ? oncomingPassCredits
-            : sameWayPassCredits;
+            ? oncomingPassCredits   // 2 CR
+            : sameWayPassCredits;   // 1 CR
 
-        // 3) Add to total credits counter
+        // 3) Double if this traffic is a big rig
+        if (passedCar != null &&
+            isBigrigByCar.TryGetValue(passedCar, out bool isBigrig) &&
+            isBigrig)
+        {
+            earned *= 2;
+        }
+
+        // 4) Apply credits
         trafficPassCreditsTotal += earned;
 
-        // 4) Show UI text with correct amount
-        // (Do NOT hardcode "+1 CR" anymore)
+        // 5) UI popup
         TriggerPassPopup(isLeftSide, earned);
     }
-
 
     private void TriggerPassPopup(bool isLeft, int creditsEarned)
     {
