@@ -133,7 +133,7 @@ public class SaveData
     
     // Menu/OptionsMenu/GameplaySettings.cs
     public int cameraType = 1; // 0 = first person, 1 = third person low, 2 = third person high.
-    public float senseOfSpeedModifier = 0.55f;
+    public float senseOfSpeedModifier = 0.25f;
 
     // Menu/OptionsMenu/UnitsSettings.cs
     public bool ImperialUnits = true;

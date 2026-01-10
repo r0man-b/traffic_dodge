@@ -193,6 +193,16 @@ public class PrefabManager : MonoBehaviour
     private Coroutine[] leftPopupRoutines;
     private Coroutine[] rightPopupRoutines;
 
+    [Header("Traffic Pass Rewards")]
+    public int trafficsPassedTotal = 0;
+    public int trafficPassCreditsTotal = 0;
+
+    [Tooltip("Credits for passing traffic in same-way lanes (4-7).")]
+    public int sameWayPassCredits = 1;
+
+    [Tooltip("Credits for passing traffic while player is in oncoming lanes (0-3).")]
+    public int oncomingPassCredits = 2;
+
     // System variables.
     private float isGameEnded = 1; // 1 = game not ended, -1 = game ended.
     private bool gameEndSet = false;
@@ -454,7 +464,7 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane - 1][0] != leftCar && allLaneTraffic[playerController.currentLane - 1][0].transform.position.z < playerPosZ + 1.5f)
             {
                 soundManager.PlayWoosh(true);
-                TriggerPassPopup(true); // LEFT side popup
+                AwardTrafficPassCredits(true);  // LEFT side popup
                 leftCar = allLaneTraffic[playerController.currentLane - 1][0];
             }
         }
@@ -463,7 +473,7 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
             {
                 soundManager.PlayWoosh(false);
-                TriggerPassPopup(false); // RIGHT side popup
+                AwardTrafficPassCredits(false); ; // RIGHT side popup
                 rightCar = allLaneTraffic[playerController.currentLane + 1][0];
             }
         }
@@ -1448,7 +1458,27 @@ public class PrefabManager : MonoBehaviour
         }
     }
 
-    private void TriggerPassPopup(bool isLeft)
+    private void AwardTrafficPassCredits(bool isLeftSide)
+    {
+        // 1) Count the pass
+        trafficsPassedTotal++;
+
+        // 2) Determine credits based on player's CURRENT lane
+        // Oncoming lanes: 0-3, Same-way lanes: 4-7
+        int earned = (playerController.currentLane >= 0 && playerController.currentLane <= 3)
+            ? oncomingPassCredits
+            : sameWayPassCredits;
+
+        // 3) Add to total credits counter
+        trafficPassCreditsTotal += earned;
+
+        // 4) Show UI text with correct amount
+        // (Do NOT hardcode "+1 CR" anymore)
+        TriggerPassPopup(isLeftSide, earned);
+    }
+
+
+    private void TriggerPassPopup(bool isLeft, int creditsEarned)
     {
         if (isLeft)
         {
@@ -1477,7 +1507,7 @@ public class PrefabManager : MonoBehaviour
                 : tmp.color;
 
             ResetPopup(tmp, startPos, baseCol);
-            tmp.text = passPopupText;
+            tmp.text = $"+{creditsEarned} CR";
             tmp.gameObject.SetActive(true);
 
             leftPopupRoutines[idx] = StartCoroutine(AnimatePopup(tmp, startPos, baseCol, passPopupRiseAmount, passPopupDuration / playerController.accel, () =>
@@ -1514,7 +1544,7 @@ public class PrefabManager : MonoBehaviour
                 : tmp.color;
 
             ResetPopup(tmp, startPos, baseCol);
-            tmp.text = passPopupText;
+            tmp.text = $"+{creditsEarned} CR";
             tmp.gameObject.SetActive(true);
 
             rightPopupRoutines[idx] = StartCoroutine(AnimatePopup(tmp, startPos, baseCol, passPopupRiseAmount, passPopupDuration / playerController.accel, () =>
@@ -1555,6 +1585,7 @@ public class PrefabManager : MonoBehaviour
         // Split time: rise+hold, then fade.
         // Rise happens first, then the text stays still, then fades out.
         float risePortion = 0.6f;  // 60% of total time to move up
+        if (playerController.bullet) risePortion = 1.0f;
         float fadePortion = 1f - risePortion; // remaining time
 
         // Safety clamp if edited incorrectly
