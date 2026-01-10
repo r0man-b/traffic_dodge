@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class PrefabManager : MonoBehaviour
 {
@@ -165,6 +166,33 @@ public class PrefabManager : MonoBehaviour
     private List<GameObject> lane6traffic = new List<GameObject>();
     private List<GameObject> lane7traffic = new List<GameObject>();
 
+    // UI: Pass-by Credit Popups
+    public TextMeshProUGUI[] leftPassPopups = new TextMeshProUGUI[10];
+    public TextMeshProUGUI[] rightPassPopups = new TextMeshProUGUI[10];
+
+    // Text shown when passing traffic.
+    private string passPopupText = "+1 CR";
+
+    // How far (in UI units) the popup moves upward over the animation.
+    private float passPopupRiseAmount = 75f;
+
+    // Total duration of the popup animation in seconds.
+    private float passPopupDuration = 0.5f;
+
+    // Internal indices
+    private int leftPopupIndex = 0;
+    private int rightPopupIndex = 0;
+
+    // Cached reset data
+    private Vector2[] leftPopupStartPos;
+    private Vector2[] rightPopupStartPos;
+    private Color[] leftPopupBaseColor;
+    private Color[] rightPopupBaseColor;
+
+    // Track running coroutines so we can restart cleanly
+    private Coroutine[] leftPopupRoutines;
+    private Coroutine[] rightPopupRoutines;
+
     // System variables.
     private float isGameEnded = 1; // 1 = game not ended, -1 = game ended.
     private bool gameEndSet = false;
@@ -197,6 +225,9 @@ public class PrefabManager : MonoBehaviour
         // Find 'SoundManager' script.
         GameObject SoundManagerObject = GameObject.Find("SoundManager");
         soundManager = SoundManagerObject.GetComponent<SoundManager>();
+
+        // Cache popup original positions/colors and ensure they start inactive.
+        InitPassPopups();
 
         // Set the power up spawn time.
         powerUpSpawnTime = Random.Range(15, 30);
@@ -423,6 +454,7 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane - 1][0] != leftCar && allLaneTraffic[playerController.currentLane - 1][0].transform.position.z < playerPosZ + 1.5f)
             {
                 soundManager.PlayWoosh(true);
+                TriggerPassPopup(true); // LEFT side popup
                 leftCar = allLaneTraffic[playerController.currentLane - 1][0];
             }
         }
@@ -431,6 +463,7 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
             {
                 soundManager.PlayWoosh(false);
+                TriggerPassPopup(false); // RIGHT side popup
                 rightCar = allLaneTraffic[playerController.currentLane + 1][0];
             }
         }
@@ -1367,6 +1400,215 @@ public class PrefabManager : MonoBehaviour
         else return 0;
     }
 
+    /*-------------------------------------- PASS BY UI FUNCTIONS -------------------------------------*/
+    private void InitPassPopups()
+    {
+        // Left
+        if (leftPassPopups != null)
+        {
+            leftPopupStartPos = new Vector2[leftPassPopups.Length];
+            leftPopupBaseColor = new Color[leftPassPopups.Length];
+            leftPopupRoutines = new Coroutine[leftPassPopups.Length];
+
+            for (int i = 0; i < leftPassPopups.Length; i++)
+            {
+                var tmp = leftPassPopups[i];
+                if (tmp == null) continue;
+
+                RectTransform rt = tmp.rectTransform;
+                leftPopupStartPos[i] = rt.anchoredPosition;
+                leftPopupBaseColor[i] = tmp.color;
+
+                // Force initial reset
+                ResetPopup(tmp, leftPopupStartPos[i], leftPopupBaseColor[i]);
+                tmp.gameObject.SetActive(false);
+            }
+        }
+
+        // Right
+        if (rightPassPopups != null)
+        {
+            rightPopupStartPos = new Vector2[rightPassPopups.Length];
+            rightPopupBaseColor = new Color[rightPassPopups.Length];
+            rightPopupRoutines = new Coroutine[rightPassPopups.Length];
+
+            for (int i = 0; i < rightPassPopups.Length; i++)
+            {
+                var tmp = rightPassPopups[i];
+                if (tmp == null) continue;
+
+                RectTransform rt = tmp.rectTransform;
+                rightPopupStartPos[i] = rt.anchoredPosition;
+                rightPopupBaseColor[i] = tmp.color;
+
+                // Force initial reset
+                ResetPopup(tmp, rightPopupStartPos[i], rightPopupBaseColor[i]);
+                tmp.gameObject.SetActive(false);
+            }
+        }
+    }
+
+    private void TriggerPassPopup(bool isLeft)
+    {
+        if (isLeft)
+        {
+            if (leftPassPopups == null || leftPassPopups.Length == 0) return;
+
+            int idx = leftPopupIndex;
+            leftPopupIndex = (leftPopupIndex + 1) % leftPassPopups.Length;
+
+            var tmp = leftPassPopups[idx];
+            if (tmp == null) return;
+
+            // Restart if already animating
+            if (leftPopupRoutines != null && leftPopupRoutines[idx] != null)
+            {
+                StopCoroutine(leftPopupRoutines[idx]);
+                leftPopupRoutines[idx] = null;
+            }
+
+            // Reset, then animate
+            Vector2 startPos = (leftPopupStartPos != null && idx < leftPopupStartPos.Length)
+                ? leftPopupStartPos[idx]
+                : tmp.rectTransform.anchoredPosition;
+
+            Color baseCol = (leftPopupBaseColor != null && idx < leftPopupBaseColor.Length)
+                ? leftPopupBaseColor[idx]
+                : tmp.color;
+
+            ResetPopup(tmp, startPos, baseCol);
+            tmp.text = passPopupText;
+            tmp.gameObject.SetActive(true);
+
+            leftPopupRoutines[idx] = StartCoroutine(AnimatePopup(tmp, startPos, baseCol, passPopupRiseAmount, passPopupDuration / playerController.accel, () =>
+            {
+                tmp.gameObject.SetActive(false);
+                ResetPopup(tmp, startPos, baseCol);
+                leftPopupRoutines[idx] = null;
+            }));
+        }
+        else
+        {
+            if (rightPassPopups == null || rightPassPopups.Length == 0) return;
+
+            int idx = rightPopupIndex;
+            rightPopupIndex = (rightPopupIndex + 1) % rightPassPopups.Length;
+
+            var tmp = rightPassPopups[idx];
+            if (tmp == null) return;
+
+            // Restart if already animating
+            if (rightPopupRoutines != null && rightPopupRoutines[idx] != null)
+            {
+                StopCoroutine(rightPopupRoutines[idx]);
+                rightPopupRoutines[idx] = null;
+            }
+
+            // Reset, then animate
+            Vector2 startPos = (rightPopupStartPos != null && idx < rightPopupStartPos.Length)
+                ? rightPopupStartPos[idx]
+                : tmp.rectTransform.anchoredPosition;
+
+            Color baseCol = (rightPopupBaseColor != null && idx < rightPopupBaseColor.Length)
+                ? rightPopupBaseColor[idx]
+                : tmp.color;
+
+            ResetPopup(tmp, startPos, baseCol);
+            tmp.text = passPopupText;
+            tmp.gameObject.SetActive(true);
+
+            rightPopupRoutines[idx] = StartCoroutine(AnimatePopup(tmp, startPos, baseCol, passPopupRiseAmount, passPopupDuration / playerController.accel, () =>
+            {
+                tmp.gameObject.SetActive(false);
+                ResetPopup(tmp, startPos, baseCol);
+                rightPopupRoutines[idx] = null;
+            }));
+        }
+    }
+
+    private static void ResetPopup(TextMeshProUGUI tmp, Vector2 startPos, Color baseColor)
+    {
+        if (tmp == null) return;
+
+        tmp.rectTransform.anchoredPosition = startPos;
+
+        // Reset alpha to 1 while preserving RGB
+        Color c = baseColor;
+        c.a = 1f;
+        tmp.color = c;
+    }
+
+    private IEnumerator AnimatePopup(
+        TextMeshProUGUI tmp,
+        Vector2 startPos,
+        Color baseColor,
+        float riseAmount,
+        float duration,
+        System.Action onComplete)
+    {
+        if (tmp == null)
+        {
+            onComplete?.Invoke();
+            yield break;
+        }
+
+        // Split time: rise+hold, then fade.
+        // Rise happens first, then the text stays still, then fades out.
+        float risePortion = 0.6f;  // 60% of total time to move up
+        float fadePortion = 1f - risePortion; // remaining time
+
+        // Safety clamp if edited incorrectly
+        risePortion = Mathf.Clamp01(risePortion);
+        fadePortion = Mathf.Clamp01(fadePortion);
+
+        float riseTime = duration * risePortion;
+        float fadeTime = duration * fadePortion;
+
+        // Ensure fully visible at start
+        Color c0 = baseColor; c0.a = 1f;
+        tmp.color = c0;
+        tmp.rectTransform.anchoredPosition = startPos;
+
+        // Phase 1: rise (ease-out), alpha stays at 1
+        float t = 0f;
+        while (t < riseTime)
+        {
+            t += Time.unscaledDeltaTime;
+            float u = (riseTime <= 0f) ? 1f : Mathf.Clamp01(t / riseTime);
+
+            // Ease-out for nicer motion
+            float eased = 1f - Mathf.Pow(1f - u, 3f);
+
+            tmp.rectTransform.anchoredPosition = startPos + new Vector2(0f, riseAmount * eased);
+
+            Color c = baseColor; c.a = 1f;
+            tmp.color = c;
+
+            yield return null;
+        }
+
+        // Lock at top position
+        Vector2 topPos = startPos + new Vector2(0f, riseAmount);
+        tmp.rectTransform.anchoredPosition = topPos;
+
+        // Phase 2: fade out (no movement)
+        t = 0f;
+        while (t < fadeTime)
+        {
+            t += Time.unscaledDeltaTime;
+            float u = (fadeTime <= 0f) ? 1f : Mathf.Clamp01(t / fadeTime);
+
+            tmp.rectTransform.anchoredPosition = topPos;
+
+            Color c = baseColor;
+            c.a = 1f - u;
+            tmp.color = c;
+
+            yield return null;
+        }
+
+        onComplete?.Invoke();
+    }
 
     /*---------------------------------------- OTHER FUNCTIONS ----------------------------------------*/
     private static void OffsetAndFlip(IList<GameObject> list, float zDelta, bool isLeft, bool isGrass = false)
