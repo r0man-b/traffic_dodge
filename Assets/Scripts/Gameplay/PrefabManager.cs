@@ -392,7 +392,22 @@ public class PrefabManager : MonoBehaviour
                                 ReplaceTrafficParent(car);
                                 if (!tornadoTraffic.Contains(car))
                                 {
+                                    // Add the car to tornado traffic list
                                     tornadoTraffic.Add(car);
+
+                                    // Add rewards for car sucked into tornado
+                                    trafficsPassedTotal++;
+
+                                    // Base: regular +1, bigrig +2
+                                    int earned = 1;
+                                    if (isBigrigByCar.TryGetValue(car, out bool isBigrig) && isBigrig)
+                                        earned = 2;
+
+                                    // No oncoming multipliers during tornado
+                                    trafficPassCreditsTotal += earned;
+
+                                    // Always show RIGHT popup
+                                    TriggerPassPopup(false, earned);
                                 }
                             }
                             float distanceToTarget = Mathf.Abs(car.transform.localPosition.x);
@@ -467,7 +482,8 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane - 1][0] != leftCar && allLaneTraffic[playerController.currentLane - 1][0].transform.position.z < playerPosZ + 1.5f)
             {
                 soundManager.PlayWoosh(true);
-                if (!playerController.gameEnd) AwardTrafficPassCredits(true, allLaneTraffic[playerController.currentLane - 1][0]);  // LEFT side popup
+                if (!playerController.gameEnd && !playerController.aggro && !playerController.tornado)
+                    AwardTrafficPassCredits(true, allLaneTraffic[playerController.currentLane - 1][0]);  // LEFT side popup
                 leftCar = allLaneTraffic[playerController.currentLane - 1][0];
             }
         }
@@ -476,7 +492,8 @@ public class PrefabManager : MonoBehaviour
             if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
             {
                 soundManager.PlayWoosh(false);
-                if (!playerController.gameEnd) AwardTrafficPassCredits(false, allLaneTraffic[playerController.currentLane + 1][0]); ; // RIGHT side popup
+                if (!playerController.gameEnd && !playerController.aggro && !playerController.tornado)
+                    AwardTrafficPassCredits(false, allLaneTraffic[playerController.currentLane + 1][0]); ; // RIGHT side popup
                 rightCar = allLaneTraffic[playerController.currentLane + 1][0];
             }
         }
@@ -1236,6 +1253,12 @@ public class PrefabManager : MonoBehaviour
     // If the player collides with a traffic while he is in aggro mode, this coroutine will launch the traffic into the air.
     public IEnumerator LaunchTraffic(Transform trafficTransform)
     {
+        // First, add UI popup that displays whenever player collides with traffic
+        trafficsPassedTotal++;
+        int aggroCrashCredits = 10;
+        trafficPassCreditsTotal += aggroCrashCredits;
+        TriggerPassPopup(false, aggroCrashCredits);
+
         float upwardSpeed;
         if (playerController.aggro) upwardSpeed = Mathf.Min(6 + 10 * playerController.accel, 25);  // Units per second.
         else upwardSpeed = Mathf.Min(6 + 10 * playerController.accel, 40);
@@ -1362,7 +1385,7 @@ public class PrefabManager : MonoBehaviour
     {
         powerUpSpawnTime = Time.time - startTime;
         int randomPowerup = powerup_probabilities[Random.Range(0, powerup_probabilities.Length)];
-        //int randomPowerup = 2;
+        //randomPowerup = 2;
         powerups[randomPowerup].transform.position = new(lane_positions[Random.Range(0, lane_positions.Length)], -5, playerPosZ + 200);
         powerups[randomPowerup].Play();
     }
