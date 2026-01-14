@@ -314,7 +314,7 @@ public class PrefabManager : MonoBehaviour
         }
         PutTrafficBehindPlayer();
 
-        trafficDensity = Mathf.Max(1f, SaveManager.Instance.SaveData.TrafficDensity * 0.75f);
+        trafficDensity = Mathf.Max(1f, SaveManager.Instance.SaveData.TrafficDensity);
         if (trafficDensity < 0)
         {
             trafficDensity = 3;
