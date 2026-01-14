@@ -707,7 +707,7 @@ public class PlayerController : MonoBehaviour
         }
 
         // Update movement value that determines how quickly we change lanes.
-        float movement_val = Time.deltaTime * accel / 5f;
+        float movement_val = (Time.deltaTime * accel * 1.25f) / 5f;
 
         // If the bullet powerup is enabled, auto lane change the player.
         if ((bullet) && (raceStarted))
