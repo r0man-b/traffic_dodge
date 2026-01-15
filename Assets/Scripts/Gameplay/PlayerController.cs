@@ -55,6 +55,8 @@ public class PlayerController : MonoBehaviour
     private int nextGearShiftIndex = 0;     // index into currentCar.gearChangeTimes
     private int currentGear = 1;           // starts in Gear 1
     private bool gearShiftTrackingActive = false;
+    private AudioSource engineAccelSource;              // 2nd AudioSource on the spawned car prefab
+    private float gearTimePitchModifier = 1f;           // scales array times so shifts stay aligned to accel clip pitch
 
     // Camera variables.
     public GameObject cameraObject;
@@ -472,15 +474,17 @@ public class PlayerController : MonoBehaviour
         {
             float raceTime = Time.time - startTime;
 
-            // Fire any gear shifts that should have happened already
+            // If the pitch can change at runtime, keep this current
+            float pitch = (engineAccelSource != null) ? Mathf.Max(0.0001f, engineAccelSource.pitch) : 1f;
+            gearTimePitchModifier = pitch;
+
             var shifts = currentCar.gearChangeTimes;
             while (shifts != null &&
                    nextGearShiftIndex < shifts.Length &&
-                   raceTime >= shifts[nextGearShiftIndex] + soundManager.drop)
+                   raceTime >= soundManager.drop + (shifts[nextGearShiftIndex] / gearTimePitchModifier))
             {
                 // First shift indicates Gear 2, then Gear 3, etc.
                 currentGear = nextGearShiftIndex + 2;
-
                 Debug.Log($"Gear {currentGear}");
 
                 nextGearShiftIndex++;
@@ -1480,9 +1484,19 @@ public class PlayerController : MonoBehaviour
         nextGearShiftIndex = 0;
         currentGear = 1;
         gearShiftTrackingActive = (currentCar != null && currentCar.hasExhaustFlames);
+
+        engineAccelSource = null;
+
+        if (carObject == null) return;
+
+        // Engine acceleration audio source is the 2nd AudioSource component on the spawned car prefab
+        var sources = carObject.GetComponents<AudioSource>();
+        if (sources != null && sources.Length >= 2)
+            engineAccelSource = sources[1];
+
+        // Default to 1 if not found
+        gearTimePitchModifier = (engineAccelSource != null) ? Mathf.Max(0.0001f, engineAccelSource.pitch) : 1f;
     }
-
-
 
     /*----------------------------------------- OTHER FUNCTIONS ---------------------------------------*/
     // Handle collisions with traffic cars & powerups.
