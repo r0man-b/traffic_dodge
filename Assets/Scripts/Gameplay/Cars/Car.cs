@@ -158,6 +158,12 @@ public class Car : ScriptableObject
     public Material secondLight;
     public Material tailLight;
 
+    [Header("Exhaust Flames")]
+    public bool hasExhaustFlames;
+
+    [Header("Gear Change Times for Exhaust Flames")]
+    public float[] gearChangeTimes;
+
     [Header("Liveries (Don't Change These)")]
     public Texture2D[] liveries;
 

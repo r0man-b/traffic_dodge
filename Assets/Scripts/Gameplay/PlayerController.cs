@@ -51,6 +51,10 @@ public class PlayerController : MonoBehaviour
     private float endFlashInterval = 0.02f; // Fastest interval at end (seconds)
     private bool isRecovering = false;
     private float fpsModifier;
+    // Track gear shifts for exhaust flames
+    private int nextGearShiftIndex = 0;     // index into currentCar.gearChangeTimes
+    private int currentGear = 1;           // starts in Gear 1
+    private bool gearShiftTrackingActive = false;
 
     // Camera variables.
     public GameObject cameraObject;
@@ -389,6 +393,9 @@ public class PlayerController : MonoBehaviour
 
         // Start clock.
         startTime = Time.time;
+
+        // Begin tracking gear shifts for exhaust flames if applicable
+        ResetGearShiftTracking();
     }
 
     private void Update()
@@ -459,6 +466,26 @@ public class PlayerController : MonoBehaviour
 
         // Update race started variable if the song has dropped.
         if (!raceStarted && Time.time - startTime > soundManager.drop) raceStarted = true;
+
+        // Spawn exhaust flames each gear shift if applicable
+        if (raceStarted && gearShiftTrackingActive)
+        {
+            float raceTime = Time.time - startTime;
+
+            // Fire any gear shifts that should have happened already
+            var shifts = currentCar.gearChangeTimes;
+            while (shifts != null &&
+                   nextGearShiftIndex < shifts.Length &&
+                   raceTime >= shifts[nextGearShiftIndex] + soundManager.drop)
+            {
+                // First shift indicates Gear 2, then Gear 3, etc.
+                currentGear = nextGearShiftIndex + 2;
+
+                Debug.Log($"Gear {currentGear}");
+
+                nextGearShiftIndex++;
+            }
+        }
 
         // Disable powerup effect.
         if (!powerupsOnStandby && Time.time - startTime >= powerupCountdown)
@@ -1447,6 +1474,15 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    /*------------------------ GEAR SHIFT & EXHAUST FLAME MANAGEMENT FUNCTIONS ------------------------*/
+    private void ResetGearShiftTracking()
+    {
+        nextGearShiftIndex = 0;
+        currentGear = 1;
+        gearShiftTrackingActive = (currentCar != null && currentCar.hasExhaustFlames);
+    }
+
+
 
     /*----------------------------------------- OTHER FUNCTIONS ---------------------------------------*/
     // Handle collisions with traffic cars & powerups.
@@ -1626,6 +1662,9 @@ public class PlayerController : MonoBehaviour
         startTime = Time.time - 3;
         lastLaneSplitTime = 1; // Set to 1 for lane splitting to be enabled upon exit of recovery animation
         timeSinceLastPowerup = 0;
+
+        // Reset gear shift tracking
+        ResetGearShiftTracking();
 
         // Start car flashing animation
         StartCoroutine(RecoverFlashAndGhost(recoverDuration, startFlashInterval, endFlashInterval));
