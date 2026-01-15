@@ -7,6 +7,7 @@ public class CarPartData : ScriptableObject
 {
     [Header("Attributes")]
     public float price;
-    public Vector3 exhaustFlamePosition;
-    public Quaternion exhaustFlameRotation;
+    public Vector3[] exhaustFlamePositions;
+    public Quaternion[] exhaustFlameRotations;
+    public Vector3[] exhaustFlameScales;
 }

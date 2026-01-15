@@ -57,6 +57,10 @@ public class PlayerController : MonoBehaviour
     private bool gearShiftTrackingActive = false;
     private AudioSource engineAccelSource;              // 2nd AudioSource on the spawned car prefab
     private float gearTimePitchModifier = 1f;           // scales array times so shifts stay aligned to accel clip pitch
+    public GameObject ExhaustFlameTemplate;
+    // Spawned runtime instances (one per tube/index)
+    private readonly List<GameObject> exhaustFlameInstances = new();
+    private Coroutine exhaustFlamePulseCoroutine;
 
     // Camera variables.
     public GameObject cameraObject;
@@ -284,6 +288,9 @@ public class PlayerController : MonoBehaviour
 
         // Initialize probe/renderers so it is ready on first frame
         newCp.InitializeProperties();
+
+        // Build exhaust flame instances for the currently active exhaust
+        SetupExhaustFlameTemplates();
     }
 
     private void Awake()
@@ -483,10 +490,10 @@ public class PlayerController : MonoBehaviour
                    nextGearShiftIndex < shifts.Length &&
                    raceTime >= soundManager.drop + (shifts[nextGearShiftIndex] / gearTimePitchModifier))
             {
-                // First shift indicates Gear 2, then Gear 3, etc.
-                currentGear = nextGearShiftIndex + 2;
-                Debug.Log($"Gear {currentGear}");
+                // Fire exhaust flames for this shift
+                PulseExhaustFlames(0.1f);
 
+                Debug.Log($"Gear {currentGear}");
                 nextGearShiftIndex++;
             }
         }
@@ -1496,6 +1503,127 @@ public class PlayerController : MonoBehaviour
 
         // Default to 1 if not found
         gearTimePitchModifier = (engineAccelSource != null) ? Mathf.Max(0.0001f, engineAccelSource.pitch) : 1f;
+    }
+
+    private void SetupExhaustFlameTemplates()
+    {
+        // Clean previous instances (important for recovery respawns)
+        if (exhaustFlamePulseCoroutine != null)
+        {
+            StopCoroutine(exhaustFlamePulseCoroutine);
+            exhaustFlamePulseCoroutine = null;
+        }
+
+        for (int i = 0; i < exhaustFlameInstances.Count; i++)
+        {
+            if (exhaustFlameInstances[i] != null)
+                Destroy(exhaustFlameInstances[i]);
+        }
+        exhaustFlameInstances.Clear();
+
+        if (ExhaustFlameTemplate == null || carObject == null)
+            return;
+
+        // Find BODY/EXHAUSTS (exhausts are under BODY in your Car.InitializeCar)
+        Transform body = carObject.transform.Find("BODY");
+        if (body == null) return;
+
+        Transform exhausts = body.Find("EXHAUSTS");
+        if (exhausts == null) return;
+
+        // Your EXHAUSTS object has PartHolder
+        PartHolder exhaustHolder = exhausts.GetComponent<PartHolder>();
+        if (exhaustHolder == null) return;
+
+        // Find the currently active exhaust GameObject under EXHAUSTS
+        Transform activeExhaust = FindFirstActiveChild(exhausts);
+        if (activeExhaust == null) return;
+
+        // Active exhaust must have a CarPart component that points to the CarPartData
+        CarPart activeExhaustPart = activeExhaust.GetComponent<CarPart>();
+        if (activeExhaustPart == null || activeExhaustPart.carPartData == null) return;
+
+        CarPartData exhaustPartData = activeExhaustPart.carPartData;
+
+        // Validate arrays
+        var positions = exhaustPartData.exhaustFlamePositions;
+        var rotations = exhaustPartData.exhaustFlameRotations;
+        var scales = exhaustPartData.exhaustFlameScales;
+
+        if (positions == null || rotations == null || scales == null) return;
+        int count = positions.Length;
+        if (count == 0) return;
+
+        // Your hierarchy rule:
+        // EXHAUSTS -> ACTIVE_EXHAUST -> EXHAUST_TUBE_N
+        // Tubes are direct children of the active exhaust.
+        int tubeCount = activeExhaust.childCount;
+        if (tubeCount == 0) return;
+
+        int spawnCount = Mathf.Min(count, tubeCount);
+
+        for (int i = 0; i < spawnCount; i++)
+        {
+            Transform tube = activeExhaust.GetChild(i);
+            if (tube == null) continue;
+
+            GameObject inst = Instantiate(ExhaustFlameTemplate, tube, false);
+            inst.transform.localPosition = positions[i];
+            inst.transform.localRotation = rotations[i];
+            inst.transform.localScale = scales[i];
+
+            inst.SetActive(false);
+            exhaustFlameInstances.Add(inst);
+        }
+    }
+
+    private Transform FindFirstActiveChild(Transform parent)
+    {
+        if (parent == null) return null;
+
+        Transform fallback = null;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform c = parent.GetChild(i);
+            if (fallback == null) fallback = c;
+
+            // Prefer an exhaust that is active in hierarchy
+            if (c != null && c.gameObject.activeInHierarchy)
+                return c;
+        }
+
+        return fallback;
+    }
+
+    private void PulseExhaustFlames(float durationSeconds = 0.25f)
+    {
+        if (exhaustFlameInstances.Count == 0)
+            return;
+
+        if (exhaustFlamePulseCoroutine != null)
+            StopCoroutine(exhaustFlamePulseCoroutine);
+
+        exhaustFlamePulseCoroutine = StartCoroutine(ExhaustFlamePulseRoutine(durationSeconds));
+    }
+
+    private IEnumerator ExhaustFlamePulseRoutine(float durationSeconds)
+    {
+        for (int i = 0; i < exhaustFlameInstances.Count; i++)
+        {
+            var go = exhaustFlameInstances[i];
+            if (go != null) go.SetActive(true);
+        }
+
+        yield return new WaitForSeconds(durationSeconds);
+
+        for (int i = 0; i < exhaustFlameInstances.Count; i++)
+        {
+            var go = exhaustFlameInstances[i];
+            if (go != null) go.SetActive(false);
+        }
+
+        exhaustFlamePulseCoroutine = null;
     }
 
     /*----------------------------------------- OTHER FUNCTIONS ---------------------------------------*/
