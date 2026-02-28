@@ -491,7 +491,7 @@ public class PlayerController : MonoBehaviour
                    raceTime >= soundManager.drop + (shifts[nextGearShiftIndex] / gearTimePitchModifier))
             {
                 // Fire exhaust flames for this shift
-                PulseExhaustFlames(0.1f);
+                PulseExhaustFlames(0.075f);
 
                 Debug.Log($"Gear {currentGear}");
                 nextGearShiftIndex++;
@@ -1505,6 +1505,10 @@ public class PlayerController : MonoBehaviour
         gearTimePitchModifier = (engineAccelSource != null) ? Mathf.Max(0.0001f, engineAccelSource.pitch) : 1f;
     }
 
+    // Replace the array-read section in PlayerController.SetupExhaustFlameTemplates()
+    // with this tube-based version. This supports:
+    // 1) ACTIVE_EXHAUST has N child tube objects -> tube index maps to child index
+    // 2) ACTIVE_EXHAUST has 0 children -> use tube 0 and parent all its flames to ACTIVE_EXHAUST
     private void SetupExhaustFlameTemplates()
     {
         // Clean previous instances (important for recovery respawns)
@@ -1524,56 +1528,70 @@ public class PlayerController : MonoBehaviour
         if (ExhaustFlameTemplate == null || carObject == null)
             return;
 
-        // Find BODY/EXHAUSTS (exhausts are under BODY in your Car.InitializeCar)
         Transform body = carObject.transform.Find("BODY");
         if (body == null) return;
 
         Transform exhausts = body.Find("EXHAUSTS");
         if (exhausts == null) return;
 
-        // Your EXHAUSTS object has PartHolder
-        PartHolder exhaustHolder = exhausts.GetComponent<PartHolder>();
-        if (exhaustHolder == null) return;
-
-        // Find the currently active exhaust GameObject under EXHAUSTS
         Transform activeExhaust = FindFirstActiveChild(exhausts);
         if (activeExhaust == null) return;
 
-        // Active exhaust must have a CarPart component that points to the CarPartData
         CarPart activeExhaustPart = activeExhaust.GetComponent<CarPart>();
         if (activeExhaustPart == null || activeExhaustPart.carPartData == null) return;
 
-        CarPartData exhaustPartData = activeExhaustPart.carPartData;
+        CarPartData data = activeExhaustPart.carPartData;
+        if (data.exhaustFlameTubes == null || data.exhaustFlameTubes.Length == 0) return;
 
-        // Validate arrays
-        var positions = exhaustPartData.exhaustFlamePositions;
-        var rotations = exhaustPartData.exhaustFlameRotations;
-        var scales = exhaustPartData.exhaustFlameScales;
+        int childTubeCount = activeExhaust.childCount;
 
-        if (positions == null || rotations == null || scales == null) return;
-        int count = positions.Length;
-        if (count == 0) return;
-
-        // Your hierarchy rule:
-        // EXHAUSTS -> ACTIVE_EXHAUST -> EXHAUST_TUBE_N
-        // Tubes are direct children of the active exhaust.
-        int tubeCount = activeExhaust.childCount;
-        if (tubeCount == 0) return;
-
-        int spawnCount = Mathf.Min(count, tubeCount);
-
-        for (int i = 0; i < spawnCount; i++)
+        // Case B: No children under ACTIVE_EXHAUST -> spawn flames from tube[0] under ACTIVE_EXHAUST
+        if (childTubeCount == 0)
         {
-            Transform tube = activeExhaust.GetChild(i);
-            if (tube == null) continue;
+            var tube0 = data.exhaustFlameTubes[0];
+            if (tube0 == null || tube0.flames == null || tube0.flames.Length == 0) return;
 
-            GameObject inst = Instantiate(ExhaustFlameTemplate, tube, false);
-            inst.transform.localPosition = positions[i];
-            inst.transform.localRotation = rotations[i];
-            inst.transform.localScale = scales[i];
+            for (int f = 0; f < tube0.flames.Length; f++)
+            {
+                var flame = tube0.flames[f];
 
-            inst.SetActive(false);
-            exhaustFlameInstances.Add(inst);
+                GameObject inst = Instantiate(ExhaustFlameTemplate, activeExhaust, false);
+                inst.transform.localPosition = flame.position;
+                inst.transform.localRotation = flame.rotation;
+                inst.transform.localScale = flame.scale;
+
+                inst.SetActive(false);
+                exhaustFlameInstances.Add(inst);
+            }
+
+            return;
+        }
+
+        // Case A: ACTIVE_EXHAUST has tube children.
+        // Map tube index -> activeExhaust.GetChild(tubeIndex).
+        int tubeSpawnCount = Mathf.Min(data.exhaustFlameTubes.Length, childTubeCount);
+
+        for (int t = 0; t < tubeSpawnCount; t++)
+        {
+            Transform tubeParent = activeExhaust.GetChild(t);
+            if (tubeParent == null) continue;
+
+            var tube = data.exhaustFlameTubes[t];
+            if (tube == null || tube.flames == null || tube.flames.Length == 0) continue;
+
+            for (int f = 0; f < tube.flames.Length; f++)
+            {
+                var flame = tube.flames[f];
+
+                GameObject inst = Instantiate(ExhaustFlameTemplate, tubeParent, false);
+                inst.transform.localPosition = flame.position;
+                inst.transform.localRotation = flame.rotation;
+                inst.transform.localScale = flame.scale;
+
+
+                inst.SetActive(false);
+                exhaustFlameInstances.Add(inst);
+            }
         }
     }
 
@@ -1609,19 +1627,20 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator ExhaustFlamePulseRoutine(float durationSeconds)
     {
+        // Activate
         for (int i = 0; i < exhaustFlameInstances.Count; i++)
-        {
-            var go = exhaustFlameInstances[i];
-            if (go != null) go.SetActive(true);
-        }
+            if (exhaustFlameInstances[i] != null) exhaustFlameInstances[i].SetActive(true);
 
-        yield return new WaitForSeconds(durationSeconds);
+        // Midpoint pause (runtime)
+        float half = durationSeconds * 0.5f;
+        yield return new WaitForSeconds(half);
 
+        // Finish remaining time (use realtime so it still completes even if timeScale was 0)
+        yield return new WaitForSecondsRealtime(half);
+
+        // Deactivate
         for (int i = 0; i < exhaustFlameInstances.Count; i++)
-        {
-            var go = exhaustFlameInstances[i];
-            if (go != null) go.SetActive(false);
-        }
+            if (exhaustFlameInstances[i] != null) exhaustFlameInstances[i].SetActive(false);
 
         exhaustFlamePulseCoroutine = null;
     }

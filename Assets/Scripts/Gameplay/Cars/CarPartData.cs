@@ -7,7 +7,22 @@ public class CarPartData : ScriptableObject
 {
     [Header("Attributes")]
     public float price;
-    public Vector3[] exhaustFlamePositions;
-    public Quaternion[] exhaustFlameRotations;
-    public Vector3[] exhaustFlameScales;
+
+    [Header("Exhaust Flames (Tube -> Flames)")]
+    public ExhaustFlameTube[] exhaustFlameTubes;
+}
+
+[System.Serializable]
+public class ExhaustFlameTube
+{
+    [Tooltip("All flames that belong to this tube (tube index maps to tube child index under ACTIVE_EXHAUST).")]
+    public ExhaustFlameTransform[] flames;
+}
+
+[System.Serializable]
+public class ExhaustFlameTransform
+{
+    public Vector3 position;
+    public Quaternion rotation;
+    public Vector3 scale;
 }

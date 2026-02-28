@@ -35,6 +35,13 @@ public class UIManager : MonoBehaviour
     private int currentRecoverNitroCost = 1;
     private bool recoverDecisionMade = false;
     private bool recoverChosen = false;
+    public TextMeshProUGUI totalDistanceText;
+    public TextMeshProUGUI oncomingDistanceText;
+    public TextMeshProUGUI topSpeedText;
+    public Transform trafficPassedValueT;
+    public Transform trafficPassCreditsValueT;
+    public TextMeshProUGUI recordDistanceText;
+    public TextMeshProUGUI recordSpeedText;
 
     // Variables for lane split countdown.
     public TextMeshProUGUI lanesplitcountdown;
@@ -358,11 +365,8 @@ public class UIManager : MonoBehaviour
         yield return StartCoroutine(WaitOrSkip(2f));
 
         // Update distance & top speed statistics.
-        TextMeshProUGUI totalDistanceText = distance_speed_stats.transform.Find("Distance/DistanceValue").GetComponent<TextMeshProUGUI>();
         totalDistanceText.text = distance.text;
-        TextMeshProUGUI oncomingDistanceText = distance_speed_stats.transform.Find("OncomingDistance/OncomingDistanceValue").GetComponent<TextMeshProUGUI>();
         oncomingDistanceText.text = isImperial ? System.Math.Round(oncomingDistance, 1).ToString("F1") + " mi" : System.Math.Round(oncomingDistance * metricMultiplier, 1).ToString("F1") + " km";
-        TextMeshProUGUI topSpeedText = distance_speed_stats.transform.Find("TopSpeed/TopSpeedValue").GetComponent<TextMeshProUGUI>();
         topSpeedText.text = isImperial ? topSpeed + " mph" : System.Math.Round(topSpeed * metricMultiplier)  + " kph";
         
         // Traffic passed stats (set BEFORE the stats panel animates in so it moves up with the panel)
@@ -376,7 +380,6 @@ public class UIManager : MonoBehaviour
         }
 
         // Update "Traffics Passed" row if present
-        Transform trafficPassedValueT = distance_speed_stats.transform.Find("TrafficsPassed/TrafficsPassedValue");
         if (trafficPassedValueT != null)
         {
             var trafficPassedValue = trafficPassedValueT.GetComponent<TextMeshProUGUI>();
@@ -621,7 +624,6 @@ public class UIManager : MonoBehaviour
             // otherwise fall back to the distance credits row.
             TextMeshProUGUI anchorText = null;
 
-            Transform trafficPassCreditsValueT = distance_speed_stats.transform.Find("TrafficsPassed/TrafficsPassedValue");
             if (trafficPassCreditsValueT != null)
                 anchorText = trafficPassCreditsValueT.GetComponent<TextMeshProUGUI>();
 
@@ -756,10 +758,8 @@ public class UIManager : MonoBehaviour
         }
 
         // Set record distance & speed statistics.
-        TextMeshProUGUI recordDistanceText = record_stats.transform.Find("RecordDistance/RecordDistanceValue").GetComponent<TextMeshProUGUI>();
         recordDistanceText.text = isImperial ? oldRecordDistance.ToString("F1") + " mi" : (oldRecordDistance * metricMultiplier).ToString("F1") + " km";
 
-        TextMeshProUGUI recordSpeedText = record_stats.transform.Find("RecordSpeed/RecordSpeedValue").GetComponent<TextMeshProUGUI>();
         recordSpeedText.text = isImperial ? oldRecordSpeed.ToString() + " mph" : (oldRecordSpeed * metricMultiplier).ToString("F0") + " kph";
 
         // Animate record stats + buttons to bottom of screen.
