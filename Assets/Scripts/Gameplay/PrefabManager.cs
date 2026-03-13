@@ -799,31 +799,62 @@ public class PrefabManager : MonoBehaviour
         {
             currentWastelandBuildingType = 1;
             wasteLandBuildingCount = 0;
-            leftBuildingIndex = Random.Range(0, leftWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count);
-            rightBuildingIndex = (leftBuildingIndex + 16) % rightWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count;
+
+            int leftCount = leftWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count;
+            int rightCount = rightWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count;
+
+            if (leftCount > 0)
+                leftBuildingIndex = Random.Range(0, leftCount);
+            else
+                leftBuildingIndex = 0;
+
+            if (rightCount > 0)
+                rightBuildingIndex = Random.Range(0, rightCount);
+            else
+                rightBuildingIndex = 0;
         }
         else if (wasteLandSkyscraperCount > 30)
         {
             currentWastelandBuildingType = 0;
             wasteLandSkyscraperCount = 0;
-        } 
+
+            int leftCount = leftWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count;
+            int rightCount = rightWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count;
+
+            if (leftCount > 0)
+                leftBuildingIndex = Mathf.Clamp(leftBuildingIndex, 0, leftCount - 1);
+            else
+                leftBuildingIndex = 0;
+
+            if (rightCount > 0)
+                rightBuildingIndex = Mathf.Clamp(rightBuildingIndex, 0, rightCount - 1);
+            else
+                rightBuildingIndex = 0;
+        }
 
         if (right == 0) // We are spawning a left building.
         {
-            WastelandBuilding leftBuilding = leftWastelandBuildings[currentWastelandBuildingType].buildingTypes[leftBuildingIndex];
+            List<WastelandBuilding> leftList = leftWastelandBuildings[currentWastelandBuildingType].buildingTypes;
+
+            if (leftList == null || leftList.Count == 0)
+            {
+                Debug.LogWarning($"No left wasteland buildings available for type {currentWastelandBuildingType}");
+                return;
+            }
+
+            if (leftBuildingIndex < 0 || leftBuildingIndex >= leftList.Count)
+                leftBuildingIndex = 0;
+
+            WastelandBuilding leftBuilding = leftList[leftBuildingIndex];
             float xPos = Random.Range(leftBuilding.maxXPosition, leftBuilding.minXPosition);
             float yPos = Random.Range(leftBuilding.minYPosition, leftBuilding.maxYPosition);
             Vector3 newPos;
 
             // Set spawn position.
             if (activeLeftWastelandBuildings.Count > 0)
-            {
                 newPos = new Vector3(xPos, yPos, activeLeftWastelandBuildings[^1].transform.position.z + zDistanceFromLastBuilding);
-            }
             else // If this is the first time we are spawning a left building, initialize the Z position to 200.
-            {
                 newPos = new Vector3(xPos, yPos, 200);
-            }
 
             // Set rotation.
             if (leftBuilding.rotateableBuilding)
@@ -835,27 +866,37 @@ public class PrefabManager : MonoBehaviour
             leftBuilding.transform.position = newPos;
             activeLeftWastelandBuildings.Add(leftBuilding);
             leftBuilding.gameObject.SetActive(true);
-            leftWastelandBuildings[currentWastelandBuildingType].buildingTypes.RemoveAt(leftBuildingIndex); // Remove the building from the original array to prevent unauthorized reuse.
-            leftBuildingIndex += 1;
-            if (leftBuildingIndex > leftWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count - 1) leftBuildingIndex = 0;
-        }
 
+            leftList.RemoveAt(leftBuildingIndex); // Remove the building from the original array to prevent unauthorized reuse.
+
+            if (leftList.Count == 0)
+                leftBuildingIndex = 0;
+            else if (leftBuildingIndex >= leftList.Count)
+                leftBuildingIndex = 0;
+        }
         else // We are spawning a right building.
         {
-            WastelandBuilding rightBuilding = rightWastelandBuildings[currentWastelandBuildingType].buildingTypes[rightBuildingIndex];
+            List<WastelandBuilding> rightList = rightWastelandBuildings[currentWastelandBuildingType].buildingTypes;
+
+            if (rightList == null || rightList.Count == 0)
+            {
+                Debug.LogWarning($"No right wasteland buildings available for type {currentWastelandBuildingType}");
+                return;
+            }
+
+            if (rightBuildingIndex < 0 || rightBuildingIndex >= rightList.Count)
+                rightBuildingIndex = 0;
+
+            WastelandBuilding rightBuilding = rightList[rightBuildingIndex];
             float xPos = Random.Range(rightBuilding.minXPosition, rightBuilding.maxXPosition);
             float yPos = Random.Range(rightBuilding.minYPosition, rightBuilding.maxYPosition);
             Vector3 newPos;
 
             // Set spawn position.
             if (activeRightWastelandBuildings.Count > 0)
-            {
                 newPos = new Vector3(xPos, yPos, activeRightWastelandBuildings[^1].transform.position.z + zDistanceFromLastBuilding);
-            }
-            else // If this is the first time we are spawning a right building, initialize the Z position to 200.
-            {
+            else // If this is the first time we are spawning a right building, initialize the Z position to 200
                 newPos = new Vector3(xPos, yPos, 200);
-            }
 
             // Set rotation.
             if (rightBuilding.rotateableBuilding)
@@ -867,9 +908,13 @@ public class PrefabManager : MonoBehaviour
             rightBuilding.transform.position = newPos;
             activeRightWastelandBuildings.Add(rightBuilding);
             rightBuilding.gameObject.SetActive(true);
-            rightWastelandBuildings[currentWastelandBuildingType].buildingTypes.RemoveAt(rightBuildingIndex); // Remove the building from the original array to prevent unauthorized reuse.
-            rightBuildingIndex += 1;
-            if (rightBuildingIndex > rightWastelandBuildings[currentWastelandBuildingType].buildingTypes.Count - 1) rightBuildingIndex = 0;
+
+            rightList.RemoveAt(rightBuildingIndex); // Remove the building from the original array to prevent unauthorized reuse.
+
+            if (rightList.Count == 0)
+                rightBuildingIndex = 0;
+            else if (rightBuildingIndex >= rightList.Count)
+                rightBuildingIndex = 0;
         }
     }
 
