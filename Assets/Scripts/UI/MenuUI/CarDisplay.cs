@@ -297,6 +297,8 @@ public class CarDisplay : MonoBehaviour
 
         popUps.SetActive(true);
         lockImage.SetActive(false);
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
         numOfThisCarTypeOwned = saveData.Cars.Count(car => car.Key.CarType == currentCarType);
 
         if (creditManager.GetCredits() < currentCar.price)
@@ -362,6 +364,8 @@ public class CarDisplay : MonoBehaviour
         buttonSet1.SetActive(false);
         buttonSet2.SetActive(true);
         goRaceButton.SetActive(true);
+        leftButton.SetActive(true);
+        rightButton.SetActive(true);
 
         // Play purchase sound
         menuSounds.PlayChaChing();
@@ -389,6 +393,10 @@ public class CarDisplay : MonoBehaviour
 
         // Access the SaveData instance.
         SaveData saveData = SaveManager.Instance.SaveData;
+
+        // Disable car navigation buttons
+        leftButton.SetActive(false);
+        rightButton.SetActive(false);
 
         // Check if the player has only one car in total.
         if (saveData.Cars.Count == 1)
@@ -471,6 +479,8 @@ public class CarDisplay : MonoBehaviour
         garageUIManager.UpdatePerformanceStats();
         NormalizeOwnedPointersAfterSell(SaveManager.Instance.SaveData);
         SaveManager.Instance.SaveGame(); // Save changes to the data.
+        leftButton.SetActive(true);
+        rightButton.SetActive(true);
         buyConfirmationPopUp.SetActive(false);
         notEnoughCreditsPopUp.SetActive(false);
         sellConfirmationPopUp.SetActive(false);
@@ -564,6 +574,9 @@ public class CarDisplay : MonoBehaviour
 
         // Play roulette sound effect
         menuSounds.PlayRouletteSpin();
+
+        // Reset garage camera to default position
+        garageCamera.SetCameraPosition(0);
 
         _onFinalTick = false;      // reset each run
         skipRequested = false;     // reset each run
@@ -869,6 +882,30 @@ public class CarDisplay : MonoBehaviour
     {
         var saveData = SaveManager.Instance.SaveData;
 
+        // Enforce the same per-type cap used in ConfirmBuy()
+        const int maxPerType = 10;
+        int ownedOfThisType = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
+
+        if (ownedOfThisType >= maxPerType)
+        {
+            if (lootCratePopUps != null) lootCratePopUps.SetActive(true);
+            if (addOrSellPopUp != null) addOrSellPopUp.SetActive(true);
+
+            EnsureLootboxSellPriceCached();
+
+            string displayName = TrimLeadingThe(string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name);
+            if (addOrSellPopUpText != null)
+            {
+                addOrSellPopUpText.text =
+                    $"You already own the maximum number of <u>{displayName}s</u>. " +
+                    $"You can choose to either replace an existing {displayName} with the one you just unlocked, " +
+                    $"or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
+            }
+            addButton.SetActive(false);
+            replaceButton.SetActive(true);
+            return;
+        }
+
         // --- Play the engine rev for the awarded car type ---
         if (menuSounds != null)
         {
@@ -893,30 +930,6 @@ public class CarDisplay : MonoBehaviour
                     // (No Debug.Log here unless you want noise in production.)
                 }
             }
-        }
-
-        // Enforce the same per-type cap used in ConfirmBuy()
-        const int maxPerType = 10;
-        int ownedOfThisType = saveData.Cars.Count(c => c.Key.CarType == currentCarType);
-
-        if (ownedOfThisType >= maxPerType)
-        {
-            if (lootCratePopUps != null) lootCratePopUps.SetActive(true);
-            if (addOrSellPopUp != null) addOrSellPopUp.SetActive(true);
-
-            EnsureLootboxSellPriceCached();
-
-            string displayName = TrimLeadingThe(string.IsNullOrWhiteSpace(currentCar?.car_name) ? currentCar?.name : currentCar.car_name);
-            if (addOrSellPopUpText != null)
-            {
-                addOrSellPopUpText.text =
-                    $"You already own the maximum number of <u>{displayName}s</u>. " +
-                    $"You can choose to either replace an existing {displayName} with the one you just unlocked, " +
-                    $"or sell it for { _cachedLootboxSellPrice.ToString("N0") } CR.";
-            }
-            addButton.SetActive(false);
-            replaceButton.SetActive(true);
-            return;
         }
 
         // Determine next index for this type and create/overwrite record

@@ -441,7 +441,7 @@ public class UIManager : MonoBehaviour
 
         // Create earned credit UI element for credits earned due to total distance. This TMP object will then move over to the player's total credits in the top right of screen.
         TextMeshProUGUI totalDistanceCreditsText = Instantiate(totalDistanceText, totalDistanceText.transform.parent);
-        totalDistanceCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(200f, 0f);
+        totalDistanceCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(250f, 0f);
         totalDistanceCreditsText.text = "+0 CR";
         totalDistanceCreditsText.gameObject.SetActive(true);
 
@@ -523,7 +523,7 @@ public class UIManager : MonoBehaviour
         {
             // Create a TMP object that will show the amount of credits the player earned due to oncoming distance. This TMP object will then move over to the player's total credits in the top right of screen.
             TextMeshProUGUI oncomingDistanceCreditsText = Instantiate(oncomingDistanceText, oncomingDistanceText.transform.parent);
-            oncomingDistanceCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(200f, 0f);
+            oncomingDistanceCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(250f, 0f);
             oncomingDistanceCreditsText.text = "+0 CR";
 
             // Create a copy of oncomingDistanceCreditsText which will stay stationary.
@@ -634,7 +634,7 @@ public class UIManager : MonoBehaviour
             }
 
             TextMeshProUGUI trafficPassCreditsText = Instantiate(anchorText, anchorText.transform.parent);
-            trafficPassCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(200f, 0f);
+            trafficPassCreditsText.GetComponent<RectTransform>().anchoredPosition += new Vector2(250f, 0f);
             trafficPassCreditsText.text = "+0 CR";
             trafficPassCreditsText.gameObject.SetActive(true);
 
@@ -725,7 +725,7 @@ public class UIManager : MonoBehaviour
         yield return StartCoroutine(WaitOrSkip(0.5f));
 
         // Animate distance speed stats to the top.
-        float moveUpAmount = Screen.height / 4f;
+        float moveUpAmount = Screen.height / 5f;
         animationDuration = 0.75f;
         distanceStatsTargetPosition = distance_speed_stats.transform.position + new Vector3(0, moveUpAmount, 0);
         if (skip)
@@ -825,7 +825,7 @@ public class UIManager : MonoBehaviour
 
             // Create distance difference UI element.
             TextMeshProUGUI distanceRecordDifferenceText = Instantiate(recordDistanceText, recordDistanceText.transform.parent);
-            distanceRecordDifferenceText.GetComponent<RectTransform>().anchoredPosition += new Vector2(200f, 0f);
+            distanceRecordDifferenceText.GetComponent<RectTransform>().anchoredPosition += new Vector2(250f, 0f);
             distanceRecordDifferenceText.text = isImperial ? "+0 MI" : "+0 KM";
             distanceRecordDifferenceText.gameObject.SetActive(true);
 
@@ -864,7 +864,9 @@ public class UIManager : MonoBehaviour
             // Set ending record values.
             distanceRecordDifferenceText.gameObject.SetActive(false);
             TextMeshProUGUI newRecordText = Instantiate(recordDistanceText, recordDistanceText.transform.parent);
-            newRecordText.GetComponent<RectTransform>().anchoredPosition += new Vector2(300f, 0f);
+            RectTransform rect = newRecordText.GetComponent<RectTransform>();
+            rect.anchoredPosition += new Vector2(200f, 0f);
+            rect.localScale *= 0.75f; // 25% smaller
             newRecordText.text = "NEW RECORD!";
             soundManager.newrecordsource.Play();
             newRecordText.gameObject.SetActive(true);
@@ -882,24 +884,30 @@ public class UIManager : MonoBehaviour
             // Calculate difference between new record and old record.
             double speedRecordDifference = (topSpeed - oldRecordSpeed) * metricMultiplier;
 
+            // Determine displayed speed value.
+            float displayedSpeed = isImperial ? (float)topSpeed : (float)(topSpeed * metricMultiplier);
+
+            // Choose offset depending on number of digits.
+            float offsetX = displayedSpeed >= 100 ? 300f : 250f;
+
             // Create distance difference UI element.
             TextMeshProUGUI speedRecordDifferenceText = Instantiate(recordSpeedText, recordSpeedText.transform.parent);
-            speedRecordDifferenceText.GetComponent<RectTransform>().anchoredPosition += new Vector2(250f, 0f);
+            speedRecordDifferenceText.GetComponent<RectTransform>().anchoredPosition += new Vector2(offsetX, 0f);
             speedRecordDifferenceText.text = isImperial ? "+0 MPH" : "+0 KPH";
             speedRecordDifferenceText.gameObject.SetActive(true);
 
-            yield return StartCoroutine(AnimateNumberIncrease(speedRecordDifferenceText, (float)speedRecordDifference, 0.5f, "speed")); // 'skip' could be set to true in here.
+            yield return StartCoroutine(AnimateNumberIncrease(speedRecordDifferenceText, (float)speedRecordDifference, 0.5f, "speed"));
 
-            // Move new record text to the right and add a text object. ADD SKIP LOGIC HERE.
+            // Move new record text to the right and add a text object.
             animationDuration = 0.5f;
             if (skip)
             {
-                // Instantly set positions to the final state.
                 speedRecordDifferenceText.transform.position = recordSpeedText.transform.position;
             }
             else
             {
-                LeanTween.move(speedRecordDifferenceText.gameObject, recordSpeedText.transform.position, animationDuration).setEase(LeanTweenType.easeInOutQuad);
+                LeanTween.move(speedRecordDifferenceText.gameObject, recordSpeedText.transform.position, animationDuration)
+                    .setEase(LeanTweenType.easeInOutQuad);
             }
 
             // Wait for animation to complete (unless skipped).
@@ -909,10 +917,7 @@ public class UIManager : MonoBehaviour
                 if (Input.GetMouseButtonUp(0) || Input.touchCount > 0)
                 {
                     skip = true;
-
-                    // Cancel any active LeanTween animations to stop them immediately.
                     LeanTween.cancel(speedRecordDifferenceText.gameObject);
-
                     break;
                 }
                 yield return null;
@@ -921,12 +926,17 @@ public class UIManager : MonoBehaviour
 
             // Set ending record values.
             speedRecordDifferenceText.gameObject.SetActive(false);
+
             TextMeshProUGUI newRecordText = Instantiate(recordSpeedText, recordSpeedText.transform.parent);
-            newRecordText.GetComponent<RectTransform>().anchoredPosition += new Vector2(300f, 0f);
+            RectTransform rect = newRecordText.GetComponent<RectTransform>();
+            rect.anchoredPosition += new Vector2(200f, 0f);
+            rect.localScale *= 0.75f; // 25% smaller
             newRecordText.text = "NEW RECORD!";
-            soundManager.newrecordsource.Play();
             newRecordText.gameObject.SetActive(true);
-            recordSpeedText.text = isImperial ? topSpeed.ToString() + " mph" : (topSpeed * metricMultiplier).ToString("F0") + " kph";
+
+            recordSpeedText.text = isImperial
+                ? topSpeed.ToString() + " mph"
+                : (topSpeed * metricMultiplier).ToString("F0") + " kph";
 
             // Wait for 0.5 seconds.
             yield return StartCoroutine(WaitOrSkip(0.5f));

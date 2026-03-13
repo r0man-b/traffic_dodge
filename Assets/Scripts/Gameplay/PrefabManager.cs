@@ -67,18 +67,18 @@ public class PrefabManager : MonoBehaviour
     readonly System.Tuple<float, float>[,] building_x_positions = new System.Tuple<float, float>[12, 4]
     {
         // Rotation 1                                      // Rotation 2                                    // Rotation 3                                    // Rotation 4
-        { new System.Tuple<float, float>(-124.5f, 139.3f), new System.Tuple<float, float>(-131.6f, 129.9f), new System.Tuple<float, float>(-139f, 98.5f),    new System.Tuple<float, float>(-97.5f, 115.6f)  }, // B001
-        { new System.Tuple<float, float>(-88.5f, 82.9f),   new System.Tuple<float, float>(-147.8f, 87f),    new System.Tuple<float, float>(-85.1f, 70.8f),   new System.Tuple<float, float>(-71.2f, 145f)    }, // B002
-        { new System.Tuple<float, float>(-114.5f, 97.5f),  new System.Tuple<float, float>(-114.4f, 109.7f), new System.Tuple<float, float>(-94.5f, 115.4f),  new System.Tuple<float, float>(-116.7f, 101.9f) }, // B003
-        { new System.Tuple<float, float>(-119.8f, 79.3f),  new System.Tuple<float, float>(-131.5f, 119.3f), new System.Tuple<float, float>(-75.5f, 86.8f),   new System.Tuple<float, float>(-93.2f, 131.4f)  }, // B004
-        { new System.Tuple<float, float>(-85.6f, 133.2f),  new System.Tuple<float, float>(-115.6f, 91.6f),  new System.Tuple<float, float>(-133.3f, 128.5f), new System.Tuple<float, float>(-130.5f, 112.1f) }, // B005
-        { new System.Tuple<float, float>(-152.8f, 207.8f), new System.Tuple<float, float>(-88.4f, 148.5f),  new System.Tuple<float, float>(-133.3f, 130.1f), new System.Tuple<float, float>(-131.8f, 93.4f)  }, // B006
-        { new System.Tuple<float, float>(-149.9f, 103.3f), new System.Tuple<float, float>(-140.5f, 124.6f), new System.Tuple<float, float>(-105.8f, 97.3f),  new System.Tuple<float, float>(-101f, 137.6f)   }, // B007
-        { new System.Tuple<float, float>(-124.4f, 131.3f), new System.Tuple<float, float>(-128.9f, 129.7f), new System.Tuple<float, float>(-130.4f, 110.5f), new System.Tuple<float, float>(-109.4f, 126f)   }, // B008
-        { new System.Tuple<float, float>(-120.8f, 122.6f), new System.Tuple<float, float>(-129.4f, 115.7f), new System.Tuple<float, float>(-124, 115.2f),    new System.Tuple<float, float>(-113.6f, 120.5f) }, // B009
-        { new System.Tuple<float, float>(-115.5f, 178.2f), new System.Tuple<float, float>(-101.4f, 108.3f), new System.Tuple<float, float>(-153.3f, 96.3f),  new System.Tuple<float, float>(-94.6f, 99.4f)   }, // B010
-        { new System.Tuple<float, float>(-133.9f, 135.5f), new System.Tuple<float, float>(-119.6f, 142.9f), new System.Tuple<float, float>(-137.1f, 103.3f), new System.Tuple<float, float>(-104.3f, 113.9f) }, // B011
-        { new System.Tuple<float, float>(-128.3f, 122.1f), new System.Tuple<float, float>(-196.8f, 122.8f), new System.Tuple<float, float>(-120.8f, 106.7f), new System.Tuple<float, float>(-108.3f, 195.5f) }  // B012
+        { new System.Tuple<float, float>(-117f, 134.4f),   new System.Tuple<float, float>(-110.5f, 115.2f), new System.Tuple<float, float>(-135.1f, 94.7f),  new System.Tuple<float, float>(-95.2f, 115.5f)  }, // B001
+        { new System.Tuple<float, float>(-83.9f, 83.7f),   new System.Tuple<float, float>(-145.5f, 84.3f),  new System.Tuple<float, float>(-82.5f, 66.3f),   new System.Tuple<float, float>(-62.6f, 145.4f)  }, // B002
+        { new System.Tuple<float, float>(-109.5f, 92f),    new System.Tuple<float, float>(-103.1f, 93.3f),  new System.Tuple<float, float>(-92.5f, 109.6f),  new System.Tuple<float, float>(-110.1f, 100.6f) }, // B003
+        { new System.Tuple<float, float>(-116.1f, 72.3f),  new System.Tuple<float, float>(-123f, 114.4f),   new System.Tuple<float, float>(-73.6f, 85.3f),   new System.Tuple<float, float>(-83.4f, 130.3f)  }, // B004
+        { new System.Tuple<float, float>(-85.2f, 125.3f),  new System.Tuple<float, float>(-108.1f, 83.5f),  new System.Tuple<float, float>(-125.9f, 142.1f), new System.Tuple<float, float>(-144.1f, 119.9f) }, // B005
+        { new System.Tuple<float, float>(-148.5f, 208f),   new System.Tuple<float, float>(-82.4f, 146.5f),  new System.Tuple<float, float>(-133.3f, 130.4f), new System.Tuple<float, float>(-132.6f, 80.5f)  }, // B006
+        { new System.Tuple<float, float>(-119.8f, 98.9f),  new System.Tuple<float, float>(-137.1f, 122.9f), new System.Tuple<float, float>(-92.3f, 95.5f),   new System.Tuple<float, float>(-98.7f, 136.1f)  }, // B007
+        { new System.Tuple<float, float>(-121f, 125.2f),   new System.Tuple<float, float>(-120.7f, 120.1f), new System.Tuple<float, float>(-129.3f, 107.5f), new System.Tuple<float, float>(-107.7f, 119.7f) }, // B008
+        { new System.Tuple<float, float>(-114.6f, 120.1f), new System.Tuple<float, float>(-119.8f, 109f),   new System.Tuple<float, float>(-120f, 109.3f),   new System.Tuple<float, float>(-111.7f, 119.8f) }, // B009
+        { new System.Tuple<float, float>(-108.5f, 153.9f), new System.Tuple<float, float>(-93.9f, 100f),    new System.Tuple<float, float>(-156.6f, 93f),    new System.Tuple<float, float>(-92.3f, 88.6f)   }, // B010
+        { new System.Tuple<float, float>(-127.4f, 134.2f), new System.Tuple<float, float>(-104.9f, 152.9f), new System.Tuple<float, float>(-136.7f, 95.7f),  new System.Tuple<float, float>(-97.3f, 148.4f)  }, // B011
+        { new System.Tuple<float, float>(-122f, 114.9f),   new System.Tuple<float, float>(-162f, 121f),     new System.Tuple<float, float>(-119.8f, 105.8f), new System.Tuple<float, float>(-125.6f, 179.6f) }  // B012
     };
 
     // Array and vars to manage traffic explosions.
