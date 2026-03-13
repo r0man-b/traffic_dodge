@@ -46,6 +46,8 @@ namespace Settings
 		public Button noButton;
 		private bool hasChanged = false;
 
+		public ToggleGraphicsOptions toggleGraphicsOptions;
+
 		private Dictionary<GraphicsPreset, GraphicsPresetSettings> presets = new()
 		{
 			[GraphicsPreset.Trash] = new GraphicsPresetSettings { renderScale = 0.5f, antiAliasing = 0, useLowPolyTraffic = true, shadowsEnabled = false },
@@ -137,6 +139,8 @@ namespace Settings
 			revertChangesButton.gameObject.SetActive(false);
 			acceptChangesButton.gameObject.SetActive(false);
 			hasChanged = false;
+
+			toggleGraphicsOptions?.RefreshPresetDisplay();
 		}
 
 
@@ -192,6 +196,8 @@ namespace Settings
 			revertChangesButton.gameObject.SetActive(false);
 			acceptChangesButton.gameObject.SetActive(false);
 			hasChanged = false;
+
+			toggleGraphicsOptions?.RefreshPresetDisplay();
 		}
 
 		public void DisplayPopup(System.Action<bool> onChoiceMade)

@@ -8,7 +8,7 @@ public class ToggleGraphicsOptions : MonoBehaviour
     public GameObject rightButton; // Button to go to Advanced
     public TMP_Text optionsText;   // TMP Text to show current mode
     public TMP_Text presetNameText; // Displays current basic graphics preset
-    public GameObject basicOptions;  // Panel for Basic options
+    public GameObject basicOptions; // Panel for Basic options
     public GameObject advancedOptions; // Panel for Advanced options
 
     public Settings.GraphicsSettingsMenu graphicsMenu;
@@ -26,28 +26,12 @@ public class ToggleGraphicsOptions : MonoBehaviour
 
     void Start()
     {
-        // Always verify preset match instead of trusting saved isCustomGraphics blindly
-        bool matched = false;
-        for (int i = 0; i <= maxPresetIndex; i++)
-        {
-            if (graphicsMenu.MatchesPreset((Settings.GraphicsPreset)i))
-            {
-                currentPresetIndex = i;
-                SetBasicOptions(currentPresetIndex);
-                matched = true;
-                break;
-            }
-        }
-
-        if (!matched)
-        {
-            currentPresetIndex = -1;
-            SetCustomOptions();
-        }
-
         // Hook button click events
         BasicGraphicsOptionsModeButtonLeft.onClick.AddListener(OnLeftButtonClicked);
         BasicGraphicsOptionsModeButtonRight.onClick.AddListener(OnRightButtonClicked);
+
+        // Ensure correct initial state and preset label
+        ToggleToBasic();
     }
 
     private void OnEnable()
@@ -79,81 +63,48 @@ public class ToggleGraphicsOptions : MonoBehaviour
 
     public void ToggleToBasic()
     {
-        if (isAdvanced)
+        // Always force the visual state to basic
+        basicOptions.SetActive(true);
+        advancedOptions.SetActive(false);
+
+        leftButton.SetActive(false);
+        rightButton.SetActive(true);
+
+        optionsText.text = "Basic Options";
+        optionsText.fontSize = 60;
+
+        isAdvanced = false;
+
+        revertChangesButtonTransform.anchorMin = new Vector2(0.095f, 0.22f);
+        revertChangesButtonTransform.anchorMax = new Vector2(0.335f, 0.38f);
+        acceptChangesButtonTransform.anchorMin = new Vector2(0.67f, 0.22f);
+        acceptChangesButtonTransform.anchorMax = new Vector2(0.91f, 0.38f);
+
+        // Always refresh preset label, even if already in basic mode
+        RefreshPresetDisplay();
+    }
+
+    public void RefreshPresetDisplay()
+    {
+        bool matched = false;
+
+        foreach (Settings.GraphicsPreset preset in System.Enum.GetValues(typeof(Settings.GraphicsPreset)))
         {
-            basicOptions.SetActive(true);
-            advancedOptions.SetActive(false);
-
-            leftButton.SetActive(false);
-            rightButton.SetActive(true);
-
-            optionsText.text = "Basic Options";
-            optionsText.fontSize = 60;
-
-            isAdvanced = false;
-
-            revertChangesButtonTransform.anchorMin = new Vector2(0.095f, 0.22f);
-            revertChangesButtonTransform.anchorMax = new Vector2(0.335f, 0.38f);
-            acceptChangesButtonTransform.anchorMin = new Vector2(0.67f, 0.22f);
-            acceptChangesButtonTransform.anchorMax = new Vector2(0.91f, 0.38f);
-
-            // Check if current settings match any preset
-            bool matched = false;
-            foreach (Settings.GraphicsPreset preset in System.Enum.GetValues(typeof(Settings.GraphicsPreset)))
+            if (graphicsMenu.MatchesPreset(preset))
             {
-                if (graphicsMenu.MatchesPreset(preset))
-                {
-                    currentPresetIndex = (int)preset;
-                    presetNameText.text = preset.ToString();
-                    matched = true;
-                    break;
-                }
+                currentPresetIndex = (int)preset;
+                presetNameText.text = preset.ToString();
+                matched = true;
+                break;
             }
-
-            if (!matched)
-            {
-                currentPresetIndex = -1;
-                presetNameText.text = "Custom";
-            }
-
-            UpdatePresetNavigationButtons();
         }
-    }
 
+        if (!matched)
+        {
+            currentPresetIndex = -1;
+            presetNameText.text = "Custom";
+        }
 
-    private void SetBasicOptions(int presetIndex)
-    {
-        basicOptions.SetActive(true);
-        advancedOptions.SetActive(false);
-
-        leftButton.SetActive(false);
-        rightButton.SetActive(true);
-
-        optionsText.text = "Basic Options";
-        optionsText.fontSize = 60;
-
-        presetNameText.text = ((Settings.GraphicsPreset)presetIndex).ToString();
-
-        isAdvanced = false;
-        currentPresetIndex = presetIndex;
-        UpdatePresetNavigationButtons();
-    }
-
-    private void SetCustomOptions()
-    {
-        basicOptions.SetActive(true);
-        advancedOptions.SetActive(false);
-
-        leftButton.SetActive(false);
-        rightButton.SetActive(true);
-
-        optionsText.text = "Basic Options";
-        optionsText.fontSize = 60;
-
-        presetNameText.text = "Custom";
-
-        isAdvanced = false;
-        currentPresetIndex = -1;
         UpdatePresetNavigationButtons();
     }
 
@@ -175,7 +126,6 @@ public class ToggleGraphicsOptions : MonoBehaviour
         ApplyCurrentPreset();
     }
 
-
     private void OnRightButtonClicked()
     {
         if (currentPresetIndex == -1)
@@ -194,7 +144,6 @@ public class ToggleGraphicsOptions : MonoBehaviour
         ApplyCurrentPreset();
     }
 
-
     private void ApplyCurrentPreset()
     {
         presetNameText.text = ((Settings.GraphicsPreset)currentPresetIndex).ToString();
@@ -205,7 +154,6 @@ public class ToggleGraphicsOptions : MonoBehaviour
             UpdatePresetNavigationButtons();
         });
     }
-
 
     private void UpdatePresetNavigationButtons()
     {
