@@ -324,15 +324,17 @@ public class PrefabManager : MonoBehaviour
         originalTrafficDensity = trafficDensity;
     }
 
-    void Update()
+    void FixedUpdate()
     {
+        Time.fixedDeltaTime = 1f / 120f;
+
         if (trafficDensity > 1 && !playerController.gameEnd)
         {
-            trafficDensity -= (Time.deltaTime * originalTrafficDensity) / 1000;
+            trafficDensity -= (Time.fixedDeltaTime * originalTrafficDensity) / 1000;
         }
         
         // Update vars for traffic car movement, current player position, and tornado force.
-        float adjustedSpeed = 25f * Time.deltaTime;
+        float adjustedSpeed = 25f * Time.fixedDeltaTime;
         playerPosZ = playerController.carObject.transform.position.z;
         attractionSpeed = 25 * playerController.accel;
         startSwirlSpeed = 50f * playerController.accel;
@@ -417,7 +419,7 @@ public class PrefabManager : MonoBehaviour
                             {
                                 // Lerp the car towards the target position.
                                 Vector3 directionToTarget = (targetPosition - car.transform.localPosition).normalized;
-                                car.transform.localPosition += attractionSpeed * Time.deltaTime * directionToTarget;
+                                car.transform.localPosition += attractionSpeed * Time.fixedDeltaTime * directionToTarget;
 
                                 // Orient the car to face the tornado's center.
                                 Vector3 directionToTornado = (playerController.tornadoObject.transform.position - car.transform.position).normalized;
@@ -425,25 +427,25 @@ public class PrefabManager : MonoBehaviour
                                 Quaternion targetRotation = lookAtTornado * Quaternion.Euler(0, 90, 0);  // Look at tornado and then add 90-degree offset
 
                                 // Lerp rotation based on carSpeed and the inverse of the distance.
-                                float rotationLerpFactor = attractionSpeed * Time.deltaTime;
+                                float rotationLerpFactor = attractionSpeed * Time.fixedDeltaTime;
                                 car.transform.rotation = Quaternion.Lerp(car.transform.rotation, targetRotation, rotationLerpFactor);
                             }
 
                             // If car is within swirl radius, begin swirling it.
                             else
                             {
-                                elapsedSwirlTime += Time.deltaTime;
+                                elapsedSwirlTime += Time.fixedDeltaTime;
 
                                 float t = elapsedSwirlTime / maxSwirlTime;  // Normalize the time.
                                 float currentSwirlSpeed = Mathf.Lerp(startSwirlSpeed, endSwirlSpeed, EaseInCubic(t));
 
                                 // Move in a circular path around the tornado's center.
-                                car.transform.RotateAround(playerController.tornadoObject.transform.position, Vector3.up, currentSwirlSpeed * Time.deltaTime);
+                                car.transform.RotateAround(playerController.tornadoObject.transform.position, Vector3.up, currentSwirlSpeed * Time.fixedDeltaTime);
 
                                 // Move the car upwards until it reaches a Y height of 21.
                                 if (car.transform.localPosition.y < 21)
                                 {
-                                    float upwardMovement = attractionSpeed * Time.deltaTime * 0.25f;
+                                    float upwardMovement = attractionSpeed * Time.fixedDeltaTime * 0.25f;
                                     car.transform.localPosition += new Vector3(0, upwardMovement, 0);
                                 }
                                 // Once the car is higher than 21 units, disable and despawn it.
@@ -497,10 +499,7 @@ public class PrefabManager : MonoBehaviour
                 rightCar = allLaneTraffic[playerController.currentLane + 1][0];
             }
         }
-    }
 
-    void FixedUpdate()
-    {
         // If the game has ended, set variables to their respective end-game values.
         if (!gameEndSet)
         {
@@ -525,12 +524,12 @@ public class PrefabManager : MonoBehaviour
             case 0: // Spawn & return sci fi buildings (City 77)
                 if (activeLeftBuildings.Count < maxBuildingPairs) SpawnSciFiBuilding(0);
                 if (activeRightBuildings.Count < maxBuildingPairs) SpawnSciFiBuilding(1);
-                
+
                 // If any building is behind the player, move it to the object pool.
                 if (activeLeftBuildings[0].transform.position.z < playerPosZ - 150) ReturnSciFiBuilding(0);
                 if (activeRightBuildings[0].transform.position.z < playerPosZ - 150) ReturnSciFiBuilding(1);
                 break;
-            
+
             case 1: // Spawn & return wasteland buildings (Nuclear Wasteland)
                 if (activeLeftWastelandBuildings.Count < maxBuildingPairs) SpawnWastelandBuilding(0);
                 if (activeRightWastelandBuildings.Count < maxBuildingPairs) SpawnWastelandBuilding(1);
@@ -1322,7 +1321,7 @@ public class PrefabManager : MonoBehaviour
         Vector3 horizontalEndPosition = startPosition + distance * transform.forward + direction;
         float endYPosition = startPosition.y + upwardSpeed;
 
-        for (float t = 0; t < duration; t += Time.deltaTime)
+        for (float t = 0; t < duration; t += Time.fixedDeltaTime)
         {
             // Calculate the Lerp factor.
             float factor = t / duration;
@@ -1337,7 +1336,7 @@ public class PrefabManager : MonoBehaviour
             trafficTransform.position = new Vector3(horizontalPosition.x, verticalPosition, horizontalPosition.z);
 
             // Rotate the object around its local X axis.
-            trafficTransform.localRotation *= Quaternion.Euler(rotationSpeed * Time.deltaTime * Vector3.left);
+            trafficTransform.localRotation *= Quaternion.Euler(rotationSpeed * Time.fixedDeltaTime * Vector3.left);
 
             yield return null;
         }

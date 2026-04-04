@@ -678,7 +678,7 @@ public class PlayerController : MonoBehaviour
 
                 if (accel < 2.38f && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f)
                 {
-                    cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
+                    cam.fieldOfView = 60f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
                 }
             }
 
@@ -765,7 +765,7 @@ public class PlayerController : MonoBehaviour
                     isTouchUp = false;
                 }
 
-                transform.Translate(20f * movementVal, 0f, 0f, Space.World);
+                transform.Translate(15f * movementVal, 0f, 0f, Space.World);
                 transform.rotation = DampRotation(transform.rotation, rotRight, steeringSharpness, dt);
 
                 carObject.transform.SetLocalPositionAndRotation(
@@ -799,7 +799,7 @@ public class PlayerController : MonoBehaviour
                     isTouchUp = false;
                 }
 
-                transform.Translate(-20f * movementVal, 0f, 0f, Space.World);
+                transform.Translate(-15f * movementVal, 0f, 0f, Space.World);
                 transform.rotation = DampRotation(transform.rotation, rotLeft, steeringSharpness, dt);
 
                 carObject.transform.SetLocalPositionAndRotation(
