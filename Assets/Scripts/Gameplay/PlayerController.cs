@@ -44,7 +44,7 @@ public class PlayerController : MonoBehaviour
     private Quaternion defaultRot;
     private Quaternion rotLeft;
     private Quaternion rotRight;
-    [SerializeField] private float laneSnapSharpness = 1.15f;
+    [SerializeField] private float laneSnapSharpness = 1000f;
     [SerializeField] private float steeringSharpness = 6f;
     [SerializeField] private float carLeanSharpness = 1f;
     [SerializeField] private float cameraFollowSharpness = 1f;
@@ -144,57 +144,6 @@ public class PlayerController : MonoBehaviour
     // Car collection.
     [SerializeField] private CarCollection carCollection;
 
-
-
-    private Vector3 GetCameraShakeOffset()
-    {
-        if (!raceStarted)
-            return Vector3.zero;
-
-        float t = Time.time * shakeFrequency;
-
-        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity;
-        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity;
-
-        float clampedX = Mathf.Clamp(defaultCamPosition.x + x, minXPosition, maxXPosition) - defaultCamPosition.x;
-        float clampedY = Mathf.Clamp(defaultCamPosition.y + y, minYPosition, maxYPosition) - defaultCamPosition.y;
-
-        return new Vector3(clampedX, clampedY, 0f);
-    }
-
-    private float GetLaneX(int lane)
-    {
-        return lane switch
-        {
-            0 => -11.5f,
-            1 => -8.5f,
-            2 => -5.5f,
-            3 => -2.5f,
-            4 => 1f,
-            5 => 4f,
-            6 => 7f,
-            7 => 10f,
-            _ => transform.position.x
-        };
-    }
-
-    private Vector3 GetShakeOffset()
-    {
-        if (!raceStarted)
-            return Vector3.zero;
-
-        float t = Time.time * shakeFrequency;
-
-        // Time-based noise instead of new random values every frame
-        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity;
-        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity;
-
-        float clampedX = Mathf.Clamp(cameraBasePosition.x + x, minXPosition, maxXPosition) - cameraBasePosition.x;
-        float clampedY = Mathf.Clamp(cameraBasePosition.y + y, minYPosition, maxYPosition) - cameraBasePosition.y;
-
-        return new Vector3(clampedX, clampedY, 0f);
-    }
-
     // Macros.
     private const float TORNADO_CAMERA_SHAKE = 0.5f;
     private const float BULLET_CAMERA_SHAKE = 10000f;
@@ -203,13 +152,6 @@ public class PlayerController : MonoBehaviour
 
     // Map car type name -> index in CarCollection.carTypes
     private Dictionary<string, int> carTypeIndexByName = new();
-
-    private int GetCarTypeIndex(string typeName)
-    {
-        if (!carTypeIndexByName.TryGetValue(typeName, out var idx))
-            throw new KeyNotFoundException($"Car type '{typeName}' not found in CarCollection.");
-        return idx;
-    }
 
     private void SetUpCar()
     {
@@ -485,6 +427,7 @@ public class PlayerController : MonoBehaviour
         transform.position += forwardDistance * transform.forward;
         cameraObject.transform.position += forwardDistance * transform.forward;
 
+        // Move tornado forward
         tornadoPosZ = transform.position.z + (-0.2028745f * cam.fieldOfView + 40.61494f);
         tornadoObject.transform.position = new Vector3(
             tornadoObject.transform.position.x,
@@ -607,6 +550,7 @@ public class PlayerController : MonoBehaviour
                 StartCoroutine(LerpCameraFOV(cam.fieldOfView, 35, 0.1f));
             }
 
+            // Increase shake intensity
             if (gameEnd && explosionShakeIntensity > 1)
             {
                 if (shakeIntensity > 0.3f)
@@ -967,10 +911,28 @@ public class PlayerController : MonoBehaviour
         currentLane = lane;
 
         float targetX = GetLaneX(lane);
-        float snapT = ExpFactor(laneSnapSharpness, Time.deltaTime);
+
+        // Use both the configured sharpness and the caller-provided speed.
+        float snapT = ExpFactor(laneSnapSharpness * speed, Time.deltaTime);
 
         float newX = Mathf.Lerp(transform.position.x, targetX, snapT);
         transform.position = new Vector3(newX, transform.position.y, transform.position.z);
+    }
+
+    private float GetLaneX(int lane)
+    {
+        return lane switch
+        {
+            0 => -11.5f,
+            1 => -8.5f,
+            2 => -5.5f,
+            3 => -2.5f,
+            4 => 1f,
+            5 => 4f,
+            6 => 7f,
+            7 => 10f,
+            _ => transform.position.x
+        };
     }
 
     // Return the lanesplit X positions of the camera & player transforms based on which lane we are in and which direction we are lane splitting.
@@ -1290,6 +1252,22 @@ public class PlayerController : MonoBehaviour
 
 
     /*--------------------------------- CAMERA MANIPULATION FUNCTIONS ---------------------------------*/
+    private Vector3 GetCameraShakeOffset()
+    {
+        if (!raceStarted)
+            return Vector3.zero;
+
+        float t = Time.time * shakeFrequency;
+
+        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity;
+        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity;
+
+        float clampedX = Mathf.Clamp(defaultCamPosition.x + x, minXPosition, maxXPosition) - defaultCamPosition.x;
+        float clampedY = Mathf.Clamp(defaultCamPosition.y + y, minYPosition, maxYPosition) - defaultCamPosition.y;
+
+        return new Vector3(clampedX, clampedY, 0f);
+    }
+
     private IEnumerator CameraJolt()
     {
         Vector3 originalLocalPosition = cam.transform.localPosition;
@@ -1603,6 +1581,102 @@ public class PlayerController : MonoBehaviour
         exhaustFlamePulseCoroutine = null;
     }
 
+    /*------------------------------------- CAR RECOVERY FUNCTIONS ------------------------------------*/
+    public void RecoverAndRestart()
+    {
+        // Reset explosion/collision state
+        inTrafficExplosion = false;
+        inTornadoExplosion = false;
+        inBulletExplosion = false;
+        gameEnd = false;
+
+        // Reset camera & motion/shake state
+        cameraFovLerped = false;
+        explosionShakeIntensity = 1f;
+        shakeIntensity = 0.05f;
+        inSidewaysJolt = false;
+        whichWay = 0;
+
+        // Reset powerups
+        aggro = false;
+        tornado = false;
+        bullet = false;
+        tornadoExplodeCars = false;
+        tornadoObject.SetActive(false);
+
+        // Reset audio side-effects (aggro, bullet, wind, engine flags)
+        soundManager.ResetAudioOnRecovery();
+
+        // Reset car & lives
+        accel = 0.5f;
+        accelTimeOffset = 0f;
+        transform.rotation = defaultRot;
+        carObject.transform.rotation = Quaternion.identity;
+        carObject.SetActive(true);
+        soundManager.PlayEngineSound();   // engine persists through flashing, destroy, respawn
+        if (!invincible) numlives = currentCar.numlives;
+
+        // UI
+        pauseButton.SetActive(true);
+
+        // Restore rain orientation
+        rain.transform.SetPositionAndRotation(rainDefaultPosition, rainDefaultRotation);
+
+        // Reset countdown/race timing
+        startTime = Time.time - 3;
+        lastLaneSplitTime = 1; // Set to 1 for lane splitting to be enabled upon exit of recovery animation
+        timeSinceLastPowerup = 0;
+
+        // Reset gear shift tracking
+        ResetGearShiftTracking();
+
+        // Start car flashing animation
+        StartCoroutine(RecoverFlashAndGhost(recoverDuration, startFlashInterval, endFlashInterval));
+    }
+
+    private IEnumerator RecoverFlashAndGhost(float totalDuration, float intervalStart, float intervalEnd)
+    {
+        isRecovering = true;
+
+        // Ensure the visual starts visible
+        if (!carObject.activeSelf) carObject.SetActive(true);
+
+        float elapsed = 0f;
+        bool visible = true;
+
+        // Flip repeatedly; the wait interval decreases linearly from start -> end
+        while (elapsed < totalDuration)
+        {
+            // Compute current interval based on progress (higher frequency as time passes)
+            float t = Mathf.Clamp01(elapsed / totalDuration);
+            float currentInterval = Mathf.Lerp(intervalStart, intervalEnd, t);
+
+            // Toggle visibility of the rendered car only (not the controller/root)
+            visible = !visible;
+            if (visible) soundManager.PlayBoop();
+            carObject.SetActive(visible);
+
+            // Wait, advance time
+            yield return new WaitForSeconds(currentInterval);
+            elapsed += currentInterval;
+        }
+
+        // Guarantee we end visible and exit recovering state
+        if (!carObject.activeSelf) carObject.SetActive(true);
+
+        Destroy(carObject);
+        SetUpCar();
+        isRecovering = false;
+
+        // Rebind and re-register lane split sounds as a new car object has been spawned
+        soundManager.SetUpLaneSplitSounds(true);
+
+        // Restore boop bitch and play beep to indicate car is ready
+        soundManager.RestoreBoopPitch();
+        soundManager.PlayBeep();
+    }
+
+
     /*----------------------------------------- OTHER FUNCTIONS ---------------------------------------*/
     // Handle collisions with traffic cars & powerups.
     private void OnTriggerEnter(Collider other)
@@ -1737,101 +1811,13 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    public void RecoverAndRestart()
+    private int GetCarTypeIndex(string typeName)
     {
-        // Reset explosion/collision state
-        inTrafficExplosion = false;
-        inTornadoExplosion = false;
-        inBulletExplosion = false;
-        gameEnd = false;
-
-        // Reset camera & motion/shake state
-        cameraFovLerped = false;
-        explosionShakeIntensity = 1f;
-        shakeIntensity = 0.05f;
-        inSidewaysJolt = false;
-        whichWay = 0;
-
-        // Reset powerups
-        aggro = false;
-        tornado = false;
-        bullet = false;
-        tornadoExplodeCars = false;
-        tornadoObject.SetActive(false);
-
-        // Reset audio side-effects (aggro, bullet, wind, engine flags)
-        soundManager.ResetAudioOnRecovery();
-
-        // Reset car & lives
-        accel = 0.5f;
-        accelTimeOffset = 0f;
-        transform.rotation = defaultRot;
-        carObject.transform.rotation = Quaternion.identity;
-        carObject.SetActive(true);
-        soundManager.PlayEngineSound();   // engine persists through flashing, destroy, respawn
-        if (!invincible) numlives = currentCar.numlives;
-
-        // UI
-        pauseButton.SetActive(true);
-
-        // Restore rain orientation
-        rain.transform.SetPositionAndRotation(rainDefaultPosition, rainDefaultRotation);
-
-        // Reset countdown/race timing
-        startTime = Time.time - 3;
-        lastLaneSplitTime = 1; // Set to 1 for lane splitting to be enabled upon exit of recovery animation
-        timeSinceLastPowerup = 0;
-
-        // Reset gear shift tracking
-        ResetGearShiftTracking();
-
-        // Start car flashing animation
-        StartCoroutine(RecoverFlashAndGhost(recoverDuration, startFlashInterval, endFlashInterval));
+        if (!carTypeIndexByName.TryGetValue(typeName, out var idx))
+            throw new KeyNotFoundException($"Car type '{typeName}' not found in CarCollection.");
+        return idx;
     }
 
-    private IEnumerator RecoverFlashAndGhost(float totalDuration, float intervalStart, float intervalEnd)
-    {
-        isRecovering = true;
-
-        // Ensure the visual starts visible
-        if (!carObject.activeSelf) carObject.SetActive(true);
-
-        float elapsed = 0f;
-        bool visible = true;
-
-        // Flip repeatedly; the wait interval decreases linearly from start -> end
-        while (elapsed < totalDuration)
-        {
-            // Compute current interval based on progress (higher frequency as time passes)
-            float t = Mathf.Clamp01(elapsed / totalDuration);
-            float currentInterval = Mathf.Lerp(intervalStart, intervalEnd, t);
-
-            // Toggle visibility of the rendered car only (not the controller/root)
-            visible = !visible;
-            if (visible) soundManager.PlayBoop();
-            carObject.SetActive(visible);
-
-            // Wait, advance time
-            yield return new WaitForSeconds(currentInterval);
-            elapsed += currentInterval;
-        }
-
-        // Guarantee we end visible and exit recovering state
-        if (!carObject.activeSelf) carObject.SetActive(true);
-
-        Destroy(carObject);
-        SetUpCar();
-        isRecovering = false;
-
-        // Rebind and re-register lane split sounds as a new car object has been spawned
-        soundManager.SetUpLaneSplitSounds(true);
-
-        // Restore boop bitch and play beep to indicate car is ready
-        soundManager.RestoreBoopPitch();
-        soundManager.PlayBeep();
-    }
-
-    // --- add inside PlayerController (e.g., under fields or at the end of the class) ---
     static bool IsMetallic(Material m)
     {
         if (!m) return false;
