@@ -46,8 +46,8 @@ public class PlayerController : MonoBehaviour
     private Quaternion rotRight;
     [SerializeField] private float laneSnapSharpness = 1.15f;
     [SerializeField] private float steeringSharpness = 6f;
-    [SerializeField] private float carLeanSharpness = 18f;
-    [SerializeField] private float cameraFollowSharpness = 10f;
+    [SerializeField] private float carLeanSharpness = 1f;
+    [SerializeField] private float cameraFollowSharpness = 1f;
     [SerializeField] private float shakeFrequency = 22f;
     // Recovery flash configuration.
     private readonly float recoverDuration = 3f;       // Total flashing time
