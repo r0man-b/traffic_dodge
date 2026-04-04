@@ -140,6 +140,70 @@ public class PlayerController : MonoBehaviour
     // Car collection.
     [SerializeField] private CarCollection carCollection;
 
+    // Add near your other fields
+    [SerializeField] private float laneSnapSharpness = 1.5f;
+    [SerializeField] private float steeringSharpness = 14f;
+    [SerializeField] private float carLeanSharpness = 18f;
+    [SerializeField] private float cameraFollowSharpness = 10f;
+    [SerializeField] private float shakeFrequency = 22f;
+
+    private Vector3 cameraBasePosition;
+    private float shakeSeedX;
+    private float shakeSeedY;
+
+    private static float ExpFactor(float sharpness, float dt)
+    {
+        return 1f - Mathf.Exp(-sharpness * dt);
+    }
+
+    private float Damp(float current, float target, float sharpness, float dt)
+    {
+        return Mathf.Lerp(current, target, ExpFactor(sharpness, dt));
+    }
+
+    private Vector3 Damp(Vector3 current, Vector3 target, float sharpness, float dt)
+    {
+        return Vector3.Lerp(current, target, ExpFactor(sharpness, dt));
+    }
+
+    private Quaternion Damp(Quaternion current, Quaternion target, float sharpness, float dt)
+    {
+        return Quaternion.Slerp(current, target, ExpFactor(sharpness, dt));
+    }
+
+    private float GetLaneX(int lane)
+    {
+        return lane switch
+        {
+            0 => -11.5f,
+            1 => -8.5f,
+            2 => -5.5f,
+            3 => -2.5f,
+            4 => 1.0f,
+            5 => 4.0f,
+            6 => 7.0f,
+            7 => 10.0f,
+            _ => transform.position.x
+        };
+    }
+
+    private Vector3 GetShakeOffset()
+    {
+        if (!raceStarted)
+            return Vector3.zero;
+
+        float t = Time.time * shakeFrequency;
+
+        // Time-based noise instead of new random values every frame
+        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity;
+        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity;
+
+        float clampedX = Mathf.Clamp(cameraBasePosition.x + x, minXPosition, maxXPosition) - cameraBasePosition.x;
+        float clampedY = Mathf.Clamp(cameraBasePosition.y + y, minYPosition, maxYPosition) - cameraBasePosition.y;
+
+        return new Vector3(clampedX, clampedY, 0f);
+    }
+
     // Macros.
     private const float TORNADO_CAMERA_SHAKE = 0.5f;
     private const float BULLET_CAMERA_SHAKE = 10000f;
@@ -361,6 +425,9 @@ public class PlayerController : MonoBehaviour
             rain.gameObject.SetActive(false);
         }
 
+        shakeSeedX = Random.value * 1000f;
+        shakeSeedY = Random.value * 1000f;
+
         // Set up FPS modifier
         fpsModifier = 120.0f / saveData.frameRate;
 
@@ -431,11 +498,6 @@ public class PlayerController : MonoBehaviour
         {
             Cursor.visible = !Cursor.visible;
         }
-
-
-        Vector3 camPos = cameraObject.transform.position;
-        camPos.x = transform.position.x;
-        cameraObject.transform.position = camPos;
 
         // Move the player, camera, and tornadoObject forward.
         if (raceStarted)
@@ -559,7 +621,6 @@ public class PlayerController : MonoBehaviour
                 if (gameEnd) newPosition.y = Mathf.Clamp(newPosition.y, 0.006f * cam.fieldOfView + 1.72f, 4.2f);
                 else if (!bullet) newPosition.y = Mathf.Clamp(newPosition.y, 0.006f * cam.fieldOfView + 1.72f, 3f * cameraType);
                 else newPosition.y = Mathf.Max(newPosition.y, 0.01946308724f * cam.fieldOfView);
-                cameraObject.transform.localPosition = Vector3.Lerp(cameraObject.transform.localPosition, new Vector3(newPosition.x, newPosition.y, cameraObject.transform.localPosition.z), 8f * Time.deltaTime * explosionShakeIntensity);
             }
             else if (!cameraFovLerped)
             {
@@ -660,25 +721,11 @@ public class PlayerController : MonoBehaviour
                     maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 20;
                 }
             }
-            cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(cameraObject.transform.position.x, defaultCamPosition.y, camPosZ), Time.deltaTime);
-            defaultCamPosition = cameraObject.transform.position;
 
             // Create a new random offset to simulate camera shake.
+            if (Time.time - (startTime + accelTimeOffset) < 180f && !aggro && !bullet && shakeIntensity < 0.4f)
             {
-                float shakeOffsetX = Random.Range(-shakeIntensity, shakeIntensity);
-                float shakeOffsetY = Random.Range(-shakeIntensity, shakeIntensity);
-                Vector3 shakeOffset = new(shakeOffsetX, shakeOffsetY, 0f);
-
-                // Apply the offset to the camera & clamp y position to make sure it doesn't stray away.
-                newPosition = defaultCamPosition + shakeOffset;
-                newPosition.y = Mathf.Clamp(newPosition.y, minYPosition, maxYPosition);
-                newPosition.x = Mathf.Clamp(newPosition.x, minXPosition, maxXPosition);
-
-                // Continue increasing the shake intensity until time has reached 180 seconds.
-                if (Time.time - (startTime + accelTimeOffset) < 180 && !aggro && !bullet && shakeIntensity < 0.4f)
-                {
-                    shakeIntensity += 2 * shakeIncreaseRate * senseOfSpeedModifier * Time.deltaTime;
-                }
+                shakeIntensity += 2f * shakeIncreaseRate * senseOfSpeedModifier * Time.deltaTime;
             }
 
 
@@ -707,7 +754,6 @@ public class PlayerController : MonoBehaviour
                 // TODO: The two below lines of code may not be doing anything
                 // Increase camera FOV with acceleration.
                 if (accel < 2.38f /*215 mph is the hard cap on FOV*/ && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f) cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
-                cameraObject.transform.position = new Vector3(cameraObject.transform.position.x, cameraObject.transform.position.y, camPosZ);
             }
 
             // If the game has ended or player is in an explosion, apply explosion shake to the camera.
@@ -751,9 +797,9 @@ public class PlayerController : MonoBehaviour
         if ((bullet) && (raceStarted))
         {
             int desiredDirection = prefabManager.LaneChangeForBullet(currentLane, transform.position.z, false);
-            if (desiredDirection < 0 && currentLane > 0) transform.rotation = Quaternion.Lerp(transform.rotation, rotLeft, 0.01f);
-            else if (desiredDirection > 0 && currentLane < 7) transform.rotation = Quaternion.Lerp(transform.rotation, rotRight, 0.01f);
-            else transform.rotation = Quaternion.Lerp(transform.rotation, defaultRot, 1f);
+            if (desiredDirection < 0 && currentLane > 0) transform.rotation = Damp(transform.rotation, rotLeft, steeringSharpness, Time.deltaTime);
+            else if (desiredDirection > 0 && currentLane < 7) transform.rotation = Damp(transform.rotation, rotRight, steeringSharpness, Time.deltaTime);
+            else transform.rotation = transform.rotation = Damp(transform.rotation, defaultRot, steeringSharpness, Time.deltaTime);
             SetCurrentLane(currentLane + desiredDirection, movement_val);
         }
 
@@ -804,10 +850,9 @@ public class PlayerController : MonoBehaviour
                 transform.Translate(25 * movement_val, 0, 0, Space.World);
                 cameraObject.transform.Translate(25 * movement_val, 0, 0, Space.World);
                 transform.rotation = Quaternion.Lerp(transform.rotation, rotRight, 9 * movement_val);
-                carObject.transform.SetLocalPositionAndRotation
-                (
-                    Vector3.Lerp(carObject.transform.localPosition, carObject.transform.localPosition, 10 * movement_val),
-                    Quaternion.Lerp(carObject.transform.localRotation, defaultRot, 18 * movement_val)
+                carObject.transform.SetLocalPositionAndRotation(
+                    Damp(carObject.transform.localPosition, carObject.transform.localPosition, carLeanSharpness, Time.deltaTime),
+                    Damp(carObject.transform.localRotation, defaultRot, carLeanSharpness, Time.deltaTime)
                 );
                 whichWay = 1;
             }
@@ -837,10 +882,9 @@ public class PlayerController : MonoBehaviour
                 transform.Translate(-25 * movement_val, 0, 0, Space.World);
                 cameraObject.transform.Translate(-25 * movement_val, 0, 0, Space.World);
                 transform.rotation = Quaternion.Lerp(transform.rotation, rotLeft, 9 * movement_val);
-                carObject.transform.SetLocalPositionAndRotation
-                (
-                    Vector3.Lerp(carObject.transform.localPosition, carObject.transform.localPosition, 10 * movement_val),
-                    Quaternion.Lerp(carObject.transform.localRotation, defaultRot, 18 * movement_val)
+                carObject.transform.SetLocalPositionAndRotation(
+                    Damp(carObject.transform.localPosition, carObject.transform.localPosition, carLeanSharpness, Time.deltaTime),
+                    Damp(carObject.transform.localRotation, defaultRot, carLeanSharpness, Time.deltaTime)
                 );
                 whichWay = -1;
             }
@@ -852,50 +896,30 @@ public class PlayerController : MonoBehaviour
 
     }
 
-    //[SerializeField] private float cameraFollowSmooth = 0.08f;  // tweak to match your current “tightness”
-    //private Vector3 camVelocity;
-    //
-    //void LateUpdate()
-    //{
-    //    if (!raceStarted) return;
-    //
-    //    // 1. Target center above the player
-    //    Vector3 targetBase = new Vector3(
-    //        transform.position.x,              // always lock X to player
-    //        defaultCamPosY,                    // base height
-    //        camPosZ                            // current Z logic you already compute
-    //    );
-    //
-    //    // 2. Compute shake offset in local space
-    //    Vector3 shakeOffset = ComputeShakeOffset(); // only returns a small +/- X/Y offset
-    //
-    //    // 3. Apply shake to base
-    //    Vector3 target = targetBase + shakeOffset;
-    //
-    //    // 4. SmoothDamp to target - frame-rate independent smoothing
-    //    cameraObject.transform.position = Vector3.SmoothDamp(
-    //        cameraObject.transform.position,
-    //        target,
-    //        ref camVelocity,
-    //        cameraFollowSmooth
-    //    );
-    //
-    //    // cache if you still need it
-    //    defaultCamPosition = cameraObject.transform.position;
-    //}
-    //
-    //private Vector3 ComputeShakeOffset()
-    //{
-    //    if (!raceStarted || explosionShakeIntensity <= 1f)
-    //        return Vector3.zero;
-    //
-    //    float sx = Random.Range(-shakeIntensity, shakeIntensity);
-    //    float sy = Random.Range(-shakeIntensity, shakeIntensity);
-    //
-    //    // Optionally clamp further or scale down
-    //    return new Vector3(sx, sy, 0f);
-    //}
+    private void LateUpdate()
+    {
+        if (!raceStarted)
+            return;
 
+        float targetY = defaultCamPosition.y;
+        float targetZ = cameraObject.transform.position.z;
+
+        cameraBasePosition = new Vector3(
+            transform.position.x,
+            targetY,
+            targetZ
+        );
+
+        cameraBasePosition = Damp(
+            cameraObject.transform.position,
+            cameraBasePosition,
+            cameraFollowSharpness * explosionShakeIntensity,
+            Time.deltaTime
+        );
+
+        Vector3 shakeOffset = GetShakeOffset();
+        cameraObject.transform.position = cameraBasePosition + shakeOffset;
+    }
 
     /*----------------------------------- PLAYER MOVEMENT FUNCTIONS -----------------------------------*/
     // Snaps the player to a lane based on their position.
@@ -957,63 +981,19 @@ public class PlayerController : MonoBehaviour
     // Manually set the player's lane.
     void SetCurrentLane(int lane, float speed)
     {
-        // Snap the player to lane 0.
-        if (lane == 0)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(-11.5f, transform.position.y, transform.position.z), 10 * speed);
-            //cameraObject.transform.position = Vector3.Lerp(cameraObject.transform.position, new Vector3(-11.5f, defaultCamPosition.y, camPosZ), 10 * speed);
-            currentLane = 0;
-        }
+        lane = Mathf.Clamp(lane, 0, 7);
+        currentLane = lane;
 
-        // Snap the player to lane 1.
-        else if (lane == 1)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(-8.5f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 1;
-        }
+        float targetX = GetLaneX(lane);
 
-        // Snap the player to lane 2.
-        else if (lane == 2)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(-5.5f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 2;
-        }
+        // Use a time-based convergence instead of repeated frame-dependent Lerp
+        float newX = Mathf.Lerp(
+            transform.position.x,
+            targetX,
+            ExpFactor(laneSnapSharpness, Time.deltaTime)
+        );
 
-        // Snap the player to lane 3.
-        else if (lane == 3)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(-2.5f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 3;
-        }
-
-        // Snap the player to lane 4. The extra code in this block ensures that the camera zoom-in present
-        // at the start of the race stays consistent even if the player immediatly starts changing lanes.
-        else if (lane == 4)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(1f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 4;
-        }
-
-        // Snap the player to lane 5.
-        else if (lane == 5)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(4f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 5;
-        }
-
-        // Snap the player to lane 6.
-        else if (lane == 6)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(7f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 6;
-        }
-
-        // Snap the player to lane 7.
-        else if (lane == 7)
-        {
-            transform.position = Vector3.Lerp(transform.position, new Vector3(10f, transform.position.y, transform.position.z), 10 * speed);
-            currentLane = 7;
-        }
+        transform.position = new Vector3(newX, transform.position.y, transform.position.z);
     }
 
     // Return the lanesplit X positions of the camera & player transforms based on which lane we are in and which direction we are lane splitting.
@@ -1335,37 +1315,38 @@ public class PlayerController : MonoBehaviour
     /*--------------------------------- CAMERA MANIPULATION FUNCTIONS ---------------------------------*/
     private IEnumerator CameraJolt()
     {
-        // Define the jolt direction in the X, Y, and Z axes.
-        Vector3 joltDirection = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, -0.5f), Random.Range(0.5f, 1f)).normalized;
-        joltDirection.z = -Mathf.Abs(joltDirection.z); // Making sure Z always pushes forward.
+        Vector3 originalLocalPosition = cam.transform.localPosition;
+
+        Vector3 joltDirection = new Vector3(
+            Random.Range(-1f, 1f),
+            Random.Range(-1f, -0.5f),
+            Random.Range(0.5f, 1f)
+        ).normalized;
+
+        joltDirection.z = -Mathf.Abs(joltDirection.z);
 
         float joltMagnitude = 4f + accel;
-
-        // Apply the jolt.
-        Vector3 joltVector = joltDirection * joltMagnitude;
-        Vector3 joltPosition = cam.transform.localPosition + joltVector;
+        Vector3 joltPosition = originalLocalPosition + joltDirection * joltMagnitude;
         joltPosition.y = Mathf.Max(joltPosition.y, -1f);
-        joltPosition.x = Mathf.Clamp(joltPosition.x, - 1f, 1f);
+        joltPosition.x = Mathf.Clamp(joltPosition.x, -1f, 1f);
+
         cam.transform.localPosition = joltPosition;
 
-
-        // Duration of the return animation.
         float duration = 0.15f;
+        float elapsed = 0f;
 
-        // Initial position after applying the jolt.
-        Vector3 initialLocalPosition = cam.transform.localPosition;
-
-        // Animate the camera back to its original local position.
-        for (float t = 0; t < duration; t += Time.deltaTime)
+        while (elapsed < duration)
         {
-            float factor = t / duration;
-            Vector3 newPosition = Vector3.Lerp(initialLocalPosition, Vector3.zero, factor);
-            cam.transform.localPosition = newPosition;
+            elapsed += Time.deltaTime;
+            cam.transform.localPosition = Vector3.Lerp(
+                joltPosition,
+                originalLocalPosition,
+                ExpFactor(20f, Time.deltaTime)
+            );
             yield return null;
         }
 
-        // Ensure the camera ends up exactly in its original local position.
-        cam.transform.localPosition = Vector3.zero;
+        cam.transform.localPosition = originalLocalPosition;
     }
 
     private IEnumerator LerpCameraFOV(float startFov, float targetFov, float duration)
