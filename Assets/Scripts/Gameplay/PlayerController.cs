@@ -46,9 +46,9 @@ public class PlayerController : MonoBehaviour
     private Quaternion rotRight;
     [SerializeField] private float laneSnapSharpness = 1000f;
     [SerializeField] private float steeringSharpness = 6f;
-    [SerializeField] private float carLeanSharpness = 1f;
-    [SerializeField] private float cameraFollowSharpness = 1f;
-    [SerializeField] private float shakeFrequency = 22f;
+    [SerializeField] private float carLeanSharpness = 1000f;
+    [SerializeField] private float cameraFollowSharpness = 1000f;
+    [SerializeField] private float shakeFrequency = 20f;
     // Recovery flash configuration.
     private readonly float recoverDuration = 3f;       // Total flashing time
     private readonly float startFlashInterval = 0.25f; // Slowest interval at start (seconds)
@@ -72,7 +72,7 @@ public class PlayerController : MonoBehaviour
     private float camPosY;
     private float defaultCamPosY;
     private float shakeIntensity = 0.01f; // The initial intensity of the camera shake.
-    private readonly float shakeIncreaseRate = 0.0007f;
+    private readonly float shakeIncreaseRate = 0.0009f;
     private float explosionShakeIntensity = 1f; // The initial intensity of the explosion shake.
     private float minXPosition;
     private float maxXPosition;
@@ -402,9 +402,10 @@ public class PlayerController : MonoBehaviour
         ResetGearShiftTracking();
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
-        float dt = Time.deltaTime;
+        Time.fixedDeltaTime = 1f / 120f;
+        float dt = Time.fixedDeltaTime;
 
         if (Input.GetKeyDown(KeyCode.H))
             uiManager.gameObject.SetActive(!uiManager.gameObject.activeSelf);
@@ -664,8 +665,9 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
-                    rotLeft = defaultRot * Quaternion.Euler(0f, -10f * (1f / accel), 0f);
-                    rotRight = defaultRot * Quaternion.Euler(0f, 10f * (1f / accel), 0f);
+                    float steerScale = 1f / Mathf.Sqrt(accel);
+                    rotLeft = defaultRot * Quaternion.Euler(0f, -10f * steerScale, 0f);
+                    rotRight = defaultRot * Quaternion.Euler(0f, 10f * steerScale, 0f);
                 }
 
                 if (accel < accelMaxValue && !aggro)
@@ -763,7 +765,7 @@ public class PlayerController : MonoBehaviour
                     isTouchUp = false;
                 }
 
-                transform.Translate(25f * movementVal, 0f, 0f, Space.World);
+                transform.Translate(20f * movementVal, 0f, 0f, Space.World);
                 transform.rotation = DampRotation(transform.rotation, rotRight, steeringSharpness, dt);
 
                 carObject.transform.SetLocalPositionAndRotation(
@@ -797,7 +799,7 @@ public class PlayerController : MonoBehaviour
                     isTouchUp = false;
                 }
 
-                transform.Translate(-25f * movementVal, 0f, 0f, Space.World);
+                transform.Translate(-20f * movementVal, 0f, 0f, Space.World);
                 transform.rotation = DampRotation(transform.rotation, rotLeft, steeringSharpness, dt);
 
                 carObject.transform.SetLocalPositionAndRotation(
@@ -827,7 +829,7 @@ public class PlayerController : MonoBehaviour
         if (currentlyLaneSplitting)
             return;
 
-        float dt = Time.deltaTime;
+        float dt = Time.fixedDeltaTime;
 
         Vector3 currentPos = cameraObject.transform.position;
 
@@ -853,7 +855,9 @@ public class PlayerController : MonoBehaviour
     {
         // Don't do anything if the player is in the process of lanesplitting.
         if (currentlyLaneSplitting) return;
-        
+
+        float laneChangeSpeed = speed / 2;
+
         // Record the timestamp of the touch release.
         if (!isTouchUp)
         {
@@ -868,35 +872,35 @@ public class PlayerController : MonoBehaviour
         // If the touch release & touch press was very close, move over one lane.
         if (tapDuration <= 0.2f)
         {
-            SetCurrentLane(currentLane + whichWay, speed / 2);
+            SetCurrentLane(currentLane + whichWay, laneChangeSpeed);
         }
 
         // Otherwise snap the player to the closest lane.
         else
         {
             if (transform.position.x < -10f)
-                SetCurrentLane(0, speed / 2);
+                SetCurrentLane(0, laneChangeSpeed);
 
             else if (transform.position.x < -7f)
-                SetCurrentLane(1, speed / 2);
+                SetCurrentLane(1, laneChangeSpeed);
 
             else if (transform.position.x < -4f)
-                SetCurrentLane(2, speed / 2);
+                SetCurrentLane(2, laneChangeSpeed);
 
             else if (transform.position.x < -0.75f)
-                SetCurrentLane(3, speed / 2);
+                SetCurrentLane(3, laneChangeSpeed);
 
             else if (transform.position.x < 2.5)
-                SetCurrentLane(4, speed / 2);
+                SetCurrentLane(4, laneChangeSpeed);
 
             else if (transform.position.x < 5.5)
-                SetCurrentLane(5, speed / 2);
+                SetCurrentLane(5, laneChangeSpeed);
 
             else if (transform.position.x < 8.5)
-                SetCurrentLane(6, speed / 2);
+                SetCurrentLane(6, laneChangeSpeed);
 
             else
-                SetCurrentLane(7, speed / 2);
+                SetCurrentLane(7, laneChangeSpeed);
         }
 
         // Reset player rotation & whichWay variable once lane change completed.
