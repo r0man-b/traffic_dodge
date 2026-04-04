@@ -72,7 +72,7 @@ public class PlayerController : MonoBehaviour
     private float camPosY;
     private float defaultCamPosY;
     private float shakeIntensity = 0.005f; // The initial intensity of the camera shake.
-    private readonly float shakeIncreaseRate = 0.003f;
+    private readonly float shakeIncreaseRate = 0.0015f;
     private float explosionShakeIntensity = 1f; // The initial intensity of the explosion shake.
     private float minXPosition;
     private float maxXPosition;
