@@ -20,7 +20,6 @@ public class PlayerController : MonoBehaviour
     private float lastLaneSplitTime = -5.0f;
     public bool currentlyLaneSplitting = false;
     private Coroutine laneSplitCoroutine;
-    private float lastXPosition;
     public int numlives = 0;
     public Car currentCar;
     private string currentCarType;
@@ -45,12 +44,16 @@ public class PlayerController : MonoBehaviour
     private Quaternion defaultRot;
     private Quaternion rotLeft;
     private Quaternion rotRight;
+    [SerializeField] private float laneSnapSharpness = 1.15f;
+    [SerializeField] private float steeringSharpness = 6f;
+    [SerializeField] private float carLeanSharpness = 18f;
+    [SerializeField] private float cameraFollowSharpness = 10f;
+    [SerializeField] private float shakeFrequency = 22f;
     // Recovery flash configuration.
-    private float recoverDuration = 3f;       // Total flashing time
-    private float startFlashInterval = 0.25f; // Slowest interval at start (seconds)
-    private float endFlashInterval = 0.02f; // Fastest interval at end (seconds)
+    private readonly float recoverDuration = 3f;       // Total flashing time
+    private readonly float startFlashInterval = 0.25f; // Slowest interval at start (seconds)
+    private readonly float endFlashInterval = 0.02f; // Fastest interval at end (seconds)
     private bool isRecovering = false;
-    private float fpsModifier;
     // Track gear shifts for exhaust flames
     private int nextGearShiftIndex = 0;     // index into currentCar.gearChangeTimes
     private int currentGear = 1;           // starts in Gear 1
@@ -68,9 +71,8 @@ public class PlayerController : MonoBehaviour
     private Vector3 defaultCamPosition;
     private float camPosY;
     private float defaultCamPosY;
-    private float camPosZ; //= -5.5f;
-    private float shakeIntensity = 0.05f; // The initial intensity of the camera shake.
-    private readonly float shakeIncreaseRate = 0.007f;
+    private float shakeIntensity = 0.01f; // The initial intensity of the camera shake.
+    private readonly float shakeIncreaseRate = 0.0007f;
     private float explosionShakeIntensity = 1f; // The initial intensity of the explosion shake.
     private float minXPosition;
     private float maxXPosition;
@@ -82,11 +84,13 @@ public class PlayerController : MonoBehaviour
     public float cameraOffsetValue2 = 0.4f;
     private int cameraType;
     private float cameraHeightMultiplier;
-    private float cameraZMultiplier;
     private float senseOfSpeedModifier;
     Vector3 newPosition;
     Vector3 startingLocalCamPosition;
     Quaternion startingLocalCamRotation;
+    private Vector3 cameraBasePosition;
+    private float shakeSeedX;
+    private float shakeSeedY;
 
     // Powerup variables.
     public bool aggro = false;
@@ -140,35 +144,22 @@ public class PlayerController : MonoBehaviour
     // Car collection.
     [SerializeField] private CarCollection carCollection;
 
-    // Add near your other fields
-    [SerializeField] private float laneSnapSharpness = 1.5f;
-    [SerializeField] private float steeringSharpness = 14f;
-    [SerializeField] private float carLeanSharpness = 18f;
-    [SerializeField] private float cameraFollowSharpness = 10f;
-    [SerializeField] private float shakeFrequency = 22f;
 
-    private Vector3 cameraBasePosition;
-    private float shakeSeedX;
-    private float shakeSeedY;
 
-    private static float ExpFactor(float sharpness, float dt)
+    private Vector3 GetCameraShakeOffset()
     {
-        return 1f - Mathf.Exp(-sharpness * dt);
-    }
+        if (!raceStarted)
+            return Vector3.zero;
 
-    private float Damp(float current, float target, float sharpness, float dt)
-    {
-        return Mathf.Lerp(current, target, ExpFactor(sharpness, dt));
-    }
+        float t = Time.time * shakeFrequency;
 
-    private Vector3 Damp(Vector3 current, Vector3 target, float sharpness, float dt)
-    {
-        return Vector3.Lerp(current, target, ExpFactor(sharpness, dt));
-    }
+        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity;
+        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity;
 
-    private Quaternion Damp(Quaternion current, Quaternion target, float sharpness, float dt)
-    {
-        return Quaternion.Slerp(current, target, ExpFactor(sharpness, dt));
+        float clampedX = Mathf.Clamp(defaultCamPosition.x + x, minXPosition, maxXPosition) - defaultCamPosition.x;
+        float clampedY = Mathf.Clamp(defaultCamPosition.y + y, minYPosition, maxYPosition) - defaultCamPosition.y;
+
+        return new Vector3(clampedX, clampedY, 0f);
     }
 
     private float GetLaneX(int lane)
@@ -179,10 +170,10 @@ public class PlayerController : MonoBehaviour
             1 => -8.5f,
             2 => -5.5f,
             3 => -2.5f,
-            4 => 1.0f,
-            5 => 4.0f,
-            6 => 7.0f,
-            7 => 10.0f,
+            4 => 1f,
+            5 => 4f,
+            6 => 7f,
+            7 => 10f,
             _ => transform.position.x
         };
     }
@@ -402,7 +393,6 @@ public class PlayerController : MonoBehaviour
         if (cameraType == 0) // Don't render car if we're in first person
         {
             cameraHeightMultiplier = 0.5f;
-            cameraZMultiplier = 5;
             foreach (Transform child in carObject.transform)
             {
                 child.gameObject.SetActive(false);
@@ -411,12 +401,10 @@ public class PlayerController : MonoBehaviour
         else if (cameraType == 1)
         {
             cameraHeightMultiplier = 1;
-            cameraZMultiplier = 0;
         }
         else
         {
             cameraHeightMultiplier = 1.05f;
-            cameraZMultiplier = 0;
         }
 
         // Disable rain if we're in space or underwater.
@@ -425,11 +413,9 @@ public class PlayerController : MonoBehaviour
             rain.gameObject.SetActive(false);
         }
 
+        // Set up random shake seed
         shakeSeedX = Random.value * 1000f;
         shakeSeedY = Random.value * 1000f;
-
-        // Set up FPS modifier
-        fpsModifier = 120.0f / saveData.frameRate;
 
         // Set camera variables.
         defaultCamPosition = currentCar.defaultCameraPosition;
@@ -476,74 +462,68 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        float dt = Time.deltaTime;
+
         if (Input.GetKeyDown(KeyCode.H))
-        {
             uiManager.gameObject.SetActive(!uiManager.gameObject.activeSelf);
-        }
 
         if (Input.GetKeyDown(KeyCode.I))
         {
-            if (invincible)
-            {
-                numlives = 25;
-            }
-            else
-            {
-                numlives = 0;
-            }
+            if (invincible) numlives = 25;
+            else numlives = 0;
+
             invincible = !invincible;
         }
 
         if (Input.GetKeyDown(KeyCode.Q))
-        {
             Cursor.visible = !Cursor.visible;
-        }
 
-        // Move the player, camera, and tornadoObject forward.
-        if (raceStarted)
+        // Move the player and camera rig forward.
+        float forwardMultiplier = raceStarted ? 1.25f : 1f;
+        float forwardDistance = 50f * dt * accel * forwardMultiplier;
+
+        transform.position += forwardDistance * transform.forward;
+        cameraObject.transform.position += forwardDistance * transform.forward;
+
+        tornadoPosZ = transform.position.z + (-0.2028745f * cam.fieldOfView + 40.61494f);
+        tornadoObject.transform.position = new Vector3(
+            tornadoObject.transform.position.x,
+            tornadoObject.transform.position.y,
+            tornadoPosZ
+        );
+
+        // Wheel rotation.
+        float rotationSpeed = 50000f * dt * accel;
+        Vector3 rotationAmount = new Vector3(rotationSpeed, 0f, 0f);
+
+        if (camberedFrontWheelsZAxis)
         {
-            this.transform.position += 50 * Time.deltaTime * accel * 1.25f * this.transform.forward;
-            cameraObject.transform.position += 50 * Time.deltaTime * accel * 1.25f * this.transform.forward;
+            camberedWheelsFrontLeft.transform.Rotate(0f, 0f, rotationSpeed);
+            camberedWheelsFrontRight.transform.Rotate(0f, 0f, rotationSpeed);
         }
         else
         {
-            this.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
-            cameraObject.transform.position += 50 * Time.deltaTime * accel * this.transform.forward;
+            frontWheels.transform.Rotate(rotationAmount);
         }
 
-        tornadoPosZ = this.transform.position.z + (-0.2028745f * cam.fieldOfView + 40.61494f);
-        tornadoObject.transform.position = new Vector3(tornadoObject.transform.position.x, tornadoObject.transform.position.y, tornadoPosZ);
-
-        camPosZ = cameraObject.transform.position.z;
-
-        // Rotation speed for tornado.
-        float rotationSpeed = 50000 * Time.deltaTime * accel;
-        Vector3 rotationAmount = new Vector3(rotationSpeed, 0, 0); // Rotate around X-axis
-
-        // Rotate any cambered wheels if they exist.
-        if (camberedFrontWheelsZAxis)
-        {
-            camberedWheelsFrontLeft.transform.Rotate(new Vector3(0, 0, rotationSpeed));
-            camberedWheelsFrontRight.transform.Rotate(new Vector3(0, 0, rotationSpeed));
-        }
-        else frontWheels.transform.Rotate(rotationAmount);
-        
         if (camberedRearWheelsZAxis)
         {
-            camberedWheelsRearLeft.transform.Rotate(new Vector3(0, 0, rotationSpeed));
-            camberedWheelsRearRight.transform.Rotate(new Vector3(0, 0, rotationSpeed));
+            camberedWheelsRearLeft.transform.Rotate(0f, 0f, rotationSpeed);
+            camberedWheelsRearRight.transform.Rotate(0f, 0f, rotationSpeed);
         }
-        else rearWheels.transform.Rotate(rotationAmount);
+        else
+        {
+            rearWheels.transform.Rotate(rotationAmount);
+        }
 
-        // Update race started variable if the song has dropped.
-        if (!raceStarted && Time.time - startTime > soundManager.drop) raceStarted = true;
+        // Start race at song drop.
+        if (!raceStarted && Time.time - startTime > soundManager.drop)
+            raceStarted = true;
 
-        // Spawn exhaust flames each gear shift if applicable
+        // Gear shift exhaust flames.
         if (raceStarted && gearShiftTrackingActive)
         {
             float raceTime = Time.time - startTime;
-
-            // If the pitch can change at runtime, keep this current
             float pitch = (engineAccelSource != null) ? Mathf.Max(0.0001f, engineAccelSource.pitch) : 1f;
             gearTimePitchModifier = pitch;
 
@@ -552,9 +532,7 @@ public class PlayerController : MonoBehaviour
                    nextGearShiftIndex < shifts.Length &&
                    raceTime >= soundManager.drop + (shifts[nextGearShiftIndex] / gearTimePitchModifier))
             {
-                // Fire exhaust flames for this shift
                 PulseExhaustFlames(0.075f);
-
                 Debug.Log($"Gear {currentGear}");
                 nextGearShiftIndex++;
             }
@@ -566,13 +544,13 @@ public class PlayerController : MonoBehaviour
             powerupsOnStandby = true;
             StartCoroutine(DisableAllPowerups());
         }
-        else if (Time.time - startTime >= (powerupCountdown - 0.5f) && aggro) // Start playing aggro zoom out sound if 0.5 seconds left in aggro.
+        else if (Time.time - startTime >= (powerupCountdown - 0.5f) && aggro)
         {
-            if (!(soundManager.zoomoutsource.isPlaying))
+            if (!soundManager.zoomoutsource.isPlaying)
                 soundManager.PlayAggro(true);
         }
 
-        // Cinematic camera intro sequence before race starts (0–3s)
+        // Cinematic camera intro sequence before race starts.
         float timeSinceStart = Time.time - startTime;
         if (timeSinceStart < soundManager.drop)
         {
@@ -596,6 +574,7 @@ public class PlayerController : MonoBehaviour
                 float lerpT = Mathf.Clamp01(phaseTime / snapDuration);
                 cam.transform.localPosition = Vector3.Lerp(frontLeftLocalPos, rearLeftLocalPos, lerpT);
                 cam.transform.localRotation = Quaternion.Slerp(frontLeftLocalRot, rearLeftLocalRot, lerpT);
+
                 if (!hasReturnedPosteriorObjects)
                 {
                     prefabManager.ReturnPosteriorObjects();
@@ -610,10 +589,10 @@ public class PlayerController : MonoBehaviour
                 cam.transform.localRotation = Quaternion.Slerp(rearLeftLocalRot, startingLocalCamRotation, lerpT);
             }
 
-            return; // Prevent camera logic below from overriding during cinematic
+            return;
         }
 
-        // Increase acceleration, apply fov increase and camera shake.
+        // Race camera state / acceleration / shake bounds.
         if (raceStarted)
         {
             if (Time.time - startTime > soundManager.drop + 0.1f)
@@ -632,189 +611,181 @@ public class PlayerController : MonoBehaviour
             {
                 if (shakeIntensity > 0.3f)
                 {
-                    float xoffset = 0.001f * shakeIntensity * 200 * explosionShakeIntensity;
-                    float yoffset = 0.0075f * shakeIntensity * 10 * explosionShakeIntensity;
-                    minXPosition = this.transform.position.x - xoffset;
-                    maxXPosition = this.transform.position.x + xoffset;
+                    float xoffset = 0.001f * shakeIntensity * 200f * explosionShakeIntensity;
+                    float yoffset = 0.0075f * shakeIntensity * 10f * explosionShakeIntensity;
+                    minXPosition = transform.position.x - xoffset;
+                    maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
                     maxYPosition = defaultCamPosY + yoffset;
                 }
                 else if (shakeIntensity > 0.2f)
                 {
-                    float xoffset = 0.011f * shakeIntensity * 200 * explosionShakeIntensity;
-                    float yoffset = 0.015f * shakeIntensity * 10 * explosionShakeIntensity;
-                    minXPosition = this.transform.position.x - xoffset;
-                    maxXPosition = this.transform.position.x + xoffset;
+                    float xoffset = 0.011f * shakeIntensity * 200f * explosionShakeIntensity;
+                    float yoffset = 0.015f * shakeIntensity * 10f * explosionShakeIntensity;
+                    minXPosition = transform.position.x - xoffset;
+                    maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
                     maxYPosition = defaultCamPosY + yoffset;
                 }
                 else
                 {
-                    float xoffset = 0.011f * shakeIntensity * 200 * explosionShakeIntensity;
-                    float yoffset = 0.022f * shakeIntensity * 20 * explosionShakeIntensity;
-                    minXPosition = this.transform.position.x - xoffset;
-                    maxXPosition = this.transform.position.x + xoffset;
+                    float xoffset = 0.011f * shakeIntensity * 200f * explosionShakeIntensity;
+                    float yoffset = 0.022f * shakeIntensity * 20f * explosionShakeIntensity;
+                    minXPosition = transform.position.x - xoffset;
+                    maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
                     maxYPosition = defaultCamPosY + yoffset;
                 }
-                minXPosition = Mathf.Clamp(minXPosition, this.transform.position.x - 3f, this.transform.position.x + 3f);
-                maxXPosition = Mathf.Clamp(maxXPosition, this.transform.position.x - 3f, this.transform.position.x + 3f);
+
+                minXPosition = Mathf.Clamp(minXPosition, transform.position.x - 3f, transform.position.x + 3f);
+                maxXPosition = Mathf.Clamp(maxXPosition, transform.position.x - 3f, transform.position.x + 3f);
             }
             else if (explosionShakeIntensity > 2)
             {
                 if (shakeIntensity > 0.3f)
                 {
-                    float xoffset = 0.001f * shakeIntensity * 200 * accel * accel * explosionShakeIntensity / 10;
-                    float yoffset = 0.0075f * shakeIntensity * 10 * accel * accel * explosionShakeIntensity / 10;
-                    minXPosition = this.transform.position.x - xoffset;
-                    maxXPosition = this.transform.position.x + xoffset;
+                    float xoffset = 0.001f * shakeIntensity * 200f * accel * accel * explosionShakeIntensity / 10f;
+                    float yoffset = 0.0075f * shakeIntensity * 10f * accel * accel * explosionShakeIntensity / 10f;
+                    minXPosition = transform.position.x - xoffset;
+                    maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
                     maxYPosition = defaultCamPosY + yoffset;
                 }
                 else if (shakeIntensity > 0.2f)
                 {
-                    minXPosition = this.transform.position.x - 0.011f * shakeIntensity * 200 * accel * accel * explosionShakeIntensity / 10;
-                    maxXPosition = this.transform.position.x + 0.011f * shakeIntensity * 200 * accel * accel * explosionShakeIntensity / 10;
-                    minYPosition = defaultCamPosY - 0.015f * shakeIntensity * 10 * accel * explosionShakeIntensity / 10;
-                    maxYPosition = defaultCamPosY + 0.015f * shakeIntensity * 10 * accel * explosionShakeIntensity / 10;
+                    minXPosition = transform.position.x - 0.011f * shakeIntensity * 200f * accel * accel * explosionShakeIntensity / 10f;
+                    maxXPosition = transform.position.x + 0.011f * shakeIntensity * 200f * accel * accel * explosionShakeIntensity / 10f;
+                    minYPosition = defaultCamPosY - 0.015f * shakeIntensity * 10f * accel * explosionShakeIntensity / 10f;
+                    maxYPosition = defaultCamPosY + 0.015f * shakeIntensity * 10f * accel * explosionShakeIntensity / 10f;
                 }
                 else
                 {
-                    minXPosition = this.transform.position.x - 0.011f * shakeIntensity * 200 * accel * explosionShakeIntensity / 10;
-                    maxXPosition = this.transform.position.x + 0.011f * shakeIntensity * 200 * accel * explosionShakeIntensity / 10;
-                    minYPosition = defaultCamPosY - 0.022f * shakeIntensity * 20 * explosionShakeIntensity / 10;
-                    maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 20 * explosionShakeIntensity / 10;
+                    minXPosition = transform.position.x - 0.011f * shakeIntensity * 200f * accel * explosionShakeIntensity / 10f;
+                    maxXPosition = transform.position.x + 0.011f * shakeIntensity * 200f * accel * explosionShakeIntensity / 10f;
+                    minYPosition = defaultCamPosY - 0.022f * shakeIntensity * 20f * explosionShakeIntensity / 10f;
+                    maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 20f * explosionShakeIntensity / 10f;
                 }
+
                 minYPosition = Mathf.Clamp(minYPosition, 2f, 4f);
                 maxYPosition = Mathf.Clamp(maxYPosition, 2f, 4f);
-                minXPosition = Mathf.Clamp(minXPosition, this.transform.position.x - 0.25f * accel, this.transform.position.x + 0.25f * accel);
-                maxXPosition = Mathf.Clamp(maxXPosition, this.transform.position.x - 0.25f * accel, this.transform.position.x + 0.25f * accel);
+                minXPosition = Mathf.Clamp(minXPosition, transform.position.x - 0.25f * accel, transform.position.x + 0.25f * accel);
+                maxXPosition = Mathf.Clamp(maxXPosition, transform.position.x - 0.25f * accel, transform.position.x + 0.25f * accel);
             }
             else
             {
                 if (shakeIntensity > 0.3f)
                 {
-                    float xoffset = 0.001f * shakeIntensity * 200 * accel * accel;
-                    float yoffset = 0.0075f * shakeIntensity * 10 * accel * accel;
+                    float xoffset = 0.001f * shakeIntensity * 200f * accel * accel;
+                    float yoffset = 0.0075f * shakeIntensity * 10f * accel * accel;
+
                     if (!tornado)
                     {
                         xoffset = Mathf.Clamp(xoffset, -0.5f, 0.5f);
                         yoffset = Mathf.Clamp(yoffset, -0.18f, 0.18f);
                     }
-                    minXPosition = this.transform.position.x - xoffset;
-                    maxXPosition = this.transform.position.x + xoffset;
+
+                    minXPosition = transform.position.x - xoffset;
+                    maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
                     maxYPosition = defaultCamPosY + yoffset;
                 }
                 else if (shakeIntensity > 0.2f)
                 {
-                    minXPosition = this.transform.position.x - 0.011f * shakeIntensity * 200 * accel * accel;
-                    maxXPosition = this.transform.position.x + 0.011f * shakeIntensity * 200 * accel * accel;
-                    minYPosition = defaultCamPosY - 0.015f * shakeIntensity * 10 * accel;
-                    maxYPosition = defaultCamPosY + 0.015f * shakeIntensity * 10 * accel;
+                    minXPosition = transform.position.x - 0.011f * shakeIntensity * 200f * accel * accel;
+                    maxXPosition = transform.position.x + 0.011f * shakeIntensity * 200f * accel * accel;
+                    minYPosition = defaultCamPosY - 0.015f * shakeIntensity * 10f * accel;
+                    maxYPosition = defaultCamPosY + 0.015f * shakeIntensity * 10f * accel;
                 }
                 else
                 {
-                    minXPosition = this.transform.position.x - 0.011f * shakeIntensity * 200 * accel;
-                    maxXPosition = this.transform.position.x + 0.011f * shakeIntensity * 200 * accel;
-                    minYPosition = defaultCamPosY - 0.022f * shakeIntensity * 20;
-                    maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 20;
+                    minXPosition = transform.position.x - 0.011f * shakeIntensity * 200f * accel;
+                    maxXPosition = transform.position.x + 0.011f * shakeIntensity * 200f * accel;
+                    minYPosition = defaultCamPosY - 0.022f * shakeIntensity * 20f;
+                    maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 20f;
                 }
             }
 
-            // Create a new random offset to simulate camera shake.
+            // Continue increasing shake intensity until 180 seconds.
             if (Time.time - (startTime + accelTimeOffset) < 180f && !aggro && !bullet && shakeIntensity < 0.4f)
             {
-                shakeIntensity += 2f * shakeIncreaseRate * senseOfSpeedModifier * Time.deltaTime;
+                shakeIntensity += 2f * shakeIncreaseRate * senseOfSpeedModifier * dt;
             }
 
-
-            // If the game has not ended, continue increasing variables.
             if (!gameEnd)
             {
-                // Update left & right rotations.
                 if (bullet)
                 {
-                   rotLeft = defaultRot * Quaternion.Euler(0, -5, 0);
-                   rotRight = defaultRot * Quaternion.Euler(0, 5, 0);
+                    rotLeft = defaultRot * Quaternion.Euler(0f, -5f, 0f);
+                    rotRight = defaultRot * Quaternion.Euler(0f, 5f, 0f);
                 }
                 else
                 {
-                    rotLeft = defaultRot * Quaternion.Euler(0, -10 * (1 / accel), 0);
-                    rotRight = defaultRot * Quaternion.Euler(0, 10 * (1 / accel), 0);
+                    rotLeft = defaultRot * Quaternion.Euler(0f, -10f * (1f / accel), 0f);
+                    rotRight = defaultRot * Quaternion.Euler(0f, 10f * (1f / accel), 0f);
                 }
 
-                // Increase acceleration.
                 if (accel < accelMaxValue && !aggro)
                 {
                     float timeThreshold = Time.time - ((startTime + accelTimeOffset) + soundManager.drop);
-                    accel = (float)System.Math.Log10(timeThreshold * 0.22f + 1) * currentCar.accelIncreaseRate + 0.5f;
+                    accel = (float)System.Math.Log10(timeThreshold * 0.22f + 1f) * currentCar.accelIncreaseRate + 0.5f;
                 }
 
-                // TODO: The two below lines of code may not be doing anything
-                // Increase camera FOV with acceleration.
-                if (accel < 2.38f /*215 mph is the hard cap on FOV*/ && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f) cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
+                if (accel < 2.38f && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f)
+                {
+                    cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
+                }
             }
 
-            // If the game has ended or player is in an explosion, apply explosion shake to the camera.
-            if (explosionShakeIntensity > 1 && (gameEnd || inTrafficExplosion || inTornadoExplosion || inBulletExplosion))
+            if (explosionShakeIntensity > 1f && (gameEnd || inTrafficExplosion || inTornadoExplosion || inBulletExplosion))
             {
-
                 if (gameEnd)
                 {
-                    accel = 0; // Stop the playercar.
-                }
-                else if (inTrafficExplosion && !inTornadoExplosion)
-                {
-                    //StartCoroutine(CameraJolt());
-                }
-                else if (inTornadoExplosion)
-                {
-                }
-                else // The sonic boom effect at the end of the bullet powerup.
-                {
+                    accel = 0f;
                 }
 
-                // Decrease the explosion shake intensity.
-                explosionShakeIntensity -= gameEnd || inTornadoExplosion? (EaseOutCubic(explosionShakeIntensity / 2.5f * (gameEnd ? 1 : accel) * Time.deltaTime)) : (explosionShakeIntensity / 0.25f * Time.deltaTime);
-                explosionShakeIntensity = Mathf.Clamp(explosionShakeIntensity, 1, explosionShakeIntensity);
+                explosionShakeIntensity -= gameEnd || inTornadoExplosion
+                    ? EaseOutCubic(explosionShakeIntensity / 2.5f * (gameEnd ? 1f : accel) * dt)
+                    : (explosionShakeIntensity / 0.25f * dt);
+
+                explosionShakeIntensity = Mathf.Clamp(explosionShakeIntensity, 1f, explosionShakeIntensity);
             }
 
-            // Reset the shake intensity and state variables if the explosion has finished and the game has not ended.
-            if (explosionShakeIntensity <= 1 && !gameEnd)
+            if (explosionShakeIntensity <= 1f && !gameEnd)
             {
-                explosionShakeIntensity = 1;
+                explosionShakeIntensity = 1f;
                 inTrafficExplosion = false;
                 inTornadoExplosion = false;
                 inBulletExplosion = false;
             }
         }
 
-        // Update movement value that determines how quickly we change lanes.
-        float movement_val = (Time.deltaTime * accel * 1.25f) / 5f;
+        // Movement value for lane adjustments.
+        float movementVal = (dt * accel * 1.25f) / 5f;
 
-        // If the bullet powerup is enabled, auto lane change the player.
-        if ((bullet) && (raceStarted))
+        // Bullet auto lane change.
+        if (bullet && raceStarted)
         {
             int desiredDirection = prefabManager.LaneChangeForBullet(currentLane, transform.position.z, false);
-            if (desiredDirection < 0 && currentLane > 0) transform.rotation = Damp(transform.rotation, rotLeft, steeringSharpness, Time.deltaTime);
-            else if (desiredDirection > 0 && currentLane < 7) transform.rotation = Damp(transform.rotation, rotRight, steeringSharpness, Time.deltaTime);
-            else transform.rotation = transform.rotation = Damp(transform.rotation, defaultRot, steeringSharpness, Time.deltaTime);
-            SetCurrentLane(currentLane + desiredDirection, movement_val);
-        }
 
-        // Lane split if two simultaneous taps are detected.
-        else if (
-                    (Input.touchCount > 1 || (Input.GetKey(KeyCode.RightArrow) && Input.GetKey(KeyCode.LeftArrow)))
-                    && !pauseMenu.gamePaused
-                    && !currentlyLaneSplitting
-                    && !gameEnd
-                    && !bullet
-                    && raceStarted
-                    && !isRecovering
-                )
+            if (desiredDirection < 0 && currentLane > 0)
+                transform.rotation = DampRotation(transform.rotation, rotLeft, steeringSharpness, dt);
+            else if (desiredDirection > 0 && currentLane < 7)
+                transform.rotation = DampRotation(transform.rotation, rotRight, steeringSharpness, dt);
+            else
+                transform.rotation = DampRotation(transform.rotation, defaultRot, steeringSharpness, dt);
+
+            SetCurrentLane(currentLane + desiredDirection, movementVal);
+        }
+        // Lane split.
+        else if ((Input.touchCount > 1 || (Input.GetKey(KeyCode.RightArrow) && Input.GetKey(KeyCode.LeftArrow))) &&
+                 !pauseMenu.gamePaused &&
+                 !currentlyLaneSplitting &&
+                 !gameEnd &&
+                 !bullet &&
+                 raceStarted &&
+                 !isRecovering)
         {
-            if ((Time.time - startTime) - lastLaneSplitTime >= 5) // Only initiate a lane split if the lane split cooldown has expired.
+            if ((Time.time - startTime) - lastLaneSplitTime >= 5f)
             {
                 if (laneSplitCoroutine != null)
                 {
@@ -824,76 +795,84 @@ public class PlayerController : MonoBehaviour
 
                 laneSplitCoroutine = StartCoroutine(LaneSplitRoutine(0.12f, 1f / accel, lastTouchDirection));
             }
-            else SnapToClosestLane(movement_val);
+            else
+            {
+                SnapToClosestLane(movementVal);
+            }
         }
-
-        // Move & rotate the player right if the right side of the screen is tapped.
-        else if (
-                    (Input.GetKey(KeyCode.RightArrow) || (Input.touchCount > 0 && Input.GetTouch(0).position.x >= Screen.width / 2))
-                    && !pauseMenu.gamePaused
-                    && !currentlyLaneSplitting
-                    && !gameEnd
-                    && !bullet
-                    && raceStarted
-                )
+        // Move right.
+        else if ((Input.GetKey(KeyCode.RightArrow) || (Input.touchCount > 0 && Input.GetTouch(0).position.x >= Screen.width / 2)) &&
+                 !pauseMenu.gamePaused &&
+                 !currentlyLaneSplitting &&
+                 !gameEnd &&
+                 !bullet &&
+                 raceStarted)
         {
             lastTouchDirection = 1;
-            if (transform.position.x < 10) // Only start moving the player if we are within track boundaries.
+
+            if (transform.position.x < 10f)
             {
                 if (!isTouchDown)
                 {
-                    lastXPosition = transform.position.x;
-                    touchDownTime = (Time.time - startTime);
+                    touchDownTime = Time.time - startTime;
                     isTouchDown = true;
                     isTouchUp = false;
                 }
-                transform.Translate(25 * movement_val, 0, 0, Space.World);
-                cameraObject.transform.Translate(25 * movement_val, 0, 0, Space.World);
-                transform.rotation = Quaternion.Lerp(transform.rotation, rotRight, 9 * movement_val);
+
+                transform.Translate(25f * movementVal, 0f, 0f, Space.World);
+                transform.rotation = DampRotation(transform.rotation, rotRight, steeringSharpness, dt);
+
                 carObject.transform.SetLocalPositionAndRotation(
-                    Damp(carObject.transform.localPosition, carObject.transform.localPosition, carLeanSharpness, Time.deltaTime),
-                    Damp(carObject.transform.localRotation, defaultRot, carLeanSharpness, Time.deltaTime)
+                    carObject.transform.localPosition,
+                    DampRotation(carObject.transform.localRotation, defaultRot, steeringSharpness * 1.3f, dt)
                 );
+
                 whichWay = 1;
             }
-            else SnapToClosestLane(movement_val);
+            else
+            {
+                SnapToClosestLane(movementVal);
+            }
         }
-
-        // Move & rotate the player left if the left side of the screen is tapped.
-        else if (
-                    (Input.GetKey(KeyCode.LeftArrow) || (Input.touchCount > 0 && Input.GetTouch(0).position.x < Screen.width / 2))
-                    && !pauseMenu.gamePaused
-                    && !currentlyLaneSplitting
-                    && !gameEnd
-                    && !bullet
-                    && raceStarted
-                )
+        // Move left.
+        else if ((Input.GetKey(KeyCode.LeftArrow) || (Input.touchCount > 0 && Input.GetTouch(0).position.x < Screen.width / 2)) &&
+                 !pauseMenu.gamePaused &&
+                 !currentlyLaneSplitting &&
+                 !gameEnd &&
+                 !bullet &&
+                 raceStarted)
         {
             lastTouchDirection = 0;
-            if (transform.position.x > -11.5f)  // Only start moving the player if we are within track boundaries.
+
+            if (transform.position.x > -11.5f)
             {
                 if (!isTouchDown)
                 {
-                    lastXPosition = transform.position.x;
-                    touchDownTime = (Time.time - startTime);
+                    touchDownTime = Time.time - startTime;
                     isTouchDown = true;
                     isTouchUp = false;
                 }
-                transform.Translate(-25 * movement_val, 0, 0, Space.World);
-                cameraObject.transform.Translate(-25 * movement_val, 0, 0, Space.World);
-                transform.rotation = Quaternion.Lerp(transform.rotation, rotLeft, 9 * movement_val);
+
+                transform.Translate(-25f * movementVal, 0f, 0f, Space.World);
+                transform.rotation = DampRotation(transform.rotation, rotLeft, steeringSharpness, dt);
+
                 carObject.transform.SetLocalPositionAndRotation(
-                    Damp(carObject.transform.localPosition, carObject.transform.localPosition, carLeanSharpness, Time.deltaTime),
-                    Damp(carObject.transform.localRotation, defaultRot, carLeanSharpness, Time.deltaTime)
+                    carObject.transform.localPosition,
+                    DampRotation(carObject.transform.localRotation, defaultRot, steeringSharpness * 1.3f, dt)
                 );
+
                 whichWay = -1;
             }
-            else SnapToClosestLane(movement_val);
+            else
+            {
+                SnapToClosestLane(movementVal);
+            }
         }
-
-        // If there are no player inputs, snap the player to the closest lane.
-        else SnapToClosestLane(movement_val);
-
+        // No input.
+        else
+        {
+            SnapToClosestLane(movementVal);
+        }
     }
 
     private void LateUpdate()
@@ -901,24 +880,27 @@ public class PlayerController : MonoBehaviour
         if (!raceStarted)
             return;
 
-        float targetY = defaultCamPosition.y;
-        float targetZ = cameraObject.transform.position.z;
+        if (currentlyLaneSplitting)
+            return;
 
-        cameraBasePosition = new Vector3(
+        float dt = Time.deltaTime;
+
+        Vector3 currentPos = cameraObject.transform.position;
+
+        // Camera should follow car X after all movement has been applied this frame.
+        Vector3 targetPos = new Vector3(
             transform.position.x,
-            targetY,
-            targetZ
+            defaultCamPosition.y,
+            currentPos.z
         );
 
-        cameraBasePosition = Damp(
-            cameraObject.transform.position,
-            cameraBasePosition,
-            cameraFollowSharpness * explosionShakeIntensity,
-            Time.deltaTime
-        );
+        float followSharpness = cameraFollowSharpness * Mathf.Max(1f, explosionShakeIntensity);
+        Vector3 smoothed = Vector3.Lerp(currentPos, targetPos, ExpFactor(followSharpness, dt));
 
-        Vector3 shakeOffset = GetShakeOffset();
-        cameraObject.transform.position = cameraBasePosition + shakeOffset;
+        defaultCamPosition = smoothed;
+
+        Vector3 shakeOffset = GetCameraShakeOffset();
+        cameraObject.transform.position = defaultCamPosition + shakeOffset;
     }
 
     /*----------------------------------- PLAYER MOVEMENT FUNCTIONS -----------------------------------*/
@@ -985,14 +967,9 @@ public class PlayerController : MonoBehaviour
         currentLane = lane;
 
         float targetX = GetLaneX(lane);
+        float snapT = ExpFactor(laneSnapSharpness, Time.deltaTime);
 
-        // Use a time-based convergence instead of repeated frame-dependent Lerp
-        float newX = Mathf.Lerp(
-            transform.position.x,
-            targetX,
-            ExpFactor(laneSnapSharpness, Time.deltaTime)
-        );
-
+        float newX = Mathf.Lerp(transform.position.x, targetX, snapT);
         transform.position = new Vector3(newX, transform.position.y, transform.position.z);
     }
 
@@ -1877,6 +1854,16 @@ public class PlayerController : MonoBehaviour
         if (!m || !m.HasProperty("_Brightness")) return;
         if (IsMetallic(m))
             m.SetFloat("_Brightness", m.GetFloat("_Brightness") * factor);
+    }
+
+    private static float ExpFactor(float sharpness, float dt)
+    {
+        return 1f - Mathf.Exp(-sharpness * dt);
+    }
+
+    private Quaternion DampRotation(Quaternion current, Quaternion target, float sharpness, float dt)
+    {
+        return Quaternion.Slerp(current, target, ExpFactor(sharpness, dt));
     }
 
     private float EaseOutCubic(float x)
