@@ -1304,8 +1304,8 @@ public class PrefabManager : MonoBehaviour
         TriggerPassPopup(false, aggroCrashCredits);
 
         float upwardSpeed;
-        if (playerController.aggro) upwardSpeed = Mathf.Min(6 + 10 * playerController.accel, 25);  // Units per second.
-        else upwardSpeed = Mathf.Min(6 + 10 * playerController.accel, 40);
+        if (playerController.aggro) upwardSpeed = Mathf.Min(6 + 6 * playerController.accel, 20);  // Units per second.
+        else upwardSpeed = Mathf.Min(6 + 6 * playerController.accel, 20);
 
         float rotationSpeed = Mathf.Min(720 + 180 * playerController.accel, 14400); // Degrees per second.
         float duration = 1.0f / playerController.accel; // Duration of the effect in seconds.
@@ -1429,7 +1429,7 @@ public class PrefabManager : MonoBehaviour
     {
         powerUpSpawnTime = Time.time - startTime;
         int randomPowerup = powerup_probabilities[Random.Range(0, powerup_probabilities.Length)];
-        //randomPowerup = 2;
+        //int randomPowerup = 1;
         powerups[randomPowerup].transform.position = new(lane_positions[Random.Range(0, lane_positions.Length)], -5, playerPosZ + 200);
         powerups[randomPowerup].Play();
     }

@@ -45,7 +45,7 @@ public class PlayerController : MonoBehaviour
     private Quaternion rotLeft;
     private Quaternion rotRight;
     [SerializeField] private float laneSnapSharpness = 1000f;
-    [SerializeField] private float steeringSharpness = 6f;
+    [SerializeField] private float steeringSharpness = 5f;
     [SerializeField] private float carLeanSharpness = 1000f;
     [SerializeField] private float cameraFollowSharpness = 1000f;
     [SerializeField] private float shakeFrequency = 17f;
@@ -91,6 +91,10 @@ public class PlayerController : MonoBehaviour
     private Vector3 cameraBasePosition;
     private float shakeSeedX;
     private float shakeSeedY;
+    [SerializeField] private float bulletCameraZOffset = -3f;
+    [SerializeField] private float bulletCameraZLerpSharpness = 2f;
+    private float currentBulletCameraZOffset = 0f;
+    private float baseCameraZOffsetFromPlayer;
 
     // Powerup variables.
     public bool aggro = false;
@@ -146,7 +150,7 @@ public class PlayerController : MonoBehaviour
 
     // Macros.
     private const float TORNADO_CAMERA_SHAKE = 0.1f;
-    private const float BULLET_CAMERA_SHAKE = 100f;
+    private const float BULLET_CAMERA_SHAKE = 0.15f;
 
     private int currentEnvironment;
 
@@ -329,6 +333,7 @@ public class PlayerController : MonoBehaviour
         maxYPosition = camPosY + 0.066f * cameraHeightMultiplier;
         startingLocalCamPosition = cam.transform.localPosition;
         startingLocalCamRotation = cam.transform.localRotation;
+        baseCameraZOffsetFromPlayer = cameraObject.transform.position.z - transform.position.z;
 
         // Set playercar variables.
         defaultRot = transform.rotation;
@@ -611,24 +616,16 @@ public class PlayerController : MonoBehaviour
             }
 
             // Continue increasing shake intensity until 180 seconds.
-            if (Time.time - (startTime + accelTimeOffset) < 180f && !aggro && !bullet && shakeIntensity < 0.4f)
+            if (Time.time - (startTime + accelTimeOffset) < 180f && !aggro && !bullet && shakeIntensity < 0.3f)
             {
                 shakeIntensity += 2f * shakeIncreaseRate * senseOfSpeedModifier * dt;
             }
 
             if (!gameEnd)
             {
-                if (bullet)
-                {
-                    rotLeft = defaultRot * Quaternion.Euler(0f, -5f, 0f);
-                    rotRight = defaultRot * Quaternion.Euler(0f, 5f, 0f);
-                }
-                else
-                {
-                    float steerScale = 1f / Mathf.Sqrt(accel);
-                    rotLeft = defaultRot * Quaternion.Euler(0f, -10f * steerScale, 0f);
-                    rotRight = defaultRot * Quaternion.Euler(0f, 10f * steerScale, 0f);
-                }
+                float steerScale = 1f / Mathf.Sqrt(accel);
+                rotLeft = defaultRot * Quaternion.Euler(0f, -10f * steerScale, 0f);
+                rotRight = defaultRot * Quaternion.Euler(0f, 10f * steerScale, 0f);
 
                 if (accel < accelMaxValue && !aggro)
                 {
@@ -680,7 +677,7 @@ public class PlayerController : MonoBehaviour
             else
                 transform.rotation = DampRotation(transform.rotation, defaultRot, steeringSharpness, dt);
 
-            SetCurrentLane(currentLane + desiredDirection, movementVal);
+            SetCurrentLane(currentLane + desiredDirection, movementVal / 2);
         }
         // Lane split.
         else if ((Input.touchCount > 1 || (Input.GetKey(KeyCode.RightArrow) && Input.GetKey(KeyCode.LeftArrow))) &&
@@ -790,11 +787,36 @@ public class PlayerController : MonoBehaviour
 
         Vector3 currentPos = cameraObject.transform.position;
 
-        // During lane split, preserve the camera's current X/Z motion from the coroutine
-        // and only let shake ride on top of it.
-        Vector3 targetPos = currentlyLaneSplitting
-            ? new Vector3(currentPos.x, defaultCamPosition.y, currentPos.z)
-            : new Vector3(transform.position.x, defaultCamPosition.y, currentPos.z);
+        float normalTargetZ = transform.position.z + baseCameraZOffsetFromPlayer;
+
+        float desiredBulletOffset = bullet ? bulletCameraZOffset : 0f;
+        float zSharpness = bullet ? bulletCameraZLerpSharpness : 30f;
+        shakeFrequency = bullet ? 20 : 17;
+
+        currentBulletCameraZOffset = Mathf.Lerp(
+            currentBulletCameraZOffset,
+            desiredBulletOffset,
+            ExpFactor(zSharpness, dt)
+        );
+
+        Vector3 targetPos;
+
+        if (currentlyLaneSplitting)
+        {
+            targetPos = new Vector3(
+                currentPos.x,
+                defaultCamPosition.y,
+                normalTargetZ + currentBulletCameraZOffset
+            );
+        }
+        else
+        {
+            targetPos = new Vector3(
+                transform.position.x,
+                defaultCamPosition.y,
+                normalTargetZ + currentBulletCameraZOffset
+            );
+        }
 
         float followSharpness = cameraFollowSharpness * Mathf.Max(1f, explosionShakeIntensity);
         Vector3 smoothed = Vector3.Lerp(currentPos, targetPos, ExpFactor(followSharpness, dt));
@@ -1231,10 +1253,15 @@ public class PlayerController : MonoBehaviour
     private IEnumerator CameraJolt()
     {
         // Define the jolt direction in the X, Y, and Z axes.
-        Vector3 joltDirection = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, -0.5f), Random.Range(0.5f, 1f)).normalized;
-        joltDirection.z = -Mathf.Abs(joltDirection.z); // Making sure Z always pushes forward.
+        Vector3 joltDirection = new Vector3(
+            Random.Range(-1f, 1f),
+            Random.Range(-1f, -0.5f),
+            Random.Range(0.5f, 1f)
+        ).normalized;
 
-        float joltMagnitude = 100f + accel;
+        joltDirection.z = -Mathf.Abs(joltDirection.z) * 0.1f; // Z is 1/5th the X/Y magnitude
+
+        float joltMagnitude = 150f + accel;
 
         // Apply the jolt.
         Vector3 joltVector = joltDirection * joltMagnitude;
@@ -1244,7 +1271,7 @@ public class PlayerController : MonoBehaviour
         cam.transform.localPosition = joltPosition;
 
         // Duration of the return animation.
-        float duration = 0.15f;
+        float duration = 0.1f;
 
         // Initial position after applying the jolt.
         Vector3 initialLocalPosition = cam.transform.localPosition;
@@ -1317,7 +1344,6 @@ public class PlayerController : MonoBehaviour
         // Disable bullet effects.
         if (bullet)
         {
-            float movement_val = Time.deltaTime * accel / 2;
             inBulletExplosion = true;
             if (!soundManager.engineScreamPlayed) soundManager.enginesounds[1].Play();
             soundManager.ToggleBulletSound(accel);
@@ -1655,7 +1681,7 @@ public class PlayerController : MonoBehaviour
                 if (!SaveManager.Instance.SaveData.VignetteEnabled) postProcessManager.vignette.active = true;
                 StartCoroutine(postProcessManager.ColorScreen(Color.red, 15f));
                 oldFov = cam.fieldOfView;
-                StartCoroutine(LerpCameraFOV(cam.fieldOfView, 45, 0.25f));
+                StartCoroutine(LerpCameraFOV(cam.fieldOfView, 35, 0.25f));
                 oldMotionBlur = postProcessManager.motionBlur.intensity.value;
                 StartCoroutine(postProcessManager.LerpMotionBlur(postProcessManager.motionBlur.intensity.value, 0, 0.25f));
             }
@@ -1686,7 +1712,7 @@ public class PlayerController : MonoBehaviour
                 oldFov = cam.fieldOfView;
                 shakeIntensity += BULLET_CAMERA_SHAKE;
                 accel *= 3;
-                StartCoroutine(LerpCameraFOV(cam.fieldOfView * 1.1f, 149, 5f));
+                StartCoroutine(LerpCameraFOV(cam.fieldOfView * 1.25f, cam.fieldOfView * 2f, 5f));
                 StartCoroutine(postProcessManager.ColorScreen(Color.blue, 5f));
             }
 
