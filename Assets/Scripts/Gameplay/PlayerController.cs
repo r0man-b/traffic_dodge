@@ -48,7 +48,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float steeringSharpness = 6f;
     [SerializeField] private float carLeanSharpness = 1000f;
     [SerializeField] private float cameraFollowSharpness = 1000f;
-    [SerializeField] private float shakeFrequency = 20f;
+    [SerializeField] private float shakeFrequency = 17f;
     // Recovery flash configuration.
     private readonly float recoverDuration = 3f;       // Total flashing time
     private readonly float startFlashInterval = 0.25f; // Slowest interval at start (seconds)
@@ -71,8 +71,8 @@ public class PlayerController : MonoBehaviour
     private Vector3 defaultCamPosition;
     private float camPosY;
     private float defaultCamPosY;
-    private float shakeIntensity = 0.01f; // The initial intensity of the camera shake.
-    private readonly float shakeIncreaseRate = 0.0009f;
+    private float shakeIntensity = 0.005f; // The initial intensity of the camera shake.
+    private readonly float shakeIncreaseRate = 0.003f;
     private float explosionShakeIntensity = 1f; // The initial intensity of the explosion shake.
     private float minXPosition;
     private float maxXPosition;
@@ -145,8 +145,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private CarCollection carCollection;
 
     // Macros.
-    private const float TORNADO_CAMERA_SHAKE = 0.5f;
-    private const float BULLET_CAMERA_SHAKE = 10000f;
+    private const float TORNADO_CAMERA_SHAKE = 0.1f;
+    private const float BULLET_CAMERA_SHAKE = 100f;
 
     private int currentEnvironment;
 
@@ -237,46 +237,6 @@ public class PlayerController : MonoBehaviour
 
         // Remove/disable the new CarsPaint, add the old CarsPaint, copy parameters (except TextureSize and Xth frame).
         var newCp = carObject.GetComponent<CarPaintNew>();
-
-        // Ensure we have an old component
-        //var oldCp = carObject.GetComponent<CarPaintOld>();
-        //if (oldCp == null)
-        //{
-        //    oldCp = carObject.AddComponent<CarPaintOld>();
-        //}
-        //
-        //// If the new component exists, copy matching settings over to old (except TextureSize and RunForEveryXthFrame)
-        //if (newCp != null)
-        //{
-        //    // Core toggles
-        //    oldCp.IsEnabled = newCp.IsEnabled;
-        //    oldCp.IsDebug = newCp.IsDebug;
-        //
-        //    // Bounding box (enum values match; cast via int)
-        //    oldCp.BoundingBox = (BoundingBox_Old)(int)newCp.BoundingBox;
-        //
-        //    // Performance / quality (exclude RunForEveryXthFrame and TextureSize here by requirement)
-        //    oldCp.UseOcclusionCulling = newCp.UseOcclusionCulling;
-        //    oldCp.HDR = newCp.HDR;
-        //    oldCp.CameraLODLevel = newCp.CameraLODLevel;
-        //    oldCp.DisablePixelLights = newCp.DisablePixelLights;
-        //    oldCp.ShadowDistance = newCp.ShadowDistance;
-        //
-        //    // Culling & clipping
-        //    oldCp.ReflectLayers = newCp.ReflectLayers;
-        //    oldCp.ClippingPlaneNear = newCp.ClippingPlaneNear;
-        //    oldCp.ClippingPlaneFar = newCp.ClippingPlaneFar;
-        //
-        //    // Material mixing
-        //    oldCp._MixMultiplier = newCp._MixMultiplier;
-        //
-        //    // Remove or disable the new component
-        //    Destroy(newCp); // avoids SRP callbacks and cost
-        //}
-        //
-        //// Set TextureSize and Xth frame explicitly for the old component
-        //oldCp.TextureSize = TextureSize_Old.x256;  // per your requirement
-        //oldCp.RunForEveryXthFrame = 2;             // per your requirement
 
         // Optional brightness boost logic (your existing helper)
         BoostBrightnessIfMetallic(currentCar.primColor, 3f);
@@ -557,7 +517,7 @@ public class PlayerController : MonoBehaviour
                 if (shakeIntensity > 0.3f)
                 {
                     float xoffset = 0.001f * shakeIntensity * 200f * explosionShakeIntensity;
-                    float yoffset = 0.0075f * shakeIntensity * 10f * explosionShakeIntensity;
+                    float yoffset = 0.0075f * shakeIntensity * 100f * explosionShakeIntensity;
                     minXPosition = transform.position.x - xoffset;
                     maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
@@ -566,7 +526,7 @@ public class PlayerController : MonoBehaviour
                 else if (shakeIntensity > 0.2f)
                 {
                     float xoffset = 0.011f * shakeIntensity * 200f * explosionShakeIntensity;
-                    float yoffset = 0.015f * shakeIntensity * 10f * explosionShakeIntensity;
+                    float yoffset = 0.015f * shakeIntensity * 100f * explosionShakeIntensity;
                     minXPosition = transform.position.x - xoffset;
                     maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
@@ -575,7 +535,7 @@ public class PlayerController : MonoBehaviour
                 else
                 {
                     float xoffset = 0.011f * shakeIntensity * 200f * explosionShakeIntensity;
-                    float yoffset = 0.022f * shakeIntensity * 20f * explosionShakeIntensity;
+                    float yoffset = 0.022f * shakeIntensity * 100f * explosionShakeIntensity;
                     minXPosition = transform.position.x - xoffset;
                     maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
@@ -590,7 +550,7 @@ public class PlayerController : MonoBehaviour
                 if (shakeIntensity > 0.3f)
                 {
                     float xoffset = 0.001f * shakeIntensity * 200f * accel * accel * explosionShakeIntensity / 10f;
-                    float yoffset = 0.0075f * shakeIntensity * 10f * accel * accel * explosionShakeIntensity / 10f;
+                    float yoffset = 0.0075f * shakeIntensity * 100f * accel * accel * explosionShakeIntensity / 10f;
                     minXPosition = transform.position.x - xoffset;
                     maxXPosition = transform.position.x + xoffset;
                     minYPosition = defaultCamPosY - yoffset;
@@ -600,15 +560,15 @@ public class PlayerController : MonoBehaviour
                 {
                     minXPosition = transform.position.x - 0.011f * shakeIntensity * 200f * accel * accel * explosionShakeIntensity / 10f;
                     maxXPosition = transform.position.x + 0.011f * shakeIntensity * 200f * accel * accel * explosionShakeIntensity / 10f;
-                    minYPosition = defaultCamPosY - 0.015f * shakeIntensity * 10f * accel * explosionShakeIntensity / 10f;
-                    maxYPosition = defaultCamPosY + 0.015f * shakeIntensity * 10f * accel * explosionShakeIntensity / 10f;
+                    minYPosition = defaultCamPosY - 0.015f * shakeIntensity * 100f * accel * explosionShakeIntensity / 10f;
+                    maxYPosition = defaultCamPosY + 0.015f * shakeIntensity * 100f * accel * explosionShakeIntensity / 10f;
                 }
                 else
                 {
                     minXPosition = transform.position.x - 0.011f * shakeIntensity * 200f * accel * explosionShakeIntensity / 10f;
                     maxXPosition = transform.position.x + 0.011f * shakeIntensity * 200f * accel * explosionShakeIntensity / 10f;
-                    minYPosition = defaultCamPosY - 0.022f * shakeIntensity * 20f * explosionShakeIntensity / 10f;
-                    maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 20f * explosionShakeIntensity / 10f;
+                    minYPosition = defaultCamPosY - 0.022f * shakeIntensity * 100f * explosionShakeIntensity / 10f;
+                    maxYPosition = defaultCamPosY + 0.022f * shakeIntensity * 100f * explosionShakeIntensity / 10f;
                 }
 
                 minYPosition = Mathf.Clamp(minYPosition, 2f, 4f);
@@ -826,19 +786,15 @@ public class PlayerController : MonoBehaviour
         if (!raceStarted)
             return;
 
-        if (currentlyLaneSplitting)
-            return;
-
-        float dt = Time.fixedDeltaTime;
+        float dt = Time.deltaTime;
 
         Vector3 currentPos = cameraObject.transform.position;
 
-        // Camera should follow car X after all movement has been applied this frame.
-        Vector3 targetPos = new Vector3(
-            transform.position.x,
-            defaultCamPosition.y,
-            currentPos.z
-        );
+        // During lane split, preserve the camera's current X/Z motion from the coroutine
+        // and only let shake ride on top of it.
+        Vector3 targetPos = currentlyLaneSplitting
+            ? new Vector3(currentPos.x, defaultCamPosition.y, currentPos.z)
+            : new Vector3(transform.position.x, defaultCamPosition.y, currentPos.z);
 
         float followSharpness = cameraFollowSharpness * Mathf.Max(1f, explosionShakeIntensity);
         Vector3 smoothed = Vector3.Lerp(currentPos, targetPos, ExpFactor(followSharpness, dt));
@@ -1263,8 +1219,8 @@ public class PlayerController : MonoBehaviour
 
         float t = Time.time * shakeFrequency;
 
-        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity;
-        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity;
+        float x = (Mathf.PerlinNoise(shakeSeedX, t) - 0.5f) * 2f * shakeIntensity * explosionShakeIntensity;
+        float y = (Mathf.PerlinNoise(shakeSeedY, t) - 0.5f) * 2f * shakeIntensity * explosionShakeIntensity;
 
         float clampedX = Mathf.Clamp(defaultCamPosition.x + x, minXPosition, maxXPosition) - defaultCamPosition.x;
         float clampedY = Mathf.Clamp(defaultCamPosition.y + y, minYPosition, maxYPosition) - defaultCamPosition.y;
@@ -1274,38 +1230,37 @@ public class PlayerController : MonoBehaviour
 
     private IEnumerator CameraJolt()
     {
-        Vector3 originalLocalPosition = cam.transform.localPosition;
+        // Define the jolt direction in the X, Y, and Z axes.
+        Vector3 joltDirection = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, -0.5f), Random.Range(0.5f, 1f)).normalized;
+        joltDirection.z = -Mathf.Abs(joltDirection.z); // Making sure Z always pushes forward.
 
-        Vector3 joltDirection = new Vector3(
-            Random.Range(-1f, 1f),
-            Random.Range(-1f, -0.5f),
-            Random.Range(0.5f, 1f)
-        ).normalized;
+        float joltMagnitude = 100f + accel;
 
-        joltDirection.z = -Mathf.Abs(joltDirection.z);
-
-        float joltMagnitude = 4f + accel;
-        Vector3 joltPosition = originalLocalPosition + joltDirection * joltMagnitude;
+        // Apply the jolt.
+        Vector3 joltVector = joltDirection * joltMagnitude;
+        Vector3 joltPosition = cam.transform.localPosition + joltVector;
         joltPosition.y = Mathf.Max(joltPosition.y, -1f);
         joltPosition.x = Mathf.Clamp(joltPosition.x, -1f, 1f);
-
         cam.transform.localPosition = joltPosition;
 
+        // Duration of the return animation.
         float duration = 0.15f;
-        float elapsed = 0f;
 
-        while (elapsed < duration)
+        // Initial position after applying the jolt.
+        Vector3 initialLocalPosition = cam.transform.localPosition;
+
+        // Animate the camera back to its original local position.
+        for (float t = 0; t < duration; t += Time.deltaTime)
         {
-            elapsed += Time.deltaTime;
-            cam.transform.localPosition = Vector3.Lerp(
-                joltPosition,
-                originalLocalPosition,
-                ExpFactor(20f, Time.deltaTime)
-            );
+            float factor = t / duration;
+            Vector3 newPosition = Vector3.Lerp(initialLocalPosition, Vector3.zero, factor);
+            cam.transform.localPosition = newPosition;
+
             yield return null;
         }
 
-        cam.transform.localPosition = originalLocalPosition;
+        // Ensure the camera ends up exactly in its original local position.
+        cam.transform.localPosition = Vector3.zero;
     }
 
     private IEnumerator LerpCameraFOV(float startFov, float targetFov, float duration)
@@ -1319,18 +1274,6 @@ public class PlayerController : MonoBehaviour
 
             // Lerp Field Of View.
             cam.fieldOfView = Mathf.Lerp(startFov, targetFov, t);
-
-            // Calculate the desired Z position based on the lerped FOV.
-            if (!bullet)
-            {
-                //float fov = cam.fieldOfView;
-                //float adjustmentFactor = Mathf.Lerp(0, 0.4f, Mathf.InverseLerp(136f, 35f, fov));
-                float targetZ = this.transform.position.z - 0.0150065f * cam.fieldOfView + currentCar.defaultCameraPosition.z + 0.9174f;
-
-                // Adjust Z position towards the target position.
-                float deltaZ = targetZ - cameraObject.transform.position.z;
-                //cameraObject.transform.position += new Vector3(0, 0, deltaZ);
-            }
 
             yield return null;
         }
@@ -1765,7 +1708,7 @@ public class PlayerController : MonoBehaviour
             inTornadoExplosion = false;
             StartCoroutine(prefabManager.ExplodeTraffic(explosionParent.transform, transform, false));
             other.gameObject.SetActive(false);
-            explosionShakeIntensity = 100f * accel;
+            explosionShakeIntensity = 250f;
         }
                 
         else if (!currentlyLaneSplitting && !bullet && !tornado && !gameEnd && !invincible) // Handle final collision.
