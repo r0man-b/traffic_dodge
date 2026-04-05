@@ -45,7 +45,7 @@ public class PlayerController : MonoBehaviour
     private Quaternion rotLeft;
     private Quaternion rotRight;
     [SerializeField] private float laneSnapSharpness = 1000f;
-    [SerializeField] private float steeringSharpness = 5f;
+    [SerializeField] private float steeringSharpness = 4f;
     [SerializeField] private float carLeanSharpness = 1000f;
     [SerializeField] private float cameraFollowSharpness = 1000f;
     [SerializeField] private float shakeFrequency = 17f;
@@ -72,7 +72,7 @@ public class PlayerController : MonoBehaviour
     private float camPosY;
     private float defaultCamPosY;
     private float shakeIntensity = 0.005f; // The initial intensity of the camera shake.
-    private readonly float shakeIncreaseRate = 0.0015f;
+    private readonly float shakeIncreaseRate = 0.0007f;
     private float explosionShakeIntensity = 1f; // The initial intensity of the explosion shake.
     private float minXPosition;
     private float maxXPosition;
@@ -635,7 +635,7 @@ public class PlayerController : MonoBehaviour
 
                 if (accel < 2.38f && accel < accelMaxValue && !aggro && Time.time - startTime > soundManager.drop + 0.1f)
                 {
-                    cam.fieldOfView = 60f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
+                    cam.fieldOfView = 46f * (accel - 0.5f) * senseOfSpeedModifier + 33.5f;
                 }
             }
 
