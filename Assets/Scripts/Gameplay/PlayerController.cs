@@ -45,7 +45,7 @@ public class PlayerController : MonoBehaviour
     private Quaternion rotLeft;
     private Quaternion rotRight;
     [SerializeField] private float laneSnapSharpness = 1000f;
-    [SerializeField] private float steeringSharpness = 4f;
+    [SerializeField] private float steeringSharpness = 9f;
     [SerializeField] private float carLeanSharpness = 1000f;
     [SerializeField] private float cameraFollowSharpness = 1000f;
     [SerializeField] private float shakeFrequency = 17f;
@@ -71,7 +71,7 @@ public class PlayerController : MonoBehaviour
     private Vector3 defaultCamPosition;
     private float camPosY;
     private float defaultCamPosY;
-    private float shakeIntensity = 0.005f; // The initial intensity of the camera shake.
+    private float shakeIntensity = 0.007f; // The initial intensity of the camera shake.
     private readonly float shakeIncreaseRate = 0.0007f;
     private float explosionShakeIntensity = 1f; // The initial intensity of the explosion shake.
     private float minXPosition;
@@ -517,7 +517,7 @@ public class PlayerController : MonoBehaviour
             }
 
             // Increase shake intensity
-            if (gameEnd && explosionShakeIntensity > 1)
+            if (gameEnd && explosionShakeIntensity > 0f)
             {
                 if (shakeIntensity > 0.3f)
                 {
@@ -547,6 +547,8 @@ public class PlayerController : MonoBehaviour
                     maxYPosition = defaultCamPosY + yoffset;
                 }
 
+                minYPosition = Mathf.Clamp(minYPosition, 2f, 4f);
+                maxYPosition = Mathf.Clamp(maxYPosition, 2f, 4f);
                 minXPosition = Mathf.Clamp(minXPosition, transform.position.x - 3f, transform.position.x + 3f);
                 maxXPosition = Mathf.Clamp(maxXPosition, transform.position.x - 3f, transform.position.x + 3f);
             }
@@ -616,7 +618,7 @@ public class PlayerController : MonoBehaviour
             }
 
             // Continue increasing shake intensity until 180 seconds.
-            if (Time.time - (startTime + accelTimeOffset) < 180f && !aggro && !bullet && shakeIntensity < 0.3f)
+            if (Time.time - (startTime + accelTimeOffset) < 180f && !aggro && !bullet && shakeIntensity < 0.04f)
             {
                 shakeIntensity += 2f * shakeIncreaseRate * senseOfSpeedModifier * dt;
             }
@@ -639,18 +641,20 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
-            if (explosionShakeIntensity > 1f && (gameEnd || inTrafficExplosion || inTornadoExplosion || inBulletExplosion))
+            if (explosionShakeIntensity > 0f && (gameEnd || inTrafficExplosion || inTornadoExplosion || inBulletExplosion))
             {
                 if (gameEnd)
                 {
                     accel = 0f;
                 }
 
-                explosionShakeIntensity -= gameEnd || inTornadoExplosion
-                    ? EaseOutCubic(explosionShakeIntensity / 2.5f * (gameEnd ? 1f : accel) * dt)
-                    : (explosionShakeIntensity / 0.25f * dt);
+                explosionShakeIntensity -= gameEnd
+                    ? EaseOutCubic(explosionShakeIntensity / 2.5f * shakeIntensity * dt)
+                    : (gameEnd || inTornadoExplosion
+                        ? EaseOutCubic(explosionShakeIntensity / 2.5f * accel * dt)
+                        : explosionShakeIntensity / 0.25f * dt);
 
-                explosionShakeIntensity = Mathf.Clamp(explosionShakeIntensity, 1f, explosionShakeIntensity);
+                explosionShakeIntensity = Mathf.Max(0f, explosionShakeIntensity);
             }
 
             if (explosionShakeIntensity <= 1f && !gameEnd)
@@ -1760,8 +1764,8 @@ public class PlayerController : MonoBehaviour
                 inBulletExplosion = false;
 
                 // Increase explosion intensity.
-                shakeIntensity = 1.25f * accel;
-                explosionShakeIntensity = 100f;
+                shakeIntensity = 1f;
+                explosionShakeIntensity = 20f;
 
                 // Stop player car, erase player car & car collided with, play the explosion animation.
                 accel = 0;

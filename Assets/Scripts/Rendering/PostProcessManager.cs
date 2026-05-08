@@ -29,6 +29,7 @@ public class PostProcessManager : MonoBehaviour
     private LiftGammaGain liftGammaGain;
     public Vignette vignette;
     private const float duration = 93f;
+    private const float vignetteMaxIntensity = 0.65f;
 
     // Motion blur
     public MotionBlur motionBlur;
@@ -130,10 +131,10 @@ public class PostProcessManager : MonoBehaviour
         }
 
         // **Increase Vignette Intensity Based on Acceleration**
-        if (vignette != null && vignette.active && !playerController.gameEnd && !playerController.aggro)
+        if (vignette != null && vignette.active && !playerController.gameEnd && !playerController.aggro && playerController.raceStarted)
         {
-            float accelRatio = Mathf.Clamp01(playerController.accel / playerController.currentCar.accelMaxValue);
-            vignette.intensity.value = Mathf.Lerp(0, 0.75f, accelRatio);
+            float accelRatio = Mathf.InverseLerp(0.5f, 1.75f, playerController.accel);
+            vignette.intensity.value = accelRatio * vignetteMaxIntensity;
         }
 
 
