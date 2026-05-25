@@ -45,7 +45,7 @@ public class PlayerController : MonoBehaviour
     private Quaternion rotLeft;
     private Quaternion rotRight;
     [SerializeField] private float laneSnapSharpness = 1000f;
-    [SerializeField] private float steeringSharpness = 9f;
+    [SerializeField] private float steeringSharpness = 7f;
     [SerializeField] private float carLeanSharpness = 1000f;
     [SerializeField] private float cameraFollowSharpness = 1000f;
     [SerializeField] private float shakeFrequency = 17f;
