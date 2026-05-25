@@ -12,6 +12,11 @@ public class ApplyGammaSettings : MonoBehaviour
         // Get the Post Processing Volume component on the same GameObject
         postProcessingVolume = GetComponent<Volume>();
 
+        if (postProcessingVolume != null && postProcessingVolume.sharedProfile != null)
+        {
+            postProcessingVolume.profile = Instantiate(postProcessingVolume.sharedProfile);
+        }
+
         if (postProcessingVolume != null && postProcessingVolume.profile.TryGet(out liftGammaGain))
         {
             // Load the saved gamma value from SaveData

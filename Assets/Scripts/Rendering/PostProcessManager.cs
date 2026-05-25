@@ -44,6 +44,27 @@ public class PostProcessManager : MonoBehaviour
 
     private int currentEnvironment;
 
+    private void Awake()
+    {
+        if (profile != null)
+        {
+            profile = Instantiate(profile);
+        }
+
+        if (TryGetComponent(out Volume volume))
+        {
+            if (profile == null && volume.sharedProfile != null)
+            {
+                profile = Instantiate(volume.sharedProfile);
+            }
+
+            if (profile != null)
+            {
+                volume.profile = profile;
+            }
+        }
+    }
+
     private void Start()
     {
         // Get current environment.
