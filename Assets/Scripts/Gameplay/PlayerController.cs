@@ -161,10 +161,14 @@ public class PlayerController : MonoBehaviour
     {
         // Retrieve the Car instance from the collection using the string key.
         int typeIdx = GetCarTypeIndex(currentCarType);
-        currentCar = (Car)carCollection.carTypes[typeIdx].items[currentCarIndex];
+        Car carAsset = (Car)carCollection.carTypes[typeIdx].items[currentCarIndex];
 
-        currentCar.InitializeCar(currentCarType, currentCarIndex, currentCar.carModel.transform);
-        carObject = Instantiate(currentCar.carModel, Vector3.zero, Quaternion.identity, this.transform);
+        // Instantiate the prefab first, then initialize a runtime Car copy against that scene object.
+        // Initializing carAsset.carModel.transform would edit the prefab/material assets themselves,
+        // which makes Unity Version Control list them as changed after every Play Mode run.
+        carObject = Instantiate(carAsset.carModel, Vector3.zero, Quaternion.identity, this.transform);
+        currentCar = carAsset.CreateRuntimeInstance(carObject.transform);
+        currentCar.InitializeCar(currentCarType, currentCarIndex, carObject.transform);
         carObject.transform.localPosition = currentCar.raceSpawnPosition;
 
 

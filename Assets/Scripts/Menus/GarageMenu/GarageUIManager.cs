@@ -148,7 +148,9 @@ public class GarageUIManager : MonoBehaviour
     private int whichPartToPaint; // 0 = primary_color, 1 = secondary_color, 2 = rim_color, 3 = primary_light, 4 = secondary_light, 5 = tail_light
     private readonly Dictionary<Car.ColorType, SaveData.ColorData> _pendingColors = new Dictionary<Car.ColorType, SaveData.ColorData>();
     private readonly Dictionary<Car.ColorType, (int paintType, int presetIndex)> _pendingPreset = new Dictionary<Car.ColorType, (int paintType, int presetIndex)>();
+    private readonly Dictionary<Material, Material> runtimePaintButtonMaterials = new Dictionary<Material, Material>();
     private int currentPaintPrice;
+    private const string RuntimePaintButtonMaterialSuffix = " (Paint Button Runtime)";
 
     // Vars for metallic paints
     private readonly float nonMetallicVal = 0.1f;
@@ -1500,6 +1502,7 @@ public class GarageUIManager : MonoBehaviour
                 colorBuckets[1].SetActive(false);
                 colorBuckets[2].SetActive(false);
                 colorBuckets[3].SetActive(false);
+                PrepareMetalPaintButtonMaterials();
                 colorBuckets[4].SetActive(true);
                 metalSpheres.SetActive(true);
                 paintType.text = "METALS";
@@ -1582,7 +1585,8 @@ public class GarageUIManager : MonoBehaviour
         else
         {
             // Existing logic for non-metal buttons (may use Image.material or Image.color).
-            Material buttonMaterial = clickedButton.GetComponent<Image>().material;
+            Image buttonImage = clickedButton.GetComponent<Image>();
+            Material buttonMaterial = GetRuntimePaintButtonMaterial(buttonImage);
 
             // Pearlescent paint buttons have 3 different colours.
             if (buttonMaterial && buttonMaterial.HasProperty("_TopColor") &&
@@ -1595,7 +1599,7 @@ public class GarageUIManager : MonoBehaviour
             }
             else // Gloss paint buttons have only one color, set all 3 properties to it.
             {
-                buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
+                buttonColor = topColor = middleColor = bottomColor = buttonImage.color;
             }
         }
 
@@ -2280,6 +2284,63 @@ public class GarageUIManager : MonoBehaviour
 
     /* -- PAINT UI FUNCTIONS FOR METAL PAINTS -- */
 
+    private void PrepareMetalPaintButtonMaterials()
+    {
+        // The metal paint menu uses shiny UI materials for the bronze/gold/silver buttons.
+        // When those asset materials are left directly on active Images, Unity can mark
+        // the .mat files dirty during play-mode rendering even though gameplay has not
+        // intentionally edited them. Swap the bucket and preview sphere Images to
+        // DontSave runtime clones before the menu is shown so any UI-side renderer state
+        // stays local to this play session.
+        if (colorBuckets != null && colorBuckets.Count > 4)
+            PrepareRuntimePaintButtonMaterials(colorBuckets[4]);
+
+        PrepareRuntimePaintButtonMaterials(metalSpheres);
+    }
+
+    private void PrepareRuntimePaintButtonMaterials(GameObject root)
+    {
+        if (root == null) return;
+
+        Image[] images = root.GetComponentsInChildren<Image>(true);
+        foreach (Image image in images)
+        {
+            GetRuntimePaintButtonMaterial(image);
+        }
+    }
+
+    private Material GetRuntimePaintButtonMaterial(Image image)
+    {
+        if (image == null || image.material == null)
+            return null;
+
+        Material source = image.material;
+        if (IsRuntimePaintButtonMaterial(source))
+            return source;
+
+        if (!runtimePaintButtonMaterials.TryGetValue(source, out Material runtimeMaterial))
+        {
+            // Keep a single clone per source material so every duplicate swatch still
+            // shares the same visual settings, while the original project asset remains
+            // untouched by play mode and menu preview reads.
+            runtimeMaterial = new Material(source)
+            {
+                name = source.name + RuntimePaintButtonMaterialSuffix,
+                hideFlags = HideFlags.DontSave
+            };
+
+            runtimePaintButtonMaterials[source] = runtimeMaterial;
+        }
+
+        image.material = runtimeMaterial;
+        return runtimeMaterial;
+    }
+
+    private static bool IsRuntimePaintButtonMaterial(Material material)
+    {
+        return material != null && material.name.EndsWith(RuntimePaintButtonMaterialSuffix, StringComparison.Ordinal);
+    }
+
     private void RefreshOwnedMarkersForMetals(int partIndex)
     {
         if (!SaveManager.Instance.SaveData.Cars.TryGetValue((currentCarType, currentCarIndex), out var carData))
@@ -2331,7 +2392,8 @@ public class GarageUIManager : MonoBehaviour
             return;
         }
 
-        Material buttonMaterial = clickedButton.GetComponent<Image>().material;
+        Image buttonImage = clickedButton.GetComponent<Image>();
+        Material buttonMaterial = GetRuntimePaintButtonMaterial(buttonImage);
         Color topColor, middleColor, bottomColor;
         Color buttonColor = new Color(0, 0, 0);
 
@@ -2343,7 +2405,7 @@ public class GarageUIManager : MonoBehaviour
         }
         else
         {
-            buttonColor = topColor = middleColor = bottomColor = clickedButton.GetComponent<Image>().color;
+            buttonColor = topColor = middleColor = bottomColor = buttonImage.color;
         }
 
         SaveData saveData = SaveManager.Instance.SaveData;
