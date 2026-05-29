@@ -47,14 +47,6 @@ public class PostProcessManager : MonoBehaviour
 
     private void Awake()
     {
-        // These arrays are serialized with project material assets, but the screen-color effects
-        // below call SetColor on them during gameplay. Clone them up front so the effect state is
-        // runtime-only and Unity Version Control does not see road/wall materials as modified.
-        roadLine = CloneRuntimeMaterials(roadLine);
-        roadEdge = CloneRuntimeMaterials(roadEdge);
-        metalWall = CloneRuntimeMaterials(metalWall);
-        roadDashLine = CloneRuntimeMaterials(roadDashLine);
-
         if (profile != null)
         {
             profile = Instantiate(profile);
@@ -72,27 +64,6 @@ public class PostProcessManager : MonoBehaviour
                 volume.profile = profile;
             }
         }
-    }
-
-    private static Material[] CloneRuntimeMaterials(Material[] source)
-    {
-        if (source == null) return null;
-
-        Material[] runtimeMaterials = new Material[source.Length];
-        for (int i = 0; i < source.Length; i++)
-        {
-            if (source[i] == null) continue;
-
-            // HideFlags.DontSave keeps the cloned material out of scenes, prefabs, and asset files.
-            // The clone still behaves like the original material for rendering during this session.
-            runtimeMaterials[i] = new Material(source[i])
-            {
-                name = source[i].name + " (Runtime)",
-                hideFlags = HideFlags.DontSave
-            };
-        }
-
-        return runtimeMaterials;
     }
 
     private void Start()

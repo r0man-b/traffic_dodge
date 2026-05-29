@@ -16,7 +16,7 @@ public class GraphicsSettingsApplier : MonoBehaviour
         var save = SaveManager.Instance.SaveData;
 
         UniversalRenderPipelineAsset urpAsset =
-            GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
+            GraphicsSettings.renderPipelineAsset as UniversalRenderPipelineAsset;
 
         if (urpAsset != null)
         {

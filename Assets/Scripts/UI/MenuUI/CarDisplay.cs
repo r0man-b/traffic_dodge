@@ -194,6 +194,7 @@ public class CarDisplay : MonoBehaviour
     // Activate and display car on turntable in garage.
     public GameObject DisplayCar(Car _car, string carType, int carIndex, bool lootboxCar)
     {
+        currentCar = _car;
         currentCarType = carType;
         currentCarIndex = carIndex;
 
@@ -222,16 +223,11 @@ public class CarDisplay : MonoBehaviour
         // Select the pre-placed instance for this car type.
         _spawnedModel = carPrefabs[prefabIndex];
 
-        // The menu uses pre-placed car GameObjects, but paint setup mutates Material properties.
-        // Create a runtime Car wrapper bound to this scene instance before randomizing/applying
-        // saved colors so Play Mode does not check out the original Car asset or .mat files.
-        currentCar = _car.CreateRuntimeInstance(_spawnedModel.transform);
-
         if (lootboxCar)
         {
             carName.text = currentCar.car_name;
 
-            _lastPaintTraitMask = currentCar.RandomizeCar(currentCarType, currentCarIndex, _spawnedModel.transform, false);
+            _lastPaintTraitMask = _car.RandomizeCar(currentCarType, currentCarIndex, _spawnedModel.transform, false);
 
             // For lootbox path we place using local offsets under holder.
             // Your previous code overwrote the local position with the turntable values directly.
@@ -243,7 +239,7 @@ public class CarDisplay : MonoBehaviour
             _spawnedModel.transform.localRotation = Quaternion.identity;
 
             // Update performance stats
-            UpdateStats(currentCar.accelMaxValue, currentCar.accelIncreaseRate, currentCar.numlives);
+            UpdateStats(_car.accelMaxValue, _car.accelIncreaseRate, _car.numlives);
             carPrice.text = currentCar.price.ToString("N0") + " cr";
             carPowerplant.text = currentCar.powerplant;
         }
@@ -278,7 +274,7 @@ public class CarDisplay : MonoBehaviour
                 }
             }
 
-            currentCar.InitializeCar(currentCarType, currentCarIndex, _spawnedModel.transform, isOwned);
+            _car.InitializeCar(currentCarType, currentCarIndex, _spawnedModel.transform, isOwned);
 
             // Non-lootbox path previously used world pose; mirror that logic.
             // Parent is already carHolder; set world position/rotation accordingly.
