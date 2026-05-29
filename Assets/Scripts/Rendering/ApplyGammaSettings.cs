@@ -6,6 +6,8 @@ public class ApplyGammaSettings : MonoBehaviour
 {
     private Volume postProcessingVolume;
     private LiftGammaGain liftGammaGain;
+    private Vignette vignette;
+    private FilmGrain filmGrain;
 
     void Awake()
     {
@@ -17,21 +19,39 @@ public class ApplyGammaSettings : MonoBehaviour
             postProcessingVolume.profile = Instantiate(postProcessingVolume.sharedProfile);
         }
 
-        if (postProcessingVolume != null && postProcessingVolume.profile.TryGet(out liftGammaGain))
+        if (postProcessingVolume != null)
         {
-            // Load the saved gamma value from SaveData
-            float savedGamma = SaveManager.Instance.SaveData.GammaValue;
+            // Apply Lift Gamma Gain
+            if (postProcessingVolume.profile.TryGet(out liftGammaGain))
+            {
+                // Load the saved gamma value from SaveData
+                float savedGamma = SaveManager.Instance.SaveData.GammaValue;
 
-            // Apply the gamma setting
-            Vector4 gamma = liftGammaGain.gamma.value;
-            gamma.w = savedGamma * 5f; // Modify only the W component (brightness)
-            liftGammaGain.gamma.value = gamma;
+                // Apply the gamma setting
+                Vector4 gamma = liftGammaGain.gamma.value;
+                gamma.w = savedGamma * 5f; // Modify only the W component (brightness)
+                liftGammaGain.gamma.value = gamma;
 
-            Debug.Log($"Gamma Loaded and Applied: {savedGamma}");
+                Debug.Log($"Gamma Loaded and Applied: {savedGamma}");
+            }
+
+            // Apply Vignette
+            if (postProcessingVolume.profile.TryGet(out vignette))
+            {
+                vignette.active = SaveManager.Instance.SaveData.VignetteEnabled;
+                Debug.Log($"Vignette Loaded and Applied: {vignette.active}");
+            }
+
+            // Apply Film Grain
+            if (postProcessingVolume.profile.TryGet(out filmGrain))
+            {
+                filmGrain.active = SaveManager.Instance.SaveData.FilmGrainEnabled;
+                Debug.Log($"Film Grain Loaded and Applied: {filmGrain.active}");
+            }
         }
         else
         {
-            Debug.LogError("Post Processing Volume or Lift Gamma Gain not found!");
+            Debug.LogError("Post Processing Volume not found!");
         }
     }
 }

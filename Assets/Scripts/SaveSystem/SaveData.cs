@@ -114,6 +114,7 @@ public class SaveData
     // Menu/OptionsMenu/DisplaySettings.cs
     public float GammaValue = 0.08f;  // Default gamma value (1.0 = normal brightness).
     public bool VignetteEnabled = false; // Default state of vignette effect.
+    public bool FilmGrainEnabled = true; // Default state of film grain effect.
 
     // Menu/OptionsMenu/SoundSettings.cs
     public float MusicVolume = 0.5f;   // Global volume multiplier for all music.

@@ -28,6 +28,7 @@ public class PostProcessManager : MonoBehaviour
     // Post-processing effects
     private LiftGammaGain liftGammaGain;
     public Vignette vignette;
+    public FilmGrain filmGrain;
     private const float duration = 93f;
     private const float vignetteMaxIntensity = 0.65f;
 
@@ -155,6 +156,13 @@ public class PostProcessManager : MonoBehaviour
             vignette.active = SaveManager.Instance.SaveData.VignetteEnabled;
             vignette.intensity.value = 0; // Start at 0 intensity
             Debug.Log($"Vignette Enabled: {vignette.active}");
+        }
+
+        // Get Film Grain Effect
+        if (profile.TryGet(out filmGrain))
+        {
+            filmGrain.active = SaveManager.Instance.SaveData.FilmGrainEnabled;
+            Debug.Log($"Film Grain Enabled: {filmGrain.active}");
         }
 
         // Find the playerController script.
