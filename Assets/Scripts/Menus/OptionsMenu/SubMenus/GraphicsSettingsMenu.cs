@@ -267,7 +267,7 @@ namespace Settings
 	{
 		public static UniversalRenderPipelineAsset GetActiveURPAsset()
 		{
-			return GraphicsSettings.renderPipelineAsset as UniversalRenderPipelineAsset;
+			return GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
 		}
 
 	}
