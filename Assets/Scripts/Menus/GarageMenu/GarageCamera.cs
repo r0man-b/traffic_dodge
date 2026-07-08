@@ -168,7 +168,7 @@ public class GarageCamera : MonoBehaviour
                 newRot = new Quaternion(0.000229400466f, -0.996252596f, 0.086451076f, 0.00264358567f);
                 break;
             case 3: // FRONT WHEELS
-                newPos = new Vector3(-2.29049325f, 0.307607889f, 3.38278055f);
+                newPos = new Vector3(-1.50953341f, 0.202726811f, 2.22939754f);
                 newRot = new Quaternion(-0.0110159721f, -0.955369055f, 0.0359171554f, -0.293016464f);
                 break;
             case 4: // REAR SPLITTERS
@@ -176,9 +176,8 @@ public class GarageCamera : MonoBehaviour
                 newRot = new Quaternion(0.0581534915f, 0.00210877811f, -0.000122840982f, 0.99830544f);
                 break;
             case 5: // REAR WHEELS
-                newPos = new Vector3(-2.37483048f, 0.311843455f, -3.32371998f);
-                newRot = new Quaternion(-0.0362688005f, -0.305026591f, 0.0116258506f, -0.951581955f);
-
+                newPos = new Vector3(-1.8986038f, 0.454051167f, -1.8652457f);
+                newRot = new Quaternion(-0.0778172761f, -0.385394096f, 0.0326377116f, -0.918885529f);
                 break;
             case 6: // SIDESKIRTS
                 newPos = new Vector3(-2.04558563f, 0.601261377f, -1.6565218f);
@@ -197,6 +196,10 @@ public class GarageCamera : MonoBehaviour
                 newRot = new Quaternion(-0.0508729741f, -0.709620357f, 0.0515092276f, -0.700854957f);
                 break;
             case 10: // RIM COLOR
+                newPos = new Vector3(-4.19782162f, 0.612690032f, 0.0521764755f);
+                newRot = new Quaternion(-0.0508729741f, -0.709620357f, 0.0515092276f, -0.700854957f);
+                break;
+            case 11: // SIDE EXHAUSTS
                 newPos = new Vector3(-4.19782162f, 0.612690032f, 0.0521764755f);
                 newRot = new Quaternion(-0.0508729741f, -0.709620357f, 0.0515092276f, -0.700854957f);
                 break;

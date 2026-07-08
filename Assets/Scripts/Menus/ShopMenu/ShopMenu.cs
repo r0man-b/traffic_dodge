@@ -20,6 +20,8 @@ public class ShopMenu : MonoBehaviour
     [SerializeField] private CreditManager creditManager;        // Object holding a `CreditManager` component
     [SerializeField] private NitroManager nitroManager;          // Object holding a `NitroManager` component
     [SerializeField] private GameObject garageUI;
+    [SerializeField] private GameObject carSelectorUI;
+    [SerializeField] private GameObject customizationUI;
     [SerializeField] private GarageUIManager garageUIManager;
     [SerializeField] private GameObject mainMenuUI;
     [SerializeField] private CarDisplay carDisplay;
@@ -396,9 +398,13 @@ public class ShopMenu : MonoBehaviour
                     carDisplay.ConfirmBuy();
                     break;
                 case MenuType.PART_BUY_MENU:
+                    carSelectorUI.SetActive(false);
+                    customizationUI.SetActive(true);
                     garageUIManager.ConfirmBuyPart(garageUIManager.previousPartType, garageUIManager.previousPartIndex);
                     break;
                 case MenuType.PAINT_BUY_MENU:
+                    carSelectorUI.SetActive(false);
+                    customizationUI.SetActive(true);
                     garageUIManager.UseSavedPaintButton();
                     garageUIManager.SetColor(garageUIManager.previousPaintPrice);
                     break;
@@ -425,6 +431,8 @@ public class ShopMenu : MonoBehaviour
     public void HandleEntranceFromGarageMenu(int previousMenu)
     {
         cameFromGarageMenu = true;
+        carSelectorUI.SetActive(true);
+        customizationUI.SetActive(false);
         mainMenuScript.inGarage = false;
         previousMenuType = (MenuType) previousMenu;
     }

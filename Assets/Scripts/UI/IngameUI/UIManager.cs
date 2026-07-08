@@ -29,8 +29,8 @@ public class UIManager : MonoBehaviour
     private Color yellow = new(1f, 0.96f, 0f, 1f);
     private Color teal = new(0.47f, 0.96f, 1f, 1f);
     public GameObject recoverChoicePanel;           // parent container for the two buttons and cost label
-    public UnityEngine.UI.Button recoverButton;     // “Recover (x nitro)”
-    public UnityEngine.UI.Button finishButton;      // “End Run”
+    public UnityEngine.UI.Button recoverButton;     // "Recover (x nitro)"
+    public UnityEngine.UI.Button finishButton;      // "End Run"
     public TextMeshProUGUI recoverCostText;         // displays current nitro cost
     private int currentRecoverNitroCost = 1;
     private bool recoverDecisionMade = false;
@@ -60,6 +60,11 @@ public class UIManager : MonoBehaviour
     private Color fadeOutEndColorImage = new Color(0f, 0f, 0f, 0f);
     public GameObject lanesplit;
     public Graphic lanesplitimage;
+
+    // Variables for the song name popup.
+    private TextMeshProUGUI songPopupText;
+    private Coroutine songPopupCoroutine;
+    private Color songPopupBaseColor;
 
     // Variables for life counter.
     public GameObject lives;
@@ -327,7 +332,7 @@ public class UIManager : MonoBehaviour
             nitroEarnedTextInstance.lineSpacing = -35f;
             nitroEarnedTextInstance.fontSize = 45f;
 
-            // Static, one-off message – no script should change this anymore
+            // Static, one-off message - no script should change this anymore
             nitroEarnedTextInstance.text = $"<b><i>+{nitrosEarned} nitro earned !</i></b>";
         }
 
@@ -1208,10 +1213,114 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /*---------------------------------------- SONG NAME POPUP ----------------------------------------*/
+    // Display the artist and song name at the bottom of the screen with a quick pop-in and fade-out.
+    public void ShowSongPopup(string artist, string songName)
+    {
+        EnsureSongPopup();
+
+        songPopupText.text = $"{artist} - {songName}";
+
+        if (songPopupCoroutine != null) StopCoroutine(songPopupCoroutine);
+        songPopupCoroutine = StartCoroutine(SongPopupCoroutine());
+    }
+
+    // Lazily build the popup by cloning the HUD distance text so it inherits the exact HUD font & material.
+    private void EnsureSongPopup()
+    {
+        if (songPopupText != null) return;
+
+        songPopupText = Instantiate(distance, transform); // 'transform' is the Canvas (UIManager lives on it).
+        songPopupText.gameObject.name = "SongNamePopup";
+        songPopupText.gameObject.SetActive(true);
+
+        // Strip any HUD-specific behaviours that may have been copied along with the text.
+        var nitro = songPopupText.GetComponent<NitroManager>();
+        if (nitro != null) Destroy(nitro);
+        var credit = songPopupText.GetComponent<CreditManager>();
+        if (credit != null) Destroy(credit);
+
+        // Anchor to the bottom-center of the screen.
+        RectTransform rt = songPopupText.rectTransform;
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.pivot = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = new Vector2(0f, 80f);
+        rt.sizeDelta = new Vector2(1600f, 60f);
+        rt.localScale = Vector3.one;
+
+        // Same HUD font, smaller size.
+        songPopupText.enableAutoSizing = false;
+        songPopupText.fontSize = 28f;
+        songPopupText.alignment = TextAlignmentOptions.Center;
+        songPopupText.overflowMode = TextOverflowModes.Overflow;
+        songPopupText.raycastTarget = false;
+
+        songPopupBaseColor = teal;
+        SetSongPopupAlpha(0f);
+        songPopupText.gameObject.SetActive(false);
+    }
+
+    private IEnumerator SongPopupCoroutine()
+    {
+        songPopupText.gameObject.SetActive(true);
+        RectTransform rt = songPopupText.rectTransform;
+
+        const float inTime = 0.35f;
+        const float holdTime = 3.5f;
+        const float outTime = 0.6f;
+
+        // Pop-in: overshoot scale with an ease-out-back curve, fading alpha in.
+        float t = 0f;
+        while (t < inTime)
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / inTime);
+            float scale = Mathf.LerpUnclamped(0.6f, 1f, EaseOutBack(p));
+            rt.localScale = new Vector3(scale, scale, 1f);
+            SetSongPopupAlpha(p);
+            yield return null;
+        }
+        rt.localScale = Vector3.one;
+        SetSongPopupAlpha(1f);
+
+        // Hold on screen.
+        yield return new WaitForSeconds(holdTime);
+
+        // Fade out.
+        t = 0f;
+        while (t < outTime)
+        {
+            t += Time.deltaTime;
+            float p = Mathf.Clamp01(t / outTime);
+            SetSongPopupAlpha(1f - p);
+            yield return null;
+        }
+
+        SetSongPopupAlpha(0f);
+        songPopupText.gameObject.SetActive(false);
+        songPopupCoroutine = null;
+    }
+
+    private void SetSongPopupAlpha(float a)
+    {
+        Color c = songPopupBaseColor;
+        c.a = a;
+        songPopupText.color = c;
+    }
+
+    // Ease-out-back easing for a subtle overshoot "pop".
+    private float EaseOutBack(float x)
+    {
+        const float c1 = 1.70158f;
+        const float c3 = c1 + 1f;
+        return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+    }
+
     // Exit out of level into the main menu.
     public void ExitToMainMenu()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene(0);
+        SceneLoader.Go(0);
     }
 }

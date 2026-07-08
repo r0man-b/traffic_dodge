@@ -806,6 +806,7 @@ public class GarageUIManager : MonoBehaviour
     // Enter customization menu.
     public void EnterCustomizationMenu(bool entering)
     {
+        // TODO: Add reset logic here
         if (entering)
         {
             customizationUI.SetActive(true);
@@ -889,7 +890,19 @@ public class GarageUIManager : MonoBehaviour
             bool isPartOwned = carData.CarParts[currentPartIndex].Ownership.TryGetValue(i, out bool owned) && owned;
 
             int tempIndex = i;
-            newButton.onClick.AddListener(() => ConfirmBuyPart(tempIndex, partIndex));
+
+            // If part is lootbox only don't add a confirm buy part listener.
+            if (!isPartOwned && carParts[partIndex][i].carPartData.lootboxOnly)
+            {
+                newButton.onClick.AddListener(() => ConfirmBuyPart(tempIndex, partIndex));
+            }
+
+            // Otherwise add the confirm buy listener and remove the listeners that lead to the shop.
+            else
+            {
+                newButton.onClick = new Button.ButtonClickedEvent();
+                newButton.onClick.AddListener(() => ConfirmBuyPart(tempIndex, partIndex));
+            }
 
             TextMeshProUGUI[] texts = newButton.GetComponentsInChildren<TextMeshProUGUI>();
             Image image = newButton.GetComponentsInChildren<Image>()[0];
@@ -912,6 +925,8 @@ public class GarageUIManager : MonoBehaviour
                     texts[1].text = "INSTALLED";
                 else if (isPartOwned)
                     texts[1].text = "OWNED";
+                else if (carParts[partIndex][i].carPartData.lootboxOnly)
+                    texts[1].text = "UNLOCK IN SHOP";
                 else
                     texts[1].text = carParts[partIndex][i].price.ToString("F0") + " cr";
             }
@@ -971,6 +986,8 @@ public class GarageUIManager : MonoBehaviour
     {
         previousPartType = partType;
         previousPartIndex = partIndex;
+
+        if (carParts[partIndex][partType].carPartData.lootboxOnly) return;
 
         var saveData = SaveManager.Instance.SaveData;
 
@@ -1083,6 +1100,12 @@ public class GarageUIManager : MonoBehaviour
         notEnoughCreditsPopUp.SetActive(false);
         buyConfirmationPopUp.SetActive(false);
         popUps.SetActive(false);
+    }
+
+    public void SetPreviousPartTypeAndIndex()
+    {
+        previousPartType = currentInstantiatedButtonIndex;
+        previousPartIndex = currentPartIndex;
     }
 
     public void EnterPreviousBucket()

@@ -24,8 +24,8 @@ public class MainMenu : MonoBehaviour
     // Start the game from the main menu.
     public void PlayGame()
     {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex + 1);
         MenuMusic.Stop();
+        SceneLoader.Go(SceneManager.GetActiveScene().buildIndex + 1);
     }
 
     // Replay the current level.

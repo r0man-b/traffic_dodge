@@ -7,6 +7,7 @@ public class CarPartData : ScriptableObject
 {
     [Header("Attributes")]
     public float price;
+    public bool lootboxOnly;
 
     [Header("Exhaust Flames (Tube -> Flames)")]
     public ExhaustFlameTube[] exhaustFlameTubes;

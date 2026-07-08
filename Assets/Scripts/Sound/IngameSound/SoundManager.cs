@@ -45,9 +45,13 @@ public class SoundManager : MonoBehaviour
     public AudioClip crash1;
     public AudioClip woosh;
 
-    // Array to store songs.
+    // Array to store songs (populated at runtime from songList).
     public AudioSource[] songs;
     public int currentSongIndex = 0;
+
+    // Song metadata components, one per song child GameObject under the song container.
+    // Each Song provides the artist and song name displayed when a new track begins.
+    public Song[] songList;
 
     // Array to store engine sounds.
     public AudioSource[] enginesounds;
@@ -85,15 +89,22 @@ public class SoundManager : MonoBehaviour
         GameObject CanvasObject = GameObject.Find("Canvas");
         uiManager = CanvasObject.GetComponent<UIManager>();
 
-        // Set up car song radio.
-        songs = songsource.GetComponents<AudioSource>();
+        // Set up car song radio from the Song components (each on its own child GameObject).
+        songs = new AudioSource[songList.Length];
+        for (int i = 0; i < songList.Length; i++)
+        {
+            songs[i] = songList[i].source;
+        }
+        // Keep songsource pointing at a valid song AudioSource for registration/volume snapshots.
+        songsource = songs[0];
+
         SaveData saveData = SaveManager.Instance.SaveData;
         currentSongIndex = saveData.LastRaceSongIndex;
         currentSongIndex = (currentSongIndex + 1) % songs.Length;
         saveData.LastRaceSongIndex = currentSongIndex;
-        foreach (AudioSource songsource in songs)
+        foreach (AudioSource source in songs)
         {
-            songsource.volume = saveData.MusicVolume;
+            source.volume = saveData.MusicVolume;
         }
         SaveManager.Instance.SaveGame();
 
@@ -297,6 +308,7 @@ public class SoundManager : MonoBehaviour
         {
             enginesounds[0].Play();
             songs[currentSongIndex].Play();
+            AnnounceSong(currentSongIndex);
             songplayed = true;
         }
 
@@ -347,6 +359,21 @@ public class SoundManager : MonoBehaviour
                 explosplayed = true;
             }
         }
+    }
+
+
+    // Show a bottom-of-screen popup with the current song's artist and name.
+    private void AnnounceSong(int index)
+    {
+        if (uiManager == null || songList == null || index < 0 || index >= songList.Length) return;
+
+        Song song = songList[index];
+        if (song == null) return;
+
+        string artist = string.IsNullOrEmpty(song.artist) ? "Unknown Artist" : song.artist;
+        string title = string.IsNullOrEmpty(song.songName) ? "Unknown Track" : song.songName;
+
+        uiManager.ShowSongPopup(artist, title);
     }
 
 
@@ -600,6 +627,7 @@ public class SoundManager : MonoBehaviour
         float elapsedTime = 0f;
         float originalSourceFromVolume = sourceFrom.volume;
         float originalSourceToVolume = sourceTo.volume;
+        bool songAnnounced = false;
 
         sourceTo.volume = 0f;
         sourceTo.Play();
@@ -614,6 +642,11 @@ public class SoundManager : MonoBehaviour
                 float t = elapsedTime / duration;
                 sourceFrom.volume = Mathf.Lerp(originalSourceFromVolume, 0f, t);
                 sourceTo.volume = Mathf.Lerp(0f, originalSourceToVolume, t);
+                if (t > 0.5f && !songAnnounced)
+                {
+                    if (isSong) AnnounceSong(currentSongIndex);
+                    songAnnounced = true;
+                }
             }
             else
             {
