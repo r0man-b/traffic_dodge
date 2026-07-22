@@ -140,4 +140,7 @@ public class SaveData
     public bool ImperialUnits = true;
 
     // Menu/OptionsMenu/LanguageSettings.cs
+
+    // Game/TutorialManager.cs
+    public bool tutorialCompleted = false;
 }

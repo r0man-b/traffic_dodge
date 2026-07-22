@@ -115,6 +115,9 @@ public class PrefabManager : MonoBehaviour
     //  Vars for spawning traffic.
     public int maxCarsPerLane = 4;
     public float trafficDensity = 2;
+
+    // When true, normal traffic/powerup spawning is suppressed (used by the tutorial).
+    public bool tutorialActive = false;
     private float originalTrafficDensity;
     private bool useLowPolyTraffic = false;
     public Transform[] originalParent;
@@ -228,6 +231,9 @@ public class PrefabManager : MonoBehaviour
         // Get current environment.
         currentEnvironment = SaveManager.Instance.SaveData.CurrentEnvironment;
 
+        // The tutorial suppresses normal traffic/powerup spawning. It runs until the player completes it once.
+        tutorialActive = !SaveManager.Instance.SaveData.tutorialCompleted;
+
         // Start the clock.
         startTime = Time.time;
 
@@ -300,19 +306,22 @@ public class PrefabManager : MonoBehaviour
         SpawnPosteriorRoads();
         CreatePosteriorObjects();
 
-        // Spawn initial traffic cars.
-        for (int i = 0; i < maxCarsPerLane; i++)
+        // Spawn initial traffic cars (skipped during the tutorial so the road starts clean).
+        if (!tutorialActive)
         {
-            SpawnTraffic(0);
-            SpawnTraffic(1);
-            SpawnTraffic(2);
-            SpawnTraffic(3);
-            SpawnTraffic(4);
-            SpawnTraffic(5);
-            SpawnTraffic(6);
-            SpawnTraffic(7);
+            for (int i = 0; i < maxCarsPerLane; i++)
+            {
+                SpawnTraffic(0);
+                SpawnTraffic(1);
+                SpawnTraffic(2);
+                SpawnTraffic(3);
+                SpawnTraffic(4);
+                SpawnTraffic(5);
+                SpawnTraffic(6);
+                SpawnTraffic(7);
+            }
+            PutTrafficBehindPlayer();
         }
-        PutTrafficBehindPlayer();
 
         trafficDensity = Mathf.Max(1f, SaveManager.Instance.SaveData.TrafficDensity);
         if (trafficDensity < 0)
@@ -479,24 +488,27 @@ public class PrefabManager : MonoBehaviour
         else playerController.tornadoExplodeCars = false;
 
         // Play the soundManager's 'woosh' sound if the player is passing a traffic car.
+        // (Guard against empty neighbor lanes â€” e.g. during the tutorial the lane pools are empty.)
         if (playerController.raceStarted && playerController.currentLane != 0)
         {
-            if (allLaneTraffic[playerController.currentLane - 1][0] != leftCar && allLaneTraffic[playerController.currentLane - 1][0].transform.position.z < playerPosZ + 1.5f)
+            List<GameObject> leftLane = allLaneTraffic[playerController.currentLane - 1];
+            if (leftLane.Count > 0 && leftLane[0] != leftCar && leftLane[0].transform.position.z < playerPosZ + 1.5f)
             {
                 soundManager.PlayWoosh(true);
                 if (!playerController.gameEnd && !playerController.aggro && !playerController.tornado)
-                    AwardTrafficPassCredits(true, allLaneTraffic[playerController.currentLane - 1][0]);  // LEFT side popup
-                leftCar = allLaneTraffic[playerController.currentLane - 1][0];
+                    AwardTrafficPassCredits(true, leftLane[0]);  // LEFT side popup
+                leftCar = leftLane[0];
             }
         }
         if (playerController.raceStarted && playerController.currentLane != 7)
         {
-            if (allLaneTraffic[playerController.currentLane + 1][0] != rightCar && allLaneTraffic[playerController.currentLane + 1][0].transform.position.z < playerPosZ + 1.5f) // TODO: Fix index out of range exception
+            List<GameObject> rightLane = allLaneTraffic[playerController.currentLane + 1];
+            if (rightLane.Count > 0 && rightLane[0] != rightCar && rightLane[0].transform.position.z < playerPosZ + 1.5f)
             {
                 soundManager.PlayWoosh(false);
                 if (!playerController.gameEnd && !playerController.aggro && !playerController.tornado)
-                    AwardTrafficPassCredits(false, allLaneTraffic[playerController.currentLane + 1][0]); ; // RIGHT side popup
-                rightCar = allLaneTraffic[playerController.currentLane + 1][0];
+                    AwardTrafficPassCredits(false, rightLane[0]); // RIGHT side popup
+                rightCar = rightLane[0];
             }
         }
 
@@ -555,41 +567,45 @@ public class PrefabManager : MonoBehaviour
                 break;
         }
 
-        if (lane0traffic.Count < maxCarsPerLane) SpawnTraffic(0);
-        if (lane1traffic.Count < maxCarsPerLane) SpawnTraffic(1);
-        if (lane2traffic.Count < maxCarsPerLane) SpawnTraffic(2);
-        if (lane3traffic.Count < maxCarsPerLane) SpawnTraffic(3);
-        if (lane4traffic.Count < maxCarsPerLane) SpawnTraffic(4);
-        if (lane5traffic.Count < maxCarsPerLane) SpawnTraffic(5);
-        if (lane6traffic.Count < maxCarsPerLane) SpawnTraffic(6);
-        if (lane7traffic.Count < maxCarsPerLane) SpawnTraffic(7);
+        if (!tutorialActive)
+        {
+            if (lane0traffic.Count < maxCarsPerLane) SpawnTraffic(0);
+            if (lane1traffic.Count < maxCarsPerLane) SpawnTraffic(1);
+            if (lane2traffic.Count < maxCarsPerLane) SpawnTraffic(2);
+            if (lane3traffic.Count < maxCarsPerLane) SpawnTraffic(3);
+            if (lane4traffic.Count < maxCarsPerLane) SpawnTraffic(4);
+            if (lane5traffic.Count < maxCarsPerLane) SpawnTraffic(5);
+            if (lane6traffic.Count < maxCarsPerLane) SpawnTraffic(6);
+            if (lane7traffic.Count < maxCarsPerLane) SpawnTraffic(7);
 
-        // Spawn a powerup.
-        if (!playerController.gameEnd && powerUpAllowedToSpawn && (Time.time - startTime) - powerUpSpawnTime >= Mathf.Max(-6.5f * playerController.accel + 30, 10)) SpawnPowerup();
+            // Spawn a powerup.
+            if (!playerController.gameEnd && powerUpAllowedToSpawn && (Time.time - startTime) - powerUpSpawnTime >= Mathf.Max(-6.5f * playerController.accel + 30, 10)) SpawnPowerup();
+        }
 
         // If a road is behind the player, move it to the front.
         if (activeRoads[0].transform.position.z < playerPosZ - 99) RecycleRoad();
 
         // If any car is behind the player, move it to the object pool.
+        // (Guard against empty lane lists â€” e.g. during the tutorial the lane pools are empty.)
         if (Time.time - startTime > 1)
         {
-            if (lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(0);
-            if (lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(1);
-            if (lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(2);
-            if (lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(3);
+            if (lane0traffic.Count > 0 && lane0traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(0);
+            if (lane1traffic.Count > 0 && lane1traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(1);
+            if (lane2traffic.Count > 0 && lane2traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(2);
+            if (lane3traffic.Count > 0 && lane3traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(3);
             if (!playerController.gameEnd) // Return same lane traffic if the traffic is behind the player.
             {
-                if (lane4traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(4);
-                if (lane5traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(5);
-                if (lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(6);
-                if (lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(7);
+                if (lane4traffic.Count > 0 && lane4traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(4);
+                if (lane5traffic.Count > 0 && lane5traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(5);
+                if (lane6traffic.Count > 0 && lane6traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(6);
+                if (lane7traffic.Count > 0 && lane7traffic[0].transform.position.z < playerPosZ - 5) ReturnTraffic(7);
             }
             else // Once the player has crashed and exploded, start returning same lane traffic that is 200 units in front of him.
             {
-                if (lane5traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(5);
-                if (lane4traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(4);
-                if (lane6traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(6);
-                if (lane7traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(7);
+                if (lane5traffic.Count > 0 && lane5traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(5);
+                if (lane4traffic.Count > 0 && lane4traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(4);
+                if (lane6traffic.Count > 0 && lane6traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(6);
+                if (lane7traffic.Count > 0 && lane7traffic[^1].transform.position.z > playerPosZ + 200) ReturnTraffic(7);
             }
         }
     }
@@ -1098,7 +1114,7 @@ public class PrefabManager : MonoBehaviour
     /*----------------------------------- TRAFFIC SPAWNING FUNCTIONS ----------------------------------*/
     public void PutTrafficBehindPlayer()
     {
-        // 1. Find max z position from last 4 elements of lane4traffic–lane7traffic
+        // 1. Find max z position from last 4 elements of lane4trafficâ€“lane7traffic
         float maxZ = float.MinValue;
 
         List<List<GameObject>> sameWayLanes = new List<List<GameObject>>()
@@ -1125,7 +1141,7 @@ public class PrefabManager : MonoBehaviour
         if (maxZ == float.MinValue)
             return; // No objects found
         maxZ += 10;
-        // 2. Subtract full value from lane4traffic–lane7traffic
+        // 2. Subtract full value from lane4trafficâ€“lane7traffic
         foreach (var lane in sameWayLanes)
         {
             if (lane == null) continue;
@@ -1139,7 +1155,7 @@ public class PrefabManager : MonoBehaviour
             }
         }
 
-        // 3. Subtract half value from lane0traffic–lane3traffic
+        // 3. Subtract half value from lane0trafficâ€“lane3traffic
         List<List<GameObject>> oppositeWayLanes = new List<List<GameObject>>()
         {
             lane0traffic,
@@ -1238,6 +1254,126 @@ public class PrefabManager : MonoBehaviour
         else laneList.Add(vehicle);
         currentTrafficPrefabList[vehicle_id].trafficVariations.RemoveAt(vehicle_variation);
         vehicle.SetActive(true);
+    }
+
+    // Spawn a specific vehicle type in a given lane at a set distance ahead of the player.
+    // Used by the tutorial to place a scripted obstacle (e.g. a big-rig, vehicle_id 0).
+    // Registers the vehicle in the normal lane pool so collision, passing credits and recycling all work as usual.
+    public GameObject SpawnSpecificVehicle(int lane /*0-7*/, int vehicle_id, float distanceAhead)
+    {
+        BaseTrafficList[] currentTrafficPrefabList = useLowPolyTraffic
+            ? trafficPrefabsLowPoly
+            : trafficPrefabs;
+
+        if (vehicle_id < 0 || vehicle_id >= currentTrafficPrefabList.Length) return null;
+        if (currentTrafficPrefabList[vehicle_id].trafficVariations.Count < 1) return null;
+
+        GameObject vehicle = currentTrafficPrefabList[vehicle_id].trafficVariations[0];
+        isBigrigByCar[vehicle] = (vehicle_id == 0);
+
+        float x = lane switch
+        {
+            0 => -11.5f,
+            1 => -8.5f,
+            2 => -5.5f,
+            3 => -2.5f,
+            4 => 1f,
+            5 => 4f,
+            6 => 7f,
+            7 => 10f,
+            _ => 1f
+        };
+
+        List<GameObject> laneList = lane switch
+        {
+            0 => lane0traffic,
+            1 => lane1traffic,
+            2 => lane2traffic,
+            3 => lane3traffic,
+            4 => lane4traffic,
+            5 => lane5traffic,
+            6 => lane6traffic,
+            7 => lane7traffic,
+            _ => lane4traffic
+        };
+
+        float z = playerPosZ + distanceAhead;
+        Vector3 spawnPos = new Vector3(x, vehicle.transform.position.y, z);
+        Quaternion rot = lane <= 3 ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
+
+        vehicle.transform.SetPositionAndRotation(spawnPos, rot);
+        laneList.Add(vehicle);
+        currentTrafficPrefabList[vehicle_id].trafficVariations.RemoveAt(0);
+        vehicle.SetActive(true);
+        return vehicle;
+    }
+
+    // ---------------------------- TUTORIAL BIG-RIG WALLS ----------------------------
+    private Transform tutorialObstacleParent;
+    private readonly List<GameObject> tutorialWalls = new List<GameObject>();
+
+    // Spawn a static "wall" of big rigs across all lanes except gapLane, at the given world Z.
+    // These are pure visual/collision obstacles for the tutorial and are intentionally NOT
+    // registered in the traffic lane pools, so they are untouched by the movement, pooling and
+    // pass-sound logic (which keeps the tutorial's empty lane pools crash-free).
+    // Pass gapLane = -1 to fill every lane (no gap). Returns the wall's Z position.
+    public float SpawnBigRigWall(float zPosition, int gapLane)
+    {
+        if (tutorialObstacleParent == null)
+            tutorialObstacleParent = new GameObject("TutorialObstacles").transform;
+
+        float y = original_traffic_y_positions[0]; // big-rig road height
+        for (int lane = 0; lane < 8; lane++)
+        {
+            if (lane == gapLane) continue;
+
+            float x = lane switch
+            {
+                0 => -11.5f,
+                1 => -8.5f,
+                2 => -5.5f,
+                3 => -2.5f,
+                4 => 1f,
+                5 => 4f,
+                6 => 7f,
+                7 => 10f,
+                _ => 1f
+            };
+            Quaternion rot = lane <= 3 ? Quaternion.Euler(0, 180, 0) : Quaternion.identity;
+
+            // Grab a big-rig template (vehicle_id 0) from a pool without removing it.
+            GameObject template = null;
+            int trafficVariationsIndex = Random.Range(0, trafficPrefabs[0].trafficVariations.Count);
+            if (trafficPrefabs.Length > 0 && trafficPrefabs[0].trafficVariations.Count > 0)
+            {
+                template = trafficPrefabs[0].trafficVariations[trafficVariationsIndex];
+            }
+
+            else if (trafficPrefabsLowPoly.Length > 0 && trafficPrefabsLowPoly[0].trafficVariations.Count > 0)
+            {
+                template = trafficPrefabsLowPoly[0].trafficVariations[trafficVariationsIndex];
+            }
+
+            if (template == null)
+            {
+                Debug.LogError("SpawnBigRigWall: no big-rig template available in traffic pools.");
+                return zPosition;
+            }
+
+            GameObject rig = Instantiate(template, new Vector3(x, y, zPosition), rot, tutorialObstacleParent);
+            rig.name = "TutorialBigRig_L" + lane;
+            rig.SetActive(true);
+            tutorialWalls.Add(rig);
+        }
+        return zPosition;
+    }
+
+    // Destroy all spawned tutorial obstacle walls.
+    public void ClearTutorialWalls()
+    {
+        foreach (GameObject w in tutorialWalls)
+            if (w != null) Destroy(w);
+        tutorialWalls.Clear();
     }
 
     // Return the 0th traffic car of the lane to the traffic pool.
