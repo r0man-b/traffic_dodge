@@ -335,7 +335,7 @@ public class TutorialManager : MonoBehaviour
         float g2 = prefabManager.SpawnBigRigWall(baseZ + 1 * GroupSpacing, 4);   // gap lane 4
         float g3 = prefabManager.SpawnBigRigWall(baseZ + 3 * GroupSpacing, 0);   // gap lane 0
         float g4 = prefabManager.SpawnBigRigWall(baseZ + 5 * GroupSpacing, 7);   // gap lane 7
-        float g5 = prefabManager.SpawnBigRigWall(baseZ + 6 * GroupSpacing, -1);  // no gap (lane-split)
+        float g5 = prefabManager.SpawnBigRigWall(baseZ + 5.75f * GroupSpacing, -1);  // no gap (lane-split)
 
         // Wait for the race to actually start, then let the player drive a moment.
         yield return new WaitUntil(() => playerController.raceStarted);
@@ -364,6 +364,7 @@ public class TutorialManager : MonoBehaviour
             HandMode.SplitBoth, g5);
 
         // 4) Finale — powerup showcase.
+        yield return new WaitForSecondsRealtime(1f);
         SetPaused(true);
         SetHands(HandMode.None);
         ShowFinalePopup();
@@ -431,7 +432,7 @@ public class TutorialManager : MonoBehaviour
             rt.anchorMin = new Vector2(cx, 0.5f);
             rt.anchorMax = new Vector2(cx, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(96f, 96f);
+            rt.sizeDelta = new Vector2(200f, 200f);
             ball.AddComponent<TutorialFloatBob>().Init(i * 0.5f);
         }
     }
@@ -503,12 +504,14 @@ public class TutorialManager : MonoBehaviour
     }
 }
 
-// Small floating bob for the powerup showcase icons (unscaled so it animates while paused).
+// Small floating bob for the powerup showcase icons.
+// Uses unscaled time so it continues animating while paused.
 public class TutorialFloatBob : MonoBehaviour
 {
     private RectTransform rt;
     private float phase;
     private float baseY;
+    private float i = 0f;
 
     public void Init(float phaseOffset)
     {
@@ -519,10 +522,16 @@ public class TutorialFloatBob : MonoBehaviour
 
     private void Update()
     {
-        if (rt == null) return;
+        if (rt == null)
+            return;
+
         float y = baseY + Mathf.Sin(Time.unscaledTime * 2f + phase) * 10f;
-        Vector2 p = rt.anchoredPosition;
-        p.y = y;
-        rt.anchoredPosition = p;
+
+        Vector2 position = rt.anchoredPosition;
+        position.y = y;
+        rt.anchoredPosition = position;
+
+        rt.localRotation = Quaternion.Euler(0f, 0f, i);
+        i += 2.5f;
     }
 }
